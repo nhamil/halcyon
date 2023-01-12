@@ -56,7 +56,7 @@ static void game_reset(game *g)
     vector_clear(&g->history); 
     memset(&g->pieces, 0, sizeof(g->pieces)); 
     memset(&g->colors, 0, sizeof(g->colors)); 
-    // g->check = BITBOARD_NONE; 
+    g->check = BITBOARD_NONE; 
     g->castle = CASTLE_NONE; 
     g->en_passant = SQUARE_NONE; 
     g->in_check = false; 
