@@ -9,7 +9,7 @@ endif()
 
 set(CMAKE_C_FLAGS "-Wall -Wextra -pedantic -m64 -Wno-unused-function -Wno-unused-result -Wno-unused-label")
 set(CMAKE_C_FLAGS_DEBUG "-g")
-set(CMAKE_C_FLAGS_RELEASE "-O3")
+set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops")
 
 include_directories(source) 
 
@@ -18,3 +18,4 @@ set(sources
 )
 
 add_executable(engine source/main.c ${sources})
+add_executable(perft source/perft.c ${sources})
