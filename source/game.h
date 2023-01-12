@@ -326,7 +326,7 @@ static inline void game_pop_move(game *g)
     g->turn = color_get_other(g->turn); 
 }
 
-static inline bool game_in_check(const game *g, color for_color, bitboard check_king) 
+static inline bool game_in_check(const game *g, color for_color, bitboard check_king, bitboard ignore) 
 {
     color col = for_color; 
     color opp = color_get_other(col); 
@@ -335,7 +335,7 @@ static inline bool game_in_check(const game *g, color for_color, bitboard check_
     bitboard target = check_king; 
 
     // blockers include both colors' pieces other than the target squares 
-    bitboard occupants = ((g->colors[col] & ~target) | g->colors[opp]); 
+    bitboard occupants = ((g->colors[col] & ~(target | ignore)) | g->colors[opp]); 
 
     bitboard attacks = BITBOARD_NONE; 
     bitboard tmp; 
@@ -459,13 +459,25 @@ static void game_push_move(game *g, move m)
     g->turn = color_get_other(g->turn); 
 
     // useful to know if the new player is in check 
-    g->in_check = game_in_check(g, g->turn, g->pieces[piece_make_colored(PIECE_K, g->turn)]); 
+    g->in_check = game_in_check(g, g->turn, g->pieces[piece_make_colored(PIECE_K, g->turn)], BITBOARD_NONE); 
 }
 
 static inline void game_movegen_push_bitboard_moves(bitboard b, square from, piece pc, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, {
+    BITBOARD_FOR_EACH_BIT(b, 
+    {
         VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, pc)); 
+    });
+}
+
+static inline void game_movegen_push_safe_moves(const game *g, bitboard b, square from, piece pc, vector *out) 
+{
+    BITBOARD_FOR_EACH_BIT(b, 
+    {
+        if (!game_in_check(g, g->turn, bitboard_make_position(sq), bitboard_make_position(from))) 
+        {
+            VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, pc)); 
+        }
     });
 }
 
@@ -484,7 +496,8 @@ static inline void game_movegen_push_allow_ep_moves(bitboard b, square from, pie
 
 static inline void game_movegen_push_promotion_moves(bitboard b, square from, piece pc, color col, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, {
+    BITBOARD_FOR_EACH_BIT(b, 
+    {
         VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, piece_make_colored(PIECE_Q, col))); 
         VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, piece_make_colored(PIECE_R, col))); 
         VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, piece_make_colored(PIECE_B, col))); 
@@ -494,7 +507,8 @@ static inline void game_movegen_push_promotion_moves(bitboard b, square from, pi
 
 static inline void game_movegen_push_might_take_en_passant_moves(const game *g, bitboard b, square from, piece pc, square ep, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, {
+    BITBOARD_FOR_EACH_BIT(b, 
+    {
         move m = move_make_take_en_passant(from, sq, pc, sq == ep); 
         vector_push(out, &m); 
 
@@ -502,7 +516,7 @@ static inline void game_movegen_push_might_take_en_passant_moves(const game *g, 
         {
             // TODO check if legal without trying the move 
             game_push_move((game *) g, m); 
-            if (game_in_check(g, color_get_other(g->turn), g->pieces[piece_make_colored(PIECE_K, color_get_other(g->turn))])) 
+            if (game_in_check(g, color_get_other(g->turn), g->pieces[piece_make_colored(PIECE_K, color_get_other(g->turn))], BITBOARD_NONE)) 
             {
                 vector_pop(out); 
             }
@@ -584,7 +598,7 @@ static inline void game_movegen_remove_illegal_moves(const game *state, size_t s
     {
         game_push_move(g, VECTOR_AT_TYPE(out, move, i)); 
 
-        if (game_in_check(g, color_get_other(g->turn), g->check)) 
+        if (game_in_check(g, color_get_other(g->turn), g->check, BITBOARD_NONE)) 
         {
             vector_set(out, i, vector_at(out, out->size - 1)); 
             vector_pop(out); 
@@ -604,41 +618,37 @@ static inline void game_movegen_add_king_moves(const game *g, color col, vector 
     bitboard not_cur_col = ~g->colors[col]; 
     bitboard attack; 
 
-    size_t start = out->size; 
-
     piece pc = piece_make_colored(PIECE_K, col); 
     BITBOARD_FOR_EACH_BIT(g->pieces[pc], 
     {
         attack = BITBOARD_KING_MOVES[sq] & not_cur_col; 
-        game_movegen_push_bitboard_moves(attack, sq, pc, out); 
+        game_movegen_push_safe_moves(g, attack, sq, pc, out); 
 
         int c_wk = 0 != (color_get_other(col) * ((g->castle & CASTLE_WK) != 0) * ((occupants & BITBOARD_EMPTY_WK) == 0)); 
         int c_wq = 0 != (color_get_other(col) * ((g->castle & CASTLE_WQ) != 0) * ((occupants & BITBOARD_EMPTY_WQ) == 0)); 
         int c_bk = 0 != (col * ((g->castle & CASTLE_BK) != 0) * ((occupants & BITBOARD_EMPTY_BK) == 0)); 
         int c_bq = 0 != (col * ((g->castle & CASTLE_BQ) != 0) * ((occupants & BITBOARD_EMPTY_BQ) == 0)); 
 
-        if (c_wk) 
+        if (c_wk && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_WK], BITBOARD_NONE)) 
         {
             game_movegen_push_castle_move(SQUARE_E1, SQUARE_G1, PIECE_WK, MOVE_CASTLE_WK, out); 
         }
 
-        if (c_wq) 
+        if (c_wq && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_WQ], BITBOARD_NONE)) 
         {
             game_movegen_push_castle_move(SQUARE_E1, SQUARE_C1, PIECE_WK, MOVE_CASTLE_WQ, out); 
         }
 
-        if (c_bk) 
+        if (c_bk && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_BK], BITBOARD_NONE)) 
         {
             game_movegen_push_castle_move(SQUARE_E8, SQUARE_G8, PIECE_BK, MOVE_CASTLE_BK, out); 
         }
 
-        if (c_bq) 
+        if (c_bq && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_BQ], BITBOARD_NONE)) 
         {
             game_movegen_push_castle_move(SQUARE_E8, SQUARE_C8, PIECE_BK, MOVE_CASTLE_BQ, out); 
         }
     });
-
-    game_movegen_remove_illegal_moves(g, start, out); 
 }
 
 static inline void game_movegen_add_knight_moves(const game *g, color col, bitboard ok_squares, const bitboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
