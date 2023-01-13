@@ -60,13 +60,13 @@ cleanup:
 perft_data tests[] = 
 {
     // https://www.chessprogramming.org/Perft_Results
-    { .fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", { 1ULL, 20ULL, 400ULL, 8902ULL, 197281ULL, 4865609ULL, 119060324ULL, 0, 3195901860ULL, 0 } }, 
-    { .fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -", { 1ULL, 48ULL, 2039ULL, 97862ULL, 4085603ULL, 193690690ULL, 0, 8031647685ULL, 0 } }, 
+    { .fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", { 1ULL, 20ULL, 400ULL, 8902ULL, 197281ULL, 4865609ULL, 119060324ULL, 3195901860ULL, 0 } }, 
+    { .fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -", { 1ULL, 48ULL, 2039ULL, 97862ULL, 4085603ULL, 193690690ULL, 8031647685ULL, 0 } }, 
     { .fen = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -", { 1ULL, 14ULL, 191ULL, 2812ULL, 43238ULL, 674624ULL, 11030083ULL, 0 } }, 
     { .fen = "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1", { 1ULL, 6ULL, 264ULL, 9467ULL, 422333ULL, 15833292ULL, 706045033ULL, 0 } }, 
     { .fen = "r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1", { 1ULL, 6ULL, 264ULL, 9467ULL, 422333ULL, 15833292ULL, 706045033ULL, 0 } }, 
     { .fen = "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8", { 1ULL, 44ULL, 1486ULL, 62379ULL, 2103487ULL, 89941194ULL, 0 } }, 
-    { .fen = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", { 1ULL, 46ULL, 2079ULL, 89890ULL, 3894594ULL, 164075551ULL, 0, 6923051137ULL, 0 } }, 
+    { .fen = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10", { 1ULL, 46ULL, 2079ULL, 89890ULL, 3894594ULL, 164075551ULL, 6923051137ULL, 0 } }, 
     { .fen = "4k3/8/8/8/8/8/8/4K2R w K - 0 1 ", .expected = { 1ULL, 15ULL, 66ULL, 1197ULL, 7059ULL, 133987ULL, 764643ULL, 0 } }, 
     // http://www.rocechess.ch/perftsuite.zip
     { .fen = "4k3/8/8/8/8/8/8/R3K3 w Q - 0 1 ", .expected = { 1ULL, 16ULL, 71ULL, 1287ULL, 7626ULL, 145232ULL, 846648ULL, 0 } }, 
@@ -192,19 +192,6 @@ perft_data tests[] =
     { .fen = "n1n5/1Pk5/8/8/8/8/5Kp1/5N1N b - - 0 1 ", .expected = { 1ULL, 24ULL, 421ULL, 7421ULL, 124608ULL, 2193768ULL, 37665329ULL, 0 } }, 
     { .fen = "8/PPPk4/8/8/8/8/4Kppp/8 b - - 0 1 ", .expected = { 1ULL, 18ULL, 270ULL, 4699ULL, 79355ULL, 1533145ULL, 28859283ULL, 0 } }, 
     { .fen = "n1n5/PPPk4/8/8/8/8/4Kppp/5N1N b - - 0 1 ", .expected = { 1ULL, 24ULL, 496ULL, 9483ULL, 182838ULL, 3605103ULL, 71179139ULL, 0 } }, 
-};
-
-uint64_t pos6[] = 
-{
-    1ULL, 
-    46ULL, 
-    2079ULL, 
-    89890ULL, 
-    3894594ULL, 
-    0,
-    164075551ULL, 
-    6923051137ULL, 
-    0
 };
 
 int main(void) 
