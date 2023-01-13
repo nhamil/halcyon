@@ -48,6 +48,8 @@ bool perft(const char *name, const char *fen, const uint64_t *expected)
             ret = 0; 
             // goto cleanup; 
         }
+
+        fflush(stdout); 
     }
 
     printf("DONE\n\n"); 

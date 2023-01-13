@@ -57,9 +57,8 @@ static inline void *vector_at(vector *v, size_t index)
 
 static inline void vector_push(vector *v, const void *in) 
 {
-    vector_reserve(v, v->size); 
-    memcpy(vector_at(v, v->size), in, v->elem_size); 
-    v->size++; 
+    vector_reserve(v, v->size + 1); 
+    memcpy(vector_at(v, v->size++), in, v->elem_size); 
 }
 
 static inline void *vector_push_empty(vector *v) 
