@@ -2,14 +2,14 @@
 
 #include <stdint.h> 
 
-typedef struct random_state random_state; 
+typedef struct rng_state rng_state; 
 
-struct random_state 
+struct rng_state 
 {
     uint64_t state; 
 };
 
-static void random_init(random_state *r, uint64_t state) 
+static void rng_init(rng_state *r, uint64_t state) 
 {
     if (state == 0) 
     {
@@ -18,7 +18,7 @@ static void random_init(random_state *r, uint64_t state)
     r->state = state; 
 }
 
-static inline uint64_t random_next(random_state *r) 
+static inline uint64_t rng_next(rng_state *r) 
 {
     uint64_t x = r->state; 
     x ^= x >> 12; 
@@ -28,39 +28,39 @@ static inline uint64_t random_next(random_state *r)
     return x; // * 0x2545F4914F6CDD1DULL; 
 }
 
-static inline uint32_t random_next_u32(random_state *r) 
+static inline uint32_t rng_next_u32(rng_state *r) 
 {
-    return (uint32_t) random_next(r); 
+    return (uint32_t) rng_next(r); 
 }
 
-static inline uint32_t random_next_s32(random_state *r) 
+static inline uint32_t rng_next_s32(rng_state *r) 
 {
-    uint32_t x = random_next_u32(r); 
+    uint32_t x = rng_next_u32(r); 
     return *(int32_t *) &x; 
 }
 
-static inline uint64_t random_next_u64(random_state *r) 
+static inline uint64_t rng_next_u64(rng_state *r) 
 {
-    return (random_next(r) & 0xFFFFFFFF) << 32 | (random_next(r) & 0xFFFFFFFF); 
+    return (rng_next(r) & 0xFFFFFFFF) << 32 | (rng_next(r) & 0xFFFFFFFF); 
 }
 
-static inline uint64_t random_next_s64(random_state *r) 
+static inline uint64_t rng_next_s64(rng_state *r) 
 {
-    uint64_t x = random_next_u64(r); 
+    uint64_t x = rng_next_u64(r); 
     return *(int64_t *) &x; 
 }
 
-static inline int random_next_int(random_state *r) 
+static inline int rng_next_int(rng_state *r) 
 {
-    return (int) random_next_s32(r); 
+    return (int) rng_next_s32(r); 
 }
 
-static inline long random_next_long(random_state *r) 
+static inline long rng_next_long(rng_state *r) 
 {
-    return (long) random_next_s64(r); 
+    return (long) rng_next_s64(r); 
 }
 
-static inline long long random_next_long_long(random_state *r) 
+static inline long long rng_next_long_long(rng_state *r) 
 {
-    return (long long) random_next_s64(r); 
+    return (long long) rng_next_s64(r); 
 }

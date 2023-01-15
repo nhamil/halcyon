@@ -5,7 +5,7 @@
 #include <string.h> 
 #include <pthread.h> 
 
-#include "bitboard.h" 
+#include "bboard.h" 
 #include "castle.h"
 #include "game.h" 
 #include "move.h"
@@ -16,93 +16,95 @@
 
 #define UCI_MAX_INPUT 4096
 
-const char *uci_next_token(void) 
+const char *uci_next(void) 
 {
     return strtok(NULL, " \n"); 
 }
 
-bool uci_equals(const char *a, const char *b) 
+bool uci_eq(const char *a, const char *b) 
 {
     if (!a || !b) return false; 
 
     return strcmp(a, b) == 0; 
 }
 
-bool uci_command_uci(game *g) 
+bool uci_cmd_uci(game *g) 
 {
+    (void) g; 
     printf("id name chess-engine 0.1\n"); 
     printf("id author Nicholas Hamilton\n"); 
     printf("uciok\n"); 
     return true; 
 }
 
-bool uci_command_isready(game *g) 
+bool uci_cmd_isready(game *g) 
 {
+    (void) g; 
     printf("readyok\n"); 
     return true; 
 }
 
-bool uci_command_position(game *g) 
+bool uci_cmd_position(game *g) 
 {
-    vector moves; 
-    VECTOR_CREATE_TYPE(&moves, move); 
+    vector moves;  
+    VEC_CREATE(&moves, move); 
 
-    const char *token = uci_next_token(); 
+    const char *tok = uci_next(); 
 
     bool success = true; 
 
-    if (uci_equals(token, "startpos")) 
+    if (uci_eq(tok, "startpos")) 
     {
-        game_load_fen(g, GAME_STARTING_FEN); 
-        token = uci_next_token(); 
+        gm_load_fen(g, GM_START_FEN); 
+        tok = uci_next(); 
     }
-    else if (uci_equals(token, "fen")) 
+    else if (uci_eq(tok, "fen")) 
     {
-        // need to recreate FEN from token list 
+        // need to recreate FEN from tok list 
         char fen[UCI_MAX_INPUT]; 
         fen[0] = '\0'; 
-        while ((token = uci_next_token()) && !uci_equals(token, "moves")) 
+        while ((tok = uci_next()) && !uci_eq(tok, "moves")) 
         {
-            strcpy(fen + strlen(fen), token); 
+            strcpy(fen + strlen(fen), tok); 
             size_t len = strlen(fen); 
             fen[len] = ' '; 
             fen[len + 1] = '\0'; 
         }
-        // token is NULL or "moves" at this point 
+        // tok is NULL or "moves" at this point 
 
-        game_load_fen(g, fen); 
+        gm_load_fen(g, fen); 
     }
 
-    if (uci_equals(token, "moves")) 
+    if (uci_eq(tok, "moves")) 
     {
-        while (token = uci_next_token()) 
+        while ((tok = uci_next())) 
         {
-            vector_clear(&moves); 
-            game_generate_moves(g, &moves); 
+            vec_clear(&moves); 
+            gm_mvs(g, &moves); 
 
-            piece promote = PIECE_P; 
+            piece pro = PC_P; 
 
-            if (strlen(token) == 4) 
+            if (strlen(tok) == 4) 
             {
                 // from -> to no promotion 
-                if (!(token[0] >= 'a' && token[0] <= 'h' && token[2] >= 'a' && token[2] <= 'h' && token[1] >= '1' && token[1] <= '8' && token[3] >= '1' && token[3] <= '8')) 
+                if (!(tok[0] >= 'a' && tok[0] <= 'h' && tok[2] >= 'a' && tok[2] <= 'h' && tok[1] >= '1' && tok[1] <= '8' && tok[3] >= '1' && tok[3] <= '8')) 
                 {
                     success = false; goto done; 
                 }
             }
-            else if (strlen(token) == 5) 
+            else if (strlen(tok) == 5) 
             {
                 // from -> to with promotion 
-                if (!(token[0] >= 'a' && token[0] <= 'h' && token[2] >= 'a' && token[2] <= 'h' && token[1] >= '1' && token[1] <= '8' && token[3] >= '1' && token[3] <= '8' && (token[4] == 'q' || token[4] == 'r' || token[4] == 'b' || token[4] == 'n'))) 
+                if (!(tok[0] >= 'a' && tok[0] <= 'h' && tok[2] >= 'a' && tok[2] <= 'h' && tok[1] >= '1' && tok[1] <= '8' && tok[3] >= '1' && tok[3] <= '8' && (tok[4] == 'q' || tok[4] == 'r' || tok[4] == 'b' || tok[4] == 'n'))) 
                 {
                     success = false; goto done; 
                 }
                 else 
                 {
-                    if (token[4] == 'q') promote = PIECE_Q; 
-                    if (token[4] == 'r') promote = PIECE_R; 
-                    if (token[4] == 'b') promote = PIECE_B; 
-                    if (token[4] == 'n') promote = PIECE_N; 
+                    if (tok[4] == 'q') pro = PC_Q; 
+                    if (tok[4] == 'r') pro = PC_R; 
+                    if (tok[4] == 'b') pro = PC_B; 
+                    if (tok[4] == 'n') pro = PC_N; 
                 }
             }
             else 
@@ -110,38 +112,38 @@ bool uci_command_position(game *g)
                 success = false; goto done; 
             }
 
-            square from = square_make(token[0] - 'a', token[1] - '1'); 
-            square to = square_make(token[2] - 'a', token[3] - '1'); 
+            square from = sq_make(tok[0] - 'a', tok[1] - '1'); 
+            square to = sq_make(tok[2] - 'a', tok[3] - '1'); 
 
-            printf("%s (%s) to %s\n", square_string(from), piece_string(game_piece_at(g, from)), square_string(to)); 
+            printf("%s (%s) to %s\n", sq_str(from), pc_str(gm_pc_at(g, from)), sq_str(to)); 
 
-            // if promote is still pawn, then it wasn't promoted -> get the real original piece
-            if (promote == PIECE_P) 
+            // if pro is still pawn, then it wasn't prod -> get the real original piece
+            if (pro == PC_P) 
             {
-                promote = piece_get_colorless(game_piece_at(g, from)); 
+                pro = pc_no_col(gm_pc_at(g, from)); 
             }
 
-            promote = piece_make_colored(promote, g->turn); 
+            pro = pc_make(pro, g->turn); 
 
-            printf("Piece: %s\n", piece_string(promote)); 
+            printf("Piece: %s\n", pc_str(pro)); 
 
             // make sure the complete move is legal 
             bool found = false; 
             for (size_t i = 0; i < moves.size; i++) 
             {
-                move m = VECTOR_AT_TYPE(&moves, move, i); 
-                move_print(m); 
-                if (move_get_from_square(m) == from && move_get_to_square(m) == to && move_get_promotion_piece(m) == promote) 
+                move m = VEC_AT(&moves, move, i); 
+                mv_print(m); 
+                if (mv_from_sq(m) == from && mv_to_sq(m) == to && mv_pro(m) == pro) 
                 {
                     found = true; 
-                    game_push_move(g, m); 
+                    gm_push_mv(g, m); 
                 }
             }
 
             // keep previous legal moves, only ignore remaining 
             if (!found) 
             {
-                printf("Could not find move '%s'\n", token); 
+                printf("Could not find move '%s'\n", tok); 
                 goto done; 
             }
         }
@@ -150,29 +152,29 @@ bool uci_command_position(game *g)
 done: 
     if (!success) 
     {
-        game_load_fen(g, GAME_STARTING_FEN); 
+        gm_load_fen(g, GM_START_FEN); 
     }
 
-    vector_destroy(&moves); 
+    vec_destroy(&moves); 
     return success; 
 }
 
-bool uci_command_print(game *g) 
+bool uci_cmd_print(game *g) 
 {
-    game_print(g); 
+    gm_print(g); 
     return true; 
 }
 
-bool uci_command_go(game *g) 
+bool uci_cmd_go(game *g) 
 {
-    const char *token; 
+    const char *tok; 
     int depth = -1; 
 
-    while (token = uci_next_token()) 
+    while ((tok = uci_next())) 
     {
-        if (uci_equals(token, "depth") && (token = uci_next_token())) 
+        if (uci_eq(tok, "depth") && (tok = uci_next())) 
         {
-            depth = atoi(token); 
+            depth = atoi(tok); 
         }
     }
 
@@ -185,11 +187,11 @@ bool uci_command_go(game *g)
 
     int eval = 0; 
     vector pv; 
-    VECTOR_CREATE_TYPE(&pv, move); 
+    VEC_CREATE(&pv, move); 
 
-    game_search(g, depth, &pv, &eval); 
+    gm_search(g, depth, &pv, &eval); 
 
-    vector_destroy(&pv); 
+    vec_destroy(&pv); 
     return true; 
 }
 
@@ -201,15 +203,15 @@ bool uci_parse(game *g, const char *orig_cmd)
     char cmd[UCI_MAX_INPUT]; 
     strcpy(cmd, orig_cmd); 
 
-    char *token = strtok(cmd, " \n"); 
-    if (token) 
+    char *tok = strtok(cmd, " \n"); 
+    if (tok) 
     {
-        if (uci_equals(token, "quit")) exit(0); 
-        if (uci_equals(token, "uci")) return uci_command_uci(g); 
-        if (uci_equals(token, "isready")) return uci_command_isready(g); 
-        if (uci_equals(token, "position")) return uci_command_position(g); 
-        if (uci_equals(token, "d")) return uci_command_print(g); 
-        if (uci_equals(token, "go")) return uci_command_go(g); 
+        if (uci_eq(tok, "quit")) exit(0); 
+        if (uci_eq(tok, "uci")) return uci_cmd_uci(g); 
+        if (uci_eq(tok, "isready")) return uci_cmd_isready(g); 
+        if (uci_eq(tok, "position")) return uci_cmd_position(g); 
+        if (uci_eq(tok, "d")) return uci_cmd_print(g); 
+        if (uci_eq(tok, "go")) return uci_cmd_go(g); 
     }
 
     return false; 
@@ -221,7 +223,7 @@ int main(void)
     fflush(stdout); 
 
     game g; 
-    game_create_fen(&g, GAME_STARTING_FEN); 
+    gm_create_fen(&g, GM_START_FEN); 
 
     FILE *tmp = fopen("C:\\Users\\Nicholas\\Documents\\Code\\chess-engine\\build\\input.txt", "a"); 
     fprintf(tmp, "NEW RUN\n"); 
@@ -239,6 +241,6 @@ int main(void)
 
     fclose(tmp); 
 
-    game_destroy(&g); 
+    gm_destroy(&g); 
     return 0; 
 }

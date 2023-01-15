@@ -1,7 +1,7 @@
 #include <stdio.h> 
 #include <time.h> 
 
-#include "bitboard.h" 
+#include "bboard.h" 
 #include "castle.h"
 #include "game.h" 
 #include "move.h"
@@ -27,16 +27,16 @@ bool perft(const char *name, const char *fen, const uint64_t *expected)
     bool ret = true; 
 
     game g; 
-    game_create_fen(&g, fen); 
+    gm_create_fen(&g, fen); 
 
     printf("%s\n%s\n", name, fen); 
-    game_print(&g); 
+    gm_print(&g); 
 
     int i = -1; 
     while (expected[++i] > 0) 
     {
         clock_t c = clock(); 
-        uint64_t total = game_perft(&g, i);
+        uint64_t total = gm_perft(&g, i);
         clock_t c2 = clock(); 
 
         double time = (double) (c2 - c) / CLOCKS_PER_SEC; 
@@ -55,7 +55,7 @@ bool perft(const char *name, const char *fen, const uint64_t *expected)
     printf("DONE\n\n"); 
 
 cleanup: 
-    game_destroy(&g); 
+    gm_destroy(&g); 
     return ret; 
 }
 

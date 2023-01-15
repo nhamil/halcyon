@@ -1,90 +1,90 @@
 #pragma once 
 
-#define SQUARE_NONE 0 
-#define SQUARE_A1 0
-#define SQUARE_B1 1
-#define SQUARE_C1 2
-#define SQUARE_D1 3
-#define SQUARE_E1 4
-#define SQUARE_F1 5
-#define SQUARE_G1 6
-#define SQUARE_H1 7
-#define SQUARE_A2 8
-#define SQUARE_B2 9
-#define SQUARE_C2 10
-#define SQUARE_D2 11
-#define SQUARE_E2 12
-#define SQUARE_F2 13
-#define SQUARE_G2 14
-#define SQUARE_H2 15
-#define SQUARE_A3 16
-#define SQUARE_B3 17
-#define SQUARE_C3 18
-#define SQUARE_D3 19
-#define SQUARE_E3 20
-#define SQUARE_F3 21
-#define SQUARE_G3 22
-#define SQUARE_H3 23
-#define SQUARE_A4 24
-#define SQUARE_B4 25
-#define SQUARE_C4 26
-#define SQUARE_D4 27
-#define SQUARE_E4 28
-#define SQUARE_F4 29
-#define SQUARE_G4 30
-#define SQUARE_H4 31
-#define SQUARE_A5 32
-#define SQUARE_B5 33
-#define SQUARE_C5 34
-#define SQUARE_D5 35
-#define SQUARE_E5 36
-#define SQUARE_F5 37
-#define SQUARE_G5 38
-#define SQUARE_H5 39
-#define SQUARE_A6 40
-#define SQUARE_B6 41
-#define SQUARE_C6 42
-#define SQUARE_D6 43
-#define SQUARE_E6 44
-#define SQUARE_F6 45
-#define SQUARE_G6 46
-#define SQUARE_H6 47
-#define SQUARE_A7 48
-#define SQUARE_B7 49
-#define SQUARE_C7 50
-#define SQUARE_D7 51
-#define SQUARE_E7 52
-#define SQUARE_F7 53
-#define SQUARE_G7 54
-#define SQUARE_H7 55
-#define SQUARE_A8 56
-#define SQUARE_B8 57
-#define SQUARE_C8 58
-#define SQUARE_D8 59
-#define SQUARE_E8 60
-#define SQUARE_F8 61
-#define SQUARE_G8 62
-#define SQUARE_H8 63
-#define SQUARE_COUNT 64
+#define SQ_NONE 0 
+#define SQ_A1 0
+#define SQ_B1 1
+#define SQ_C1 2
+#define SQ_D1 3
+#define SQ_E1 4
+#define SQ_F1 5
+#define SQ_G1 6
+#define SQ_H1 7
+#define SQ_A2 8
+#define SQ_B2 9
+#define SQ_C2 10
+#define SQ_D2 11
+#define SQ_E2 12
+#define SQ_F2 13
+#define SQ_G2 14
+#define SQ_H2 15
+#define SQ_A3 16
+#define SQ_B3 17
+#define SQ_C3 18
+#define SQ_D3 19
+#define SQ_E3 20
+#define SQ_F3 21
+#define SQ_G3 22
+#define SQ_H3 23
+#define SQ_A4 24
+#define SQ_B4 25
+#define SQ_C4 26
+#define SQ_D4 27
+#define SQ_E4 28
+#define SQ_F4 29
+#define SQ_G4 30
+#define SQ_H4 31
+#define SQ_A5 32
+#define SQ_B5 33
+#define SQ_C5 34
+#define SQ_D5 35
+#define SQ_E5 36
+#define SQ_F5 37
+#define SQ_G5 38
+#define SQ_H5 39
+#define SQ_A6 40
+#define SQ_B6 41
+#define SQ_C6 42
+#define SQ_D6 43
+#define SQ_E6 44
+#define SQ_F6 45
+#define SQ_G6 46
+#define SQ_H6 47
+#define SQ_A7 48
+#define SQ_B7 49
+#define SQ_C7 50
+#define SQ_D7 51
+#define SQ_E7 52
+#define SQ_F7 53
+#define SQ_G7 54
+#define SQ_H7 55
+#define SQ_A8 56
+#define SQ_B8 57
+#define SQ_C8 58
+#define SQ_D8 59
+#define SQ_E8 60
+#define SQ_F8 61
+#define SQ_G8 62
+#define SQ_H8 63
+#define SQ_CNT 64
 
 typedef int square; 
 
-static inline square square_make(int file, int rank) 
+static inline square sq_make(int file, int rank) 
 {
     return file | rank << 3; 
 }
 
-static inline int square_file(square sq) 
+static inline int sq_file(square sq) 
 {
     return sq & 7; 
 }
 
-static inline int square_rank(square sq) 
+static inline int sq_rank(square sq) 
 {
     return sq >> 3; 
 }
 
-static inline int square_diagonal(square sq) 
+static inline int sq_diag(square sq) 
 {
     static const int DIAG[] = 
     {
@@ -100,7 +100,7 @@ static inline int square_diagonal(square sq)
     return DIAG[sq]; 
 }
 
-static inline int square_antidiagonal(square sq) 
+static inline int sq_anti(square sq) 
 {
     static const int ANTI[] = 
     {
@@ -116,12 +116,12 @@ static inline int square_antidiagonal(square sq)
     return ANTI[sq]; 
 }
 
-static inline square square_flip_rank(square sq) 
+static inline square sq_rrank(square sq) 
 {
-    return square_make(square_file(sq), 7 - square_rank(sq)); 
+    return sq_make(sq_file(sq), 7 - sq_rank(sq)); 
 }
 
-static inline const char* square_string(square sq) 
+static inline const char* sq_str(square sq) 
 {
     static const char* STR[] = 
     {

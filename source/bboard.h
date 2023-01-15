@@ -5,64 +5,66 @@
 
 #include "square.h" 
 
-#define BITBOARD_NO_A_FILE  0xFEFEFEFEFEFEFEFEULL 
-#define BITBOARD_NO_H_FILE  0x7F7F7F7F7F7F7F7FULL 
+#define BB_NO_A_FILE  0xFEFEFEFEFEFEFEFEULL 
+#define BB_NO_H_FILE  0x7F7F7F7F7F7F7F7FULL 
 
-#define BITBOARD_NO_AB_FILE 0xFCFCFCFCFCFCFCFCULL 
-#define BITBOARD_NO_GH_FILE 0x3F3F3F3F3F3F3F3FULL 
+#define BB_NO_AB_FILE 0xFCFCFCFCFCFCFCFCULL 
+#define BB_NO_GH_FILE 0x3F3F3F3F3F3F3F3FULL 
 
-#define BITBOARD_1_RANK     0x00000000000000FFULL
-#define BITBOARD_8_RANK     0xFF00000000000000ULL
+#define BB_1_RANK     0x00000000000000FFULL
+#define BB_8_RANK     0xFF00000000000000ULL
 
-#define BITBOARD_NO_1_RANK  0xFFFFFFFFFFFFFF00ULL
-#define BITBOARD_NO_8_RANK  0x00FFFFFFFFFFFFFFULL
+#define BB_NO_1_RANK  0xFFFFFFFFFFFFFF00ULL
+#define BB_NO_8_RANK  0x00FFFFFFFFFFFFFFULL
 
-#define BITBOARD_CASTLE_WK  0x0000000000000070ULL
-#define BITBOARD_CASTLE_WQ  0x000000000000001CULL
-#define BITBOARD_CASTLE_BK  0x7000000000000000ULL
-#define BITBOARD_CASTLE_BQ  0x1C00000000000000ULL
+#define BB_CAS_WK  0x0000000000000070ULL
+#define BB_CAS_WQ  0x000000000000001CULL
+#define BB_CAS_BK  0x7000000000000000ULL
+#define BB_CAS_BQ  0x1C00000000000000ULL
 
-#define BITBOARD_EMPTY_WK   0x0000000000000060ULL 
-#define BITBOARD_EMPTY_WQ   0x000000000000000EULL 
-#define BITBOARD_EMPTY_BK   0x6000000000000000ULL 
-#define BITBOARD_EMPTY_BQ   0x0E00000000000000ULL 
+#define BB_EMPTY_WK   0x0000000000000060ULL 
+#define BB_EMPTY_WQ   0x000000000000000EULL 
+#define BB_EMPTY_BK   0x6000000000000000ULL 
+#define BB_EMPTY_BQ   0x0E00000000000000ULL 
 
-#define BITBOARD_ALL        0xFFFFFFFFFFFFFFFFULL 
-#define BITBOARD_NONE       0ULL
+#define BB_ALL        0xFFFFFFFFFFFFFFFFULL 
+#define BB_NONE       0ULL
 
-// defines the bitboard `remain` and the current square of `board`, `sq` for the duration of the loop
-#define BITBOARD_FOR_EACH_BIT(board, action) do { \
-        bitboard remain = (board); \
-        square sq = SQUARE_A1 - 1; \
+/**
+ * defines the bboard `remain` and the current square of `board`, `s` for the duration of the loop
+ */
+#define BB_FOR_EACH(board, action) do { \
+        bboard remain = (board); \
+        square s = SQ_A1 - 1; \
         int next; \
-        while ((sq < SQUARE_H8) & (remain != 0)) \
+        while ((s < SQ_H8) & (remain != 0)) \
         { \
-            next = bitboard_least_significant_bit(remain) + 1; \
+            next = bb_lsb(remain) + 1; \
             remain >>= next; \
-            sq += next; \
+            s += next; \
             action; \
         } \
     } while (0); 
 
-typedef enum bitboard_check 
+typedef enum bb_check 
 {
-    BITBOARD_CHECK_DIR_N = 0, 
-    BITBOARD_CHECK_DIR_S, 
-    BITBOARD_CHECK_DIR_E, 
-    BITBOARD_CHECK_DIR_W, 
-    BITBOARD_CHECK_DIR_NE, 
-    BITBOARD_CHECK_DIR_NW, 
-    BITBOARD_CHECK_DIR_SE, 
-    BITBOARD_CHECK_DIR_SW, 
-    BITBOARD_CHECK_DIR_COUNT, 
+    BB_CHECK_N = 0, 
+    BB_CHECK_S, 
+    BB_CHECK_E, 
+    BB_CHECK_W, 
+    BB_CHECK_NE, 
+    BB_CHECK_NW, 
+    BB_CHECK_SE, 
+    BB_CHECK_SW, 
+    BB_CHECK_DIR_CNT, 
 
-    BITBOARD_CHECK_PIECE_N = BITBOARD_CHECK_DIR_COUNT, 
-    BITBOARD_CHECK_PIECE_P, 
-    BITBOARD_CHECK_COUNT
-} bitboard_check;
+    BB_CHECK_PC_N = BB_CHECK_DIR_CNT, 
+    BB_CHECK_PC_P, 
+    BB_CHECK_CNT
+} bb_check;
 
 // how many 1s in a byte
-static const int BITBOARD_POP_COUNT_BYTE[] = 
+static const int BB_POPCNT8[] = 
 {
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
@@ -82,14 +84,14 @@ static const int BITBOARD_POP_COUNT_BYTE[] =
     4, 5, 5, 6, 5, 6, 6, 7, 5, 6, 6, 7, 6, 7, 7, 8, 
 };
 
-typedef uint64_t bitboard; 
+typedef uint64_t bboard; 
 
-static inline bitboard bitboard_make_position(square sq) 
+static inline bboard bb_pos(square sq) 
 {
     return 1ULL << sq; 
 }
 
-static inline bitboard bitboard_reverse_rows(bitboard b) 
+static inline bboard bb_rrow(bboard b) 
 {
     b = (b & 0xFFFFFFFF00000000ULL) >> 32 | b << 32; 
     b = (b & 0xFFFF0000FFFF0000ULL) >> 16 | (b & 0x0000FFFF0000FFFFULL) << 16; 
@@ -97,7 +99,7 @@ static inline bitboard bitboard_reverse_rows(bitboard b)
     return b; 
 }
 
-static inline bitboard bitboard_reverse_cols(bitboard b) 
+static inline bboard bb_rcol(bboard b) 
 {
     b = (b & 0xF0F0F0F0F0F0F0F0ULL) >> 4 | (b & 0x0F0F0F0F0F0F0F0FULL) << 4; 
     b = (b & 0xCCCCCCCCCCCCCCCCULL) >> 2 | (b & 0x3333333333333333ULL) << 2; 
@@ -105,21 +107,21 @@ static inline bitboard bitboard_reverse_cols(bitboard b)
     return b; 
 }
 
-static inline bitboard bitboard_reverse(bitboard b) 
+static inline bboard bb_r(bboard b) 
 {
-    return bitboard_reverse_rows(bitboard_reverse_cols(b)); 
+    return bb_rrow(bb_rcol(b)); 
 }
 
 // see: https://www.chessprogramming.org/Subtracting_a_Rook_from_a_Blocking_Piece
 // uses the o^(o-2r) trick
 // only finds positive rays (squares with values higher than [sq])
-static inline bitboard bitboard_cast_positive_ray(square sq, bitboard ray, bitboard occupants) 
+static inline bboard bb_ray_pos(square sq, bboard ray, bboard occ) 
 {
     // one bit after current square 
-    bitboard b2 = bitboard_make_position(sq) << 1; 
+    bboard b2 = bb_pos(sq) << 1; 
 
     // only use bits that the piece can move to on the line 
-    bitboard relevant_occ = occupants & ray; 
+    bboard relevant_occ = occ & ray; 
 
     // Subtract 2*b from the occupants. Since we only kept bits on the line 
     // the very first bit found on the line will be removed and ones will fill 
@@ -132,20 +134,20 @@ static inline bitboard bitboard_cast_positive_ray(square sq, bitboard ray, bitbo
 }
 
 // see: https://www.chessprogramming.org/Hyperbola_Quintessence
-static inline bitboard bitboard_cast_ray(square sq, bitboard ray, bitboard occupants) 
+static inline bboard bb_ray(square sq, bboard ray, bboard occ) 
 {
     // do o^(o-2r) trick on reverse board as well (for negative rays) 
-    return bitboard_cast_positive_ray(sq, ray, occupants) | 
-           bitboard_reverse(bitboard_cast_positive_ray(63 - sq, bitboard_reverse(ray), bitboard_reverse(occupants))); 
+    return bb_ray_pos(sq, ray, occ) | 
+           bb_r(bb_ray_pos(63 - sq, bb_r(ray), bb_r(occ))); 
 }
 
 // see: https://www.chessprogramming.org/BitScan 
 // finds the least significant bit of a nonzero value
 // note that this will not work with a value of 0
-static inline int bitboard_least_significant_bit(bitboard b) 
+static inline int bb_lsb(bboard b) 
 {
     // pre-calculated hash results  
-    static const int POSITIONS[] = 
+    static const int POS[] = 
     {
         63,  0,  1, 28,  2,  6, 29, 54, 
          3, 18, 13,  7, 50, 30, 21, 55, 
@@ -168,102 +170,102 @@ static inline int bitboard_least_significant_bit(bitboard b)
     // multiply (b & -b) that by a pre-generated constant to perfect 
     // hash all possible nonzero values to unique 6-bit indices in a 
     // lookup table
-    return POSITIONS[(b & -b) * 0x45949D0DED5CC7EULL >> 58]; 
+    return POS[(b & -b) * 0x45949D0DED5CC7EULL >> 58]; 
 }
 
-static inline int bitboard_pop_count(bitboard b) 
+static inline int bb_popcnt(bboard b) 
 {
-    return BITBOARD_POP_COUNT_BYTE[b & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >>  8) & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >> 16) & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >> 24) & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >> 32) & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >> 40) & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >> 48) & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >> 56) & 255];
+    return BB_POPCNT8[b & 255] + 
+           BB_POPCNT8[(b >>  8) & 255] + 
+           BB_POPCNT8[(b >> 16) & 255] + 
+           BB_POPCNT8[(b >> 24) & 255] + 
+           BB_POPCNT8[(b >> 32) & 255] + 
+           BB_POPCNT8[(b >> 40) & 255] + 
+           BB_POPCNT8[(b >> 48) & 255] + 
+           BB_POPCNT8[(b >> 56) & 255];
 }
 
-static inline int bitboard_pop_count_16(uint16_t b) 
+static inline int bb_popcnt16(uint16_t b) 
 {
-    return BITBOARD_POP_COUNT_BYTE[b & 255] + 
-           BITBOARD_POP_COUNT_BYTE[(b >> 8) & 255];
+    return BB_POPCNT8[b & 255] + 
+           BB_POPCNT8[(b >> 8) & 255];
 }
 
-static inline bitboard bitboard_shift_nn(bitboard b) 
+static inline bboard bb_sh_nn(bboard b) 
 {
     return b << 16; 
 }
 
-static inline bitboard bitboard_shift_ss(bitboard b) 
+static inline bboard bb_sh_ss(bboard b) 
 {
     return b >> 16; 
 }
 
-static inline bitboard bitboard_shift_n(bitboard b) 
+static inline bboard bb_sh_n(bboard b) 
 {
     return b << 8; 
 }
 
-static inline bitboard bitboard_shift_s(bitboard b) 
+static inline bboard bb_sh_s(bboard b) 
 {
     return b >> 8; 
 }
 
-static inline bitboard bitboard_shift_e(bitboard b) 
+static inline bboard bb_sh_e(bboard b) 
 {
-    return (b << 1) & BITBOARD_NO_A_FILE; 
+    return (b << 1) & BB_NO_A_FILE; 
 }
 
-static inline bitboard bitboard_shift_w(bitboard b) 
+static inline bboard bb_sh_w(bboard b) 
 {
-    return (b >> 1) & BITBOARD_NO_H_FILE; 
+    return (b >> 1) & BB_NO_H_FILE; 
 }
 
-static inline bitboard bitboard_shift_ne(bitboard b) 
+static inline bboard bb_sh_ne(bboard b) 
 {
-    return (b << 9) & BITBOARD_NO_A_FILE; 
+    return (b << 9) & BB_NO_A_FILE; 
 }
 
-static inline bitboard bitboard_shift_nw(bitboard b) 
+static inline bboard bb_sh_nw(bboard b) 
 {
-    return (b << 7) & BITBOARD_NO_H_FILE; 
+    return (b << 7) & BB_NO_H_FILE; 
 }
 
-static inline bitboard bitboard_shift_se(bitboard b) 
+static inline bboard bb_sh_se(bboard b) 
 {
-    return (b >> 7) & BITBOARD_NO_A_FILE; 
+    return (b >> 7) & BB_NO_A_FILE; 
 }
 
-static inline bitboard bitboard_shift_sw(bitboard b) 
+static inline bboard bb_sh_sw(bboard b) 
 {
-    return (b >> 9) & BITBOARD_NO_H_FILE; 
+    return (b >> 9) & BB_NO_H_FILE; 
 }
 
-static inline int bitboard_at(bitboard b, square sq) 
+static inline int bb_at(bboard b, square sq) 
 {
     return (b >> sq) & 1; 
 }
 
-static inline bitboard bitboard_set(bitboard b, square sq) 
+static inline bboard bb_set(bboard b, square sq) 
 {
     return (b & ~(1ULL << sq)) | (1ULL << sq); 
 }
 
-static inline bitboard bitboard_clear(bitboard b, square sq) 
+static inline bboard bb_clear(bboard b, square sq) 
 {
     return b & ~(1ULL << sq); 
 }
 
-static void bitboard_print(bitboard b) 
+static void bb_print(bboard b) 
 {
-    b = bitboard_reverse_rows(b); 
+    b = bb_rrow(b); 
     for (int i = 0; i < 64; i++) 
     {
         printf("%s %s", ((unsigned) (b >> i) & 1) ? "1" : ".", (i + 1) % 8 == 0 ? "\n" : ""); 
     }
 }
 
-static void bitboard_print_binary(bitboard b) 
+static void bb_print_bin(bboard b) 
 {
     for (int i = 0; i < 64; i++) 
     {
@@ -272,16 +274,16 @@ static void bitboard_print_binary(bitboard b)
     printf("\n"); 
 }
 
-static const bitboard BITBOARD_CASTLE_TARGETS[] = 
+static const bboard BB_CAS_TGTS[] = 
 {
-    BITBOARD_NONE, 
-    BITBOARD_CASTLE_WK, 
-    BITBOARD_CASTLE_WQ, 
-    BITBOARD_CASTLE_BK, 
-    BITBOARD_CASTLE_BQ
+    BB_NONE, 
+    BB_CAS_WK, 
+    BB_CAS_WQ, 
+    BB_CAS_BK, 
+    BB_CAS_BQ
 };
 
-static const bitboard BITBOARD_CASTLE_KEEP_WR[] = 
+static const bboard BB_CAS_KEEP_WR[] = 
 {
     0xFFFFFFFFFFFFFFFFULL,
     0xFFFFFFFFFFFFFF7FULL, // remove H1
@@ -290,7 +292,7 @@ static const bitboard BITBOARD_CASTLE_KEEP_WR[] =
     0xFFFFFFFFFFFFFFFFULL,
 };
 
-static const bitboard BITBOARD_CASTLE_KEEP_BR[] = 
+static const bboard BB_CAS_KEEP_BR[] = 
 {
     0xFFFFFFFFFFFFFFFFULL,
     0xFFFFFFFFFFFFFFFFULL,
@@ -299,7 +301,7 @@ static const bitboard BITBOARD_CASTLE_KEEP_BR[] =
     0xFEFFFFFFFFFFFFFFULL, // remove A8
 };
 
-static const bitboard BITBOARD_CASTLE_ADD_WR[] = 
+static const bboard BB_CAS_ADD_WR[] = 
 {
     0x0000000000000000ULL, 
     0x0000000000000020ULL, // add F1
@@ -308,7 +310,7 @@ static const bitboard BITBOARD_CASTLE_ADD_WR[] =
     0x0000000000000000ULL, 
 };
 
-static const bitboard BITBOARD_CASTLE_ADD_BR[] = 
+static const bboard BB_CAS_ADD_BR[] = 
 {
     0x0000000000000000ULL, 
     0x0000000000000000ULL, 
@@ -317,7 +319,7 @@ static const bitboard BITBOARD_CASTLE_ADD_BR[] =
     0x0800000000000000ULL, // add D8
 };
 
-static const bitboard BITBOARD_SLIDE_FILE[] = 
+static const bboard BB_SLIDE_FILE[] = 
 {
     0x0101010101010101ULL,
     0x0202020202020202ULL,
@@ -329,7 +331,7 @@ static const bitboard BITBOARD_SLIDE_FILE[] =
     0x8080808080808080ULL
 };
 
-static const bitboard BITBOARD_SLIDE_RANK[] = 
+static const bboard BB_SLIDE_RANK[] = 
 {
     0x00000000000000FFULL,
     0x000000000000FF00ULL,
@@ -341,7 +343,7 @@ static const bitboard BITBOARD_SLIDE_RANK[] =
     0xFF00000000000000ULL
 };
 
-static const bitboard BITBOARD_SLIDE_DIAG[] = 
+static const bboard BB_SLIDE_DIAG[] = 
 {
     0x0100000000000000ULL,
     0x0201000000000000ULL,
@@ -360,7 +362,7 @@ static const bitboard BITBOARD_SLIDE_DIAG[] =
     0x0000000000000080ULL
 };
 
-static const bitboard BITBOARD_SLIDE_ANTI[] = 
+static const bboard BB_SLIDE_ANTI[] = 
 {
     0x0000000000000001ULL,
     0x0000000000000102ULL,
@@ -379,7 +381,7 @@ static const bitboard BITBOARD_SLIDE_ANTI[] =
     0x8000000000000000ULL
 };
 
-static const bitboard BITBOARD_KING_MOVES[] = 
+static const bboard BB_MV_K[] = 
 {
     0x0000000000000302ULL, 
     0x0000000000000705ULL, 
@@ -447,7 +449,7 @@ static const bitboard BITBOARD_KING_MOVES[] =
     0x40C0000000000000ULL
 };
 
-static const bitboard BITBOARD_KNIGHT_MOVES[] = 
+static const bboard BB_MV_N[] = 
 {
     0x0000000000020400ULL, 
     0x0000000000050800ULL, 
@@ -515,7 +517,7 @@ static const bitboard BITBOARD_KNIGHT_MOVES[] =
     0x0020400000000000ULL
 }; 
 
-static const bitboard BITBOARD_POSITIVE_ROOK_MOVES[] = 
+static const bboard BB_POS_MV_R[] = 
 {
     0x01010101010101FEULL,
     0x02020202020202FCULL,
@@ -583,7 +585,7 @@ static const bitboard BITBOARD_POSITIVE_ROOK_MOVES[] =
     0x0000000000000000ULL
 };
 
-static const bitboard BITBOARD_POSITIVE_BISHOP_MOVES[] = 
+static const bboard BB_POS_MV_B[] = 
 {
     0x8040201008040200ULL,
     0x0080402010080500ULL,
@@ -651,7 +653,7 @@ static const bitboard BITBOARD_POSITIVE_BISHOP_MOVES[] =
     0x0000000000000000ULL
 };
 
-static const bitboard BITBOARD_POSITIVE_QUEEN_MOVES[] = 
+static const bboard BB_POS_MV_Q[] = 
 {
     0x81412111090503FEULL,
     0x02824222120A07FCULL,
@@ -719,4 +721,4 @@ static const bitboard BITBOARD_POSITIVE_QUEEN_MOVES[] =
     0x0000000000000000ULL
 };
 
-#include "pin_indices.h"
+#include "pin_idx.h"

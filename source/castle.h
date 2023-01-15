@@ -1,19 +1,19 @@
 #pragma once 
 
-#define CASTLE_WK 1 
-#define CASTLE_WQ 2 
-#define CASTLE_W 3 
+#define CAS_WK 1 
+#define CAS_WQ 2 
+#define CAS_W 3 
 
-#define CASTLE_BK 4 
-#define CASTLE_BQ 8 
-#define CASTLE_B 12 
+#define CAS_BK 4 
+#define CAS_BQ 8 
+#define CAS_B 12 
+        
+#define CAS_ALL 15 
+#define CAS_NONE 0 
 
-#define CASTLE_ALL 15 
-#define CASTLE_NONE 0 
+typedef int castle; 
 
-typedef int castle_flags; 
-
-static const char *castle_string(castle_flags cf) 
+static const char *cas_str(castle cf) 
 {
     static const char *STR[] = 
     {

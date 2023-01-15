@@ -4,10 +4,10 @@
 #include <stdlib.h> 
 #include <string.h> 
 
-#define VECTOR_CREATE_TYPE(v, type) vector_create(v, sizeof(type))
-#define VECTOR_PUSH_TYPE(v, type, value) do { type vector_tmp_value = (value); vector_push(v, &vector_tmp_value); } while (0)
-#define VECTOR_INSERT_TYPE(v, type, index, value) do { type vector_tmp_value = (value); vector_insert(v, index, &vector_tmp_value); } while (0)
-#define VECTOR_AT_TYPE(v, type, index) *(type *) vector_at(v, index) 
+#define VEC_CREATE(v, type) vec_create(v, sizeof(type))
+#define VEC_PUSH(v, type, value) do { type vec_tmp_value = (value); vec_push(v, &vec_tmp_value); } while (0)
+#define VEC_INSERT(v, type, index, value) do { type vec_tmp_value = (value); vec_insert(v, index, &vec_tmp_value); } while (0)
+#define VEC_AT(v, type, index) *(type *) vec_at(v, index) 
 
 typedef struct vector vector; 
 
@@ -19,7 +19,7 @@ struct vector
     char *data; 
 };
 
-static inline void vector_create(vector *v, size_t elem_size) 
+static inline void vec_create(vector *v, size_t elem_size) 
 {
     v->size = 0; 
     v->capacity = 16; 
@@ -27,12 +27,12 @@ static inline void vector_create(vector *v, size_t elem_size)
     v->data = malloc(v->capacity * elem_size); 
 }
 
-static inline void vector_destroy(vector *v) 
+static inline void vec_destroy(vector *v) 
 {
     free(v->data); 
 }
 
-static inline void vector_reserve(vector *v, size_t cap) 
+static inline void vec_reserve(vector *v, size_t cap) 
 {
     size_t new_cap = v->capacity; 
     while (new_cap < cap) 
@@ -46,62 +46,62 @@ static inline void vector_reserve(vector *v, size_t cap)
     }
 }
 
-static inline const void *vector_at_const(const vector *v, size_t index) 
+static inline const void *vec_at_const(const vector *v, size_t index) 
 {
     return &v->data[v->elem_size * index]; 
 }
 
-static inline void *vector_at(vector *v, size_t index) 
+static inline void *vec_at(vector *v, size_t index) 
 {
     return &v->data[v->elem_size * index]; 
 }
 
-static inline void vector_push(vector *v, const void *in) 
+static inline void vec_push(vector *v, const void *in) 
 {
-    vector_reserve(v, v->size + 1); 
-    memcpy(vector_at(v, v->size++), in, v->elem_size); 
+    vec_reserve(v, v->size + 1); 
+    memcpy(vec_at(v, v->size++), in, v->elem_size); 
 }
 
-static inline void *vector_push_empty(vector *v) 
+static inline void *vec_pushe(vector *v) 
 {
-    vector_reserve(v, v->size + 1); 
-    return vector_at(v, v->size++); 
+    vec_reserve(v, v->size + 1); 
+    return vec_at(v, v->size++); 
 }
 
-static inline void vector_pop(vector *v) 
+static inline void vec_pop(vector *v) 
 {
     v->size--; 
 }
 
-static inline void vector_popn(vector *v, size_t n) 
+static inline void vec_popn(vector *v, size_t n) 
 {
     v->size -= n; 
 }
 
-static inline void vector_pop_to_size(vector *v, size_t new_size) 
+static inline void vec_pop_size(vector *v, size_t new_size) 
 {
     v->size = new_size; 
 }
 
-static inline void vector_get(const vector *v, size_t index, void *out) 
+static inline void vec_get(const vector *v, size_t index, void *out) 
 {
-    memcpy(out, vector_at_const(v, index), v->elem_size); 
+    memcpy(out, vec_at_const(v, index), v->elem_size); 
 }
 
-static inline void vector_set(vector *v, size_t index, const void *in) 
+static inline void vec_set(vector *v, size_t index, const void *in) 
 {
-    memcpy(vector_at(v, index), in, v->elem_size); 
+    memcpy(vec_at(v, index), in, v->elem_size); 
 }
 
-static inline void vector_insert(vector *v, size_t index, const void *in) 
+static inline void vec_insert(vector *v, size_t index, const void *in) 
 {
-    vector_reserve(v, v->size + 1); 
-    memmove(vector_at(v, index + 1), vector_at(v, index), v->elem_size * (v->size - index)); 
+    vec_reserve(v, v->size + 1); 
+    memmove(vec_at(v, index + 1), vec_at(v, index), v->elem_size * (v->size - index)); 
     v->size++; 
-    vector_set(v, index, in); 
+    vec_set(v, index, in); 
 }
 
-static inline void vector_clear(vector *v) 
+static inline void vec_clear(vector *v) 
 {
     v->size = 0; 
 }
