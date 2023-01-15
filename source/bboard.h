@@ -5,66 +5,66 @@
 
 #include "square.h" 
 
-#define BB_NO_A_FILE  0xFEFEFEFEFEFEFEFEULL 
-#define BB_NO_H_FILE  0x7F7F7F7F7F7F7F7FULL 
+#define NO_FILE_A  0xFEFEFEFEFEFEFEFEULL 
+#define NO_FILE_H  0x7F7F7F7F7F7F7F7FULL 
 
-#define BB_NO_AB_FILE 0xFCFCFCFCFCFCFCFCULL 
-#define BB_NO_GH_FILE 0x3F3F3F3F3F3F3F3FULL 
+#define NO_FILE_AB 0xFCFCFCFCFCFCFCFCULL 
+#define NO_FILE_GH 0x3F3F3F3F3F3F3F3FULL 
 
-#define BB_1_RANK     0x00000000000000FFULL
-#define BB_8_RANK     0xFF00000000000000ULL
+#define RANK_1     0x00000000000000FFULL
+#define RANK_8     0xFF00000000000000ULL
 
-#define BB_NO_1_RANK  0xFFFFFFFFFFFFFF00ULL
-#define BB_NO_8_RANK  0x00FFFFFFFFFFFFFFULL
+#define NO_RANK_1  0xFFFFFFFFFFFFFF00ULL
+#define NO_RANK_8  0x00FFFFFFFFFFFFFFULL
 
-#define BB_CAS_WK  0x0000000000000070ULL
-#define BB_CAS_WQ  0x000000000000001CULL
-#define BB_CAS_BK  0x7000000000000000ULL
-#define BB_CAS_BQ  0x1C00000000000000ULL
+#define CAS_BB_WK  0x0000000000000070ULL
+#define CAS_BB_WQ  0x000000000000001CULL
+#define CAS_BB_BK  0x7000000000000000ULL
+#define CAS_BB_BQ  0x1C00000000000000ULL
 
-#define BB_EMPTY_WK   0x0000000000000060ULL 
-#define BB_EMPTY_WQ   0x000000000000000EULL 
-#define BB_EMPTY_BK   0x6000000000000000ULL 
-#define BB_EMPTY_BQ   0x0E00000000000000ULL 
+#define EMPTY_WK   0x0000000000000060ULL 
+#define EMPTY_WQ   0x000000000000000EULL 
+#define EMPTY_BK   0x6000000000000000ULL 
+#define EMPTY_BQ   0x0E00000000000000ULL 
 
-#define BB_ALL        0xFFFFFFFFFFFFFFFFULL 
-#define BB_NONE       0ULL
+#define ALL_BITS   0xFFFFFFFFFFFFFFFFULL 
+#define NO_BITS    0ULL
 
 /**
  * defines the bboard `remain` and the current square of `board`, `s` for the duration of the loop
  */
-#define BB_FOR_EACH(board, action) do { \
+#define FOR_EACH_BIT(board, action) do { \
         bboard remain = (board); \
-        square s = SQ_A1 - 1; \
+        square s = A1 - 1; \
         int next; \
-        while ((s < SQ_H8) & (remain != 0)) \
+        while ((s < H8) & (remain != 0)) \
         { \
-            next = bb_lsb(remain) + 1; \
+            next = lsb(remain) + 1; \
             remain >>= next; \
             s += next; \
             action; \
         } \
     } while (0); 
 
-typedef enum bb_check 
+typedef enum check_idx 
 {
-    BB_CHECK_N = 0, 
-    BB_CHECK_S, 
-    BB_CHECK_E, 
-    BB_CHECK_W, 
-    BB_CHECK_NE, 
-    BB_CHECK_NW, 
-    BB_CHECK_SE, 
-    BB_CHECK_SW, 
-    BB_CHECK_DIR_CNT, 
+    CHECK_N = 0, 
+    CHECK_S, 
+    CHECK_E, 
+    CHECK_W, 
+    CHECK_NE, 
+    CHECK_NW, 
+    CHECK_SE, 
+    CHECK_SW, 
+    CHECK_DIR_CNT, 
 
-    BB_CHECK_PC_N = BB_CHECK_DIR_CNT, 
-    BB_CHECK_PC_P, 
-    BB_CHECK_CNT
-} bb_check;
+    CHECK_PC_N = CHECK_DIR_CNT, 
+    CHECK_PC_P, 
+    CHECK_CNT
+} check_idx;
 
 // how many 1s in a byte
-static const int BB_POPCNT8[] = 
+static const int POPCNT8[] = 
 {
     0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 
     1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 
@@ -86,12 +86,12 @@ static const int BB_POPCNT8[] =
 
 typedef uint64_t bboard; 
 
-static inline bboard bb_pos(square sq) 
+static inline bboard bb(square sq) 
 {
     return 1ULL << sq; 
 }
 
-static inline bboard bb_rrow(bboard b) 
+static inline bboard rrow(bboard b) 
 {
     b = (b & 0xFFFFFFFF00000000ULL) >> 32 | b << 32; 
     b = (b & 0xFFFF0000FFFF0000ULL) >> 16 | (b & 0x0000FFFF0000FFFFULL) << 16; 
@@ -99,7 +99,7 @@ static inline bboard bb_rrow(bboard b)
     return b; 
 }
 
-static inline bboard bb_rcol(bboard b) 
+static inline bboard rcol(bboard b) 
 {
     b = (b & 0xF0F0F0F0F0F0F0F0ULL) >> 4 | (b & 0x0F0F0F0F0F0F0F0FULL) << 4; 
     b = (b & 0xCCCCCCCCCCCCCCCCULL) >> 2 | (b & 0x3333333333333333ULL) << 2; 
@@ -107,18 +107,18 @@ static inline bboard bb_rcol(bboard b)
     return b; 
 }
 
-static inline bboard bb_r(bboard b) 
+static inline bboard rev(bboard b) 
 {
-    return bb_rrow(bb_rcol(b)); 
+    return rrow(rcol(b)); 
 }
 
 // see: https://www.chessprogramming.org/Subtracting_a_Rook_from_a_Blocking_Piece
 // uses the o^(o-2r) trick
 // only finds positive rays (squares with values higher than [sq])
-static inline bboard bb_ray_pos(square sq, bboard ray, bboard occ) 
+static inline bboard pos_ray(square sq, bboard ray, bboard occ) 
 {
     // one bit after current square 
-    bboard b2 = bb_pos(sq) << 1; 
+    bboard b2 = bb(sq) << 1; 
 
     // only use bits that the piece can move to on the line 
     bboard relevant_occ = occ & ray; 
@@ -134,17 +134,17 @@ static inline bboard bb_ray_pos(square sq, bboard ray, bboard occ)
 }
 
 // see: https://www.chessprogramming.org/Hyperbola_Quintessence
-static inline bboard bb_ray(square sq, bboard ray, bboard occ) 
+static inline bboard ray(square sq, bboard ray, bboard occ) 
 {
     // do o^(o-2r) trick on reverse board as well (for negative rays) 
-    return bb_ray_pos(sq, ray, occ) | 
-           bb_r(bb_ray_pos(63 - sq, bb_r(ray), bb_r(occ))); 
+    return pos_ray(sq, ray, occ) | 
+           rev(pos_ray(63 - sq, rev(ray), rev(occ))); 
 }
 
 // see: https://www.chessprogramming.org/BitScan 
 // finds the least significant bit of a nonzero value
 // note that this will not work with a value of 0
-static inline int bb_lsb(bboard b) 
+static inline int lsb(bboard b) 
 {
     // pre-calculated hash results  
     static const int POS[] = 
@@ -173,99 +173,99 @@ static inline int bb_lsb(bboard b)
     return POS[(b & -b) * 0x45949D0DED5CC7EULL >> 58]; 
 }
 
-static inline int bb_popcnt(bboard b) 
+static inline int popcnt(bboard b) 
 {
-    return BB_POPCNT8[b & 255] + 
-           BB_POPCNT8[(b >>  8) & 255] + 
-           BB_POPCNT8[(b >> 16) & 255] + 
-           BB_POPCNT8[(b >> 24) & 255] + 
-           BB_POPCNT8[(b >> 32) & 255] + 
-           BB_POPCNT8[(b >> 40) & 255] + 
-           BB_POPCNT8[(b >> 48) & 255] + 
-           BB_POPCNT8[(b >> 56) & 255];
+    return POPCNT8[b & 255] + 
+           POPCNT8[(b >>  8) & 255] + 
+           POPCNT8[(b >> 16) & 255] + 
+           POPCNT8[(b >> 24) & 255] + 
+           POPCNT8[(b >> 32) & 255] + 
+           POPCNT8[(b >> 40) & 255] + 
+           POPCNT8[(b >> 48) & 255] + 
+           POPCNT8[(b >> 56) & 255];
 }
 
-static inline int bb_popcnt16(uint16_t b) 
+static inline int popcnt16(uint16_t b) 
 {
-    return BB_POPCNT8[b & 255] + 
-           BB_POPCNT8[(b >> 8) & 255];
+    return POPCNT8[b & 255] + 
+           POPCNT8[(b >> 8) & 255];
 }
 
-static inline bboard bb_sh_nn(bboard b) 
+static inline bboard sh_nn(bboard b) 
 {
     return b << 16; 
 }
 
-static inline bboard bb_sh_ss(bboard b) 
+static inline bboard sh_ss(bboard b) 
 {
     return b >> 16; 
 }
 
-static inline bboard bb_sh_n(bboard b) 
+static inline bboard sh_n(bboard b) 
 {
     return b << 8; 
 }
 
-static inline bboard bb_sh_s(bboard b) 
+static inline bboard sh_s(bboard b) 
 {
     return b >> 8; 
 }
 
-static inline bboard bb_sh_e(bboard b) 
+static inline bboard sh_e(bboard b) 
 {
-    return (b << 1) & BB_NO_A_FILE; 
+    return (b << 1) & NO_FILE_A; 
 }
 
-static inline bboard bb_sh_w(bboard b) 
+static inline bboard sh_w(bboard b) 
 {
-    return (b >> 1) & BB_NO_H_FILE; 
+    return (b >> 1) & NO_FILE_H; 
 }
 
-static inline bboard bb_sh_ne(bboard b) 
+static inline bboard sh_ne(bboard b) 
 {
-    return (b << 9) & BB_NO_A_FILE; 
+    return (b << 9) & NO_FILE_A; 
 }
 
-static inline bboard bb_sh_nw(bboard b) 
+static inline bboard sh_nw(bboard b) 
 {
-    return (b << 7) & BB_NO_H_FILE; 
+    return (b << 7) & NO_FILE_H; 
 }
 
-static inline bboard bb_sh_se(bboard b) 
+static inline bboard sh_se(bboard b) 
 {
-    return (b >> 7) & BB_NO_A_FILE; 
+    return (b >> 7) & NO_FILE_A; 
 }
 
-static inline bboard bb_sh_sw(bboard b) 
+static inline bboard sh_sw(bboard b) 
 {
-    return (b >> 9) & BB_NO_H_FILE; 
+    return (b >> 9) & NO_FILE_H; 
 }
 
-static inline int bb_at(bboard b, square sq) 
+static inline int at_sq(bboard b, square sq) 
 {
     return (b >> sq) & 1; 
 }
 
-static inline bboard bb_set(bboard b, square sq) 
+static inline bboard set_sq(bboard b, square sq) 
 {
     return (b & ~(1ULL << sq)) | (1ULL << sq); 
 }
 
-static inline bboard bb_clear(bboard b, square sq) 
+static inline bboard clear_sq(bboard b, square sq) 
 {
     return b & ~(1ULL << sq); 
 }
 
-static void bb_print(bboard b) 
+static void print_bb(bboard b) 
 {
-    b = bb_rrow(b); 
+    b = rrow(b); 
     for (int i = 0; i < 64; i++) 
     {
         printf("%s %s", ((unsigned) (b >> i) & 1) ? "1" : ".", (i + 1) % 8 == 0 ? "\n" : ""); 
     }
 }
 
-static void bb_print_bin(bboard b) 
+static void print_bin_bb(bboard b) 
 {
     for (int i = 0; i < 64; i++) 
     {
@@ -274,16 +274,16 @@ static void bb_print_bin(bboard b)
     printf("\n"); 
 }
 
-static const bboard BB_CAS_TGTS[] = 
+static const bboard CAS_TGTS[] = 
 {
-    BB_NONE, 
-    BB_CAS_WK, 
-    BB_CAS_WQ, 
-    BB_CAS_BK, 
-    BB_CAS_BQ
+    NO_BITS, 
+    CAS_BB_WK, 
+    CAS_BB_WQ, 
+    CAS_BB_BK, 
+    CAS_BB_BQ
 };
 
-static const bboard BB_CAS_KEEP_WR[] = 
+static const bboard CAS_KEEP_WR[] = 
 {
     0xFFFFFFFFFFFFFFFFULL,
     0xFFFFFFFFFFFFFF7FULL, // remove H1
@@ -292,7 +292,7 @@ static const bboard BB_CAS_KEEP_WR[] =
     0xFFFFFFFFFFFFFFFFULL,
 };
 
-static const bboard BB_CAS_KEEP_BR[] = 
+static const bboard CAS_KEEP_BR[] = 
 {
     0xFFFFFFFFFFFFFFFFULL,
     0xFFFFFFFFFFFFFFFFULL,
@@ -301,7 +301,7 @@ static const bboard BB_CAS_KEEP_BR[] =
     0xFEFFFFFFFFFFFFFFULL, // remove A8
 };
 
-static const bboard BB_CAS_ADD_WR[] = 
+static const bboard CAS_ADD_WR[] = 
 {
     0x0000000000000000ULL, 
     0x0000000000000020ULL, // add F1
@@ -310,7 +310,7 @@ static const bboard BB_CAS_ADD_WR[] =
     0x0000000000000000ULL, 
 };
 
-static const bboard BB_CAS_ADD_BR[] = 
+static const bboard CAS_ADD_BR[] = 
 {
     0x0000000000000000ULL, 
     0x0000000000000000ULL, 
@@ -319,7 +319,7 @@ static const bboard BB_CAS_ADD_BR[] =
     0x0800000000000000ULL, // add D8
 };
 
-static const bboard BB_SLIDE_FILE[] = 
+static const bboard SLIDE_FILE[] = 
 {
     0x0101010101010101ULL,
     0x0202020202020202ULL,
@@ -331,7 +331,7 @@ static const bboard BB_SLIDE_FILE[] =
     0x8080808080808080ULL
 };
 
-static const bboard BB_SLIDE_RANK[] = 
+static const bboard SLIDE_RANK[] = 
 {
     0x00000000000000FFULL,
     0x000000000000FF00ULL,
@@ -343,7 +343,7 @@ static const bboard BB_SLIDE_RANK[] =
     0xFF00000000000000ULL
 };
 
-static const bboard BB_SLIDE_DIAG[] = 
+static const bboard SLIDE_DIAG[] = 
 {
     0x0100000000000000ULL,
     0x0201000000000000ULL,
@@ -362,7 +362,7 @@ static const bboard BB_SLIDE_DIAG[] =
     0x0000000000000080ULL
 };
 
-static const bboard BB_SLIDE_ANTI[] = 
+static const bboard SLIDE_ANTI[] = 
 {
     0x0000000000000001ULL,
     0x0000000000000102ULL,
@@ -381,7 +381,7 @@ static const bboard BB_SLIDE_ANTI[] =
     0x8000000000000000ULL
 };
 
-static const bboard BB_MV_K[] = 
+static const bboard MV_K[] = 
 {
     0x0000000000000302ULL, 
     0x0000000000000705ULL, 
@@ -449,7 +449,7 @@ static const bboard BB_MV_K[] =
     0x40C0000000000000ULL
 };
 
-static const bboard BB_MV_N[] = 
+static const bboard MV_N[] = 
 {
     0x0000000000020400ULL, 
     0x0000000000050800ULL, 
@@ -517,7 +517,7 @@ static const bboard BB_MV_N[] =
     0x0020400000000000ULL
 }; 
 
-static const bboard BB_POS_MV_R[] = 
+static const bboard POS_MV_R[] = 
 {
     0x01010101010101FEULL,
     0x02020202020202FCULL,
@@ -585,7 +585,7 @@ static const bboard BB_POS_MV_R[] =
     0x0000000000000000ULL
 };
 
-static const bboard BB_POS_MV_B[] = 
+static const bboard POS_MV_B[] = 
 {
     0x8040201008040200ULL,
     0x0080402010080500ULL,
@@ -653,7 +653,7 @@ static const bboard BB_POS_MV_B[] =
     0x0000000000000000ULL
 };
 
-static const bboard BB_POS_MV_Q[] = 
+static const bboard POS_MV_Q[] = 
 {
     0x81412111090503FEULL,
     0x02824222120A07FCULL,

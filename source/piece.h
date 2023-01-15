@@ -28,7 +28,7 @@
 typedef int color; 
 typedef int piece; 
 
-static inline color col_r(color c) 
+static inline color opp_col(color c) 
 {
     return c ^ 1; 
 }
@@ -38,19 +38,19 @@ static inline color pc_col(piece p)
     return p >= 6; 
 }
 
-static inline piece pc_no_col(piece p) 
+static inline piece no_col_pc(piece p) 
 {
     return p - (p >= 6) * 6; 
 }
 
-static inline piece pc_make(piece no_col, color col) 
+static inline piece make_pc(piece no_col, color col) 
 {
     return no_col + col * 6; 
 }
 
-static inline piece pc_recolor(piece p, color col) 
+static inline piece recol_pc(piece p, color col) 
 {
-    return pc_make(pc_no_col(p), col); 
+    return make_pc(no_col_pc(p), col); 
 }
 
 static inline const char *pc_str(piece p) 

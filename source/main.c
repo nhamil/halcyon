@@ -47,7 +47,7 @@ bool uci_cmd_isready(game *g)
 bool uci_cmd_position(game *g) 
 {
     vector moves;  
-    VEC_CREATE(&moves, move); 
+    CREATE_VEC(&moves, move); 
 
     const char *tok = uci_next(); 
 
@@ -55,7 +55,7 @@ bool uci_cmd_position(game *g)
 
     if (uci_eq(tok, "startpos")) 
     {
-        gm_load_fen(g, GM_START_FEN); 
+        load_fen_game(g, START_FEN); 
         tok = uci_next(); 
     }
     else if (uci_eq(tok, "fen")) 
@@ -72,15 +72,15 @@ bool uci_cmd_position(game *g)
         }
         // tok is NULL or "moves" at this point 
 
-        gm_load_fen(g, fen); 
+        load_fen_game(g, fen); 
     }
 
     if (uci_eq(tok, "moves")) 
     {
         while ((tok = uci_next())) 
         {
-            vec_clear(&moves); 
-            gm_mvs(g, &moves); 
+            clear_vec(&moves); 
+            gen_mvs(g, &moves); 
 
             piece pro = PC_P; 
 
@@ -112,18 +112,18 @@ bool uci_cmd_position(game *g)
                 success = false; goto done; 
             }
 
-            square from = sq_make(tok[0] - 'a', tok[1] - '1'); 
-            square to = sq_make(tok[2] - 'a', tok[3] - '1'); 
+            square from = make_sq(tok[0] - 'a', tok[1] - '1'); 
+            square to = make_sq(tok[2] - 'a', tok[3] - '1'); 
 
-            printf("%s (%s) to %s\n", sq_str(from), pc_str(gm_pc_at(g, from)), sq_str(to)); 
+            printf("%s (%s) to %s\n", sq_str(from), pc_str(pc_at(g, from)), sq_str(to)); 
 
-            // if pro is still pawn, then it wasn't prod -> get the real original piece
+            // if pro is still pawn, then it wasn't promoted -> get the real original piece
             if (pro == PC_P) 
             {
-                pro = pc_no_col(gm_pc_at(g, from)); 
+                pro = no_col_pc(pc_at(g, from)); 
             }
 
-            pro = pc_make(pro, g->turn); 
+            pro = make_pc(pro, g->turn); 
 
             printf("Piece: %s\n", pc_str(pro)); 
 
@@ -131,12 +131,12 @@ bool uci_cmd_position(game *g)
             bool found = false; 
             for (size_t i = 0; i < moves.size; i++) 
             {
-                move m = VEC_AT(&moves, move, i); 
-                mv_print(m); 
-                if (mv_from_sq(m) == from && mv_to_sq(m) == to && mv_pro(m) == pro) 
+                move m = AT_VEC(&moves, move, i); 
+                print_mv(m); 
+                if (from_sq(m) == from && to_sq(m) == to && promoted(m) == pro) 
                 {
                     found = true; 
-                    gm_push_mv(g, m); 
+                    push_mv(g, m); 
                 }
             }
 
@@ -152,16 +152,16 @@ bool uci_cmd_position(game *g)
 done: 
     if (!success) 
     {
-        gm_load_fen(g, GM_START_FEN); 
+        load_fen_game(g, START_FEN); 
     }
 
-    vec_destroy(&moves); 
+    destroy_vec(&moves); 
     return success; 
 }
 
 bool uci_cmd_print(game *g) 
 {
-    gm_print(g); 
+    print_game(g); 
     return true; 
 }
 
@@ -187,11 +187,11 @@ bool uci_cmd_go(game *g)
 
     int eval = 0; 
     vector pv; 
-    VEC_CREATE(&pv, move); 
+    CREATE_VEC(&pv, move); 
 
-    gm_search(g, depth, &pv, &eval); 
+    search(g, depth, &pv, &eval); 
 
-    vec_destroy(&pv); 
+    destroy_vec(&pv); 
     return true; 
 }
 
@@ -223,7 +223,7 @@ int main(void)
     fflush(stdout); 
 
     game g; 
-    gm_create_fen(&g, GM_START_FEN); 
+    create_fen_game(&g, START_FEN); 
 
     FILE *tmp = fopen("C:\\Users\\Nicholas\\Documents\\Code\\chess-engine\\build\\input.txt", "a"); 
     fprintf(tmp, "NEW RUN\n"); 
@@ -241,6 +241,6 @@ int main(void)
 
     fclose(tmp); 
 
-    gm_destroy(&g); 
+    destroy_game(&g); 
     return 0; 
 }

@@ -7,7 +7,7 @@
 #define CAS_BK 4 
 #define CAS_BQ 8 
 #define CAS_B 12 
-        
+
 #define CAS_ALL 15 
 #define CAS_NONE 0 
 
