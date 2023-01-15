@@ -11,11 +11,11 @@ set(CMAKE_C_FLAGS "-Wall -Wextra -pedantic -m64 -Wno-unused-function -Wno-unused
 set(CMAKE_C_FLAGS_DEBUG "-g")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops")
 
-include_directories(source) 
+include_directories(src) 
 
-set(sources 
+set(srcs 
     
 )
 
-add_executable(engine source/main.c ${sources})
-add_executable(perft source/perft.c ${sources})
+add_executable(engine src/main.c ${srcs})
+add_executable(perft src/perft.c ${srcs})
