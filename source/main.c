@@ -1,7 +1,9 @@
+#include <stdatomic.h> 
 #include <stdbool.h> 
 #include <stdio.h> 
 #include <stdlib.h> 
 #include <string.h> 
+#include <pthread.h> 
 
 #include "bitboard.h" 
 #include "castle.h"
@@ -31,6 +33,12 @@ bool uci_command_uci(game *g)
     printf("id name chess-engine 0.1\n"); 
     printf("id author Nicholas Hamilton\n"); 
     printf("uciok\n"); 
+    return true; 
+}
+
+bool uci_command_isready(game *g) 
+{
+    printf("readyok\n"); 
     return true; 
 }
 
@@ -105,19 +113,24 @@ bool uci_command_position(game *g)
             square from = square_make(token[0] - 'a', token[1] - '1'); 
             square to = square_make(token[2] - 'a', token[3] - '1'); 
 
+            printf("%s (%s) to %s\n", square_string(from), piece_string(game_piece_at(g, from)), square_string(to)); 
+
             // if promote is still pawn, then it wasn't promoted -> get the real original piece
             if (promote == PIECE_P) 
             {
-                promote == piece_get_colorless(game_piece_at(g, from)); 
+                promote = piece_get_colorless(game_piece_at(g, from)); 
             }
 
             promote = piece_make_colored(promote, g->turn); 
+
+            printf("Piece: %s\n", piece_string(promote)); 
 
             // make sure the complete move is legal 
             bool found = false; 
             for (size_t i = 0; i < moves.size; i++) 
             {
                 move m = VECTOR_AT_TYPE(&moves, move, i); 
+                move_print(m); 
                 if (move_get_from_square(m) == from && move_get_to_square(m) == to && move_get_promotion_piece(m) == promote) 
                 {
                     found = true; 
@@ -126,7 +139,11 @@ bool uci_command_position(game *g)
             }
 
             // keep previous legal moves, only ignore remaining 
-            if (!found) goto done; 
+            if (!found) 
+            {
+                printf("Could not find move '%s'\n", token); 
+                goto done; 
+            }
         }
     }
 
@@ -148,7 +165,32 @@ bool uci_command_print(game *g)
 
 bool uci_command_go(game *g) 
 {
-    return false; 
+    const char *token; 
+    int depth = -1; 
+
+    while (token = uci_next_token()) 
+    {
+        if (uci_equals(token, "depth") && (token = uci_next_token())) 
+        {
+            depth = atoi(token); 
+        }
+    }
+
+    if (depth <= 0) 
+    {
+        depth = 4; 
+    }
+
+    printf("info string Searching with max depth of %d\n", depth); 
+
+    int eval = 0; 
+    vector pv; 
+    VECTOR_CREATE_TYPE(&pv, move); 
+
+    game_search(g, depth, &pv, &eval); 
+
+    vector_destroy(&pv); 
+    return true; 
 }
 
 bool uci_parse(game *g, const char *orig_cmd) 
@@ -164,6 +206,7 @@ bool uci_parse(game *g, const char *orig_cmd)
     {
         if (uci_equals(token, "quit")) exit(0); 
         if (uci_equals(token, "uci")) return uci_command_uci(g); 
+        if (uci_equals(token, "isready")) return uci_command_isready(g); 
         if (uci_equals(token, "position")) return uci_command_position(g); 
         if (uci_equals(token, "d")) return uci_command_print(g); 
         if (uci_equals(token, "go")) return uci_command_go(g); 
@@ -180,14 +223,21 @@ int main(void)
     game g; 
     game_create_fen(&g, GAME_STARTING_FEN); 
 
+    FILE *tmp = fopen("C:\\Users\\Nicholas\\Documents\\Code\\chess-engine\\build\\input.txt", "a"); 
+    fprintf(tmp, "NEW RUN\n"); 
+
     char input[UCI_MAX_INPUT]; 
     while (true) 
     {
         fflush(stdout); 
         fgets(input, UCI_MAX_INPUT, stdin); 
+        fprintf(tmp, "%s", input); 
+        fflush(tmp); 
         input[strlen(input) - 1] = '\0'; 
         if (!uci_parse(&g, input)) printf("Unknown command: '%s'\n", input); 
     }
+
+    fclose(tmp); 
 
     game_destroy(&g); 
     return 0; 

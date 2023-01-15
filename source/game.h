@@ -286,6 +286,11 @@ static void game_create_fen(game *g, const char *fen)
     game_load_fen(g, fen); 
 }
 
+static inline int game_sign(const game *g) 
+{
+    return 1 - 2 * g->turn; 
+}
+
 // assumes there is a white piece on the square, otherwise returns WP
 static inline piece game_white_piece_at(const game *g, square sq) 
 {
@@ -849,6 +854,140 @@ static void game_generate_moves(const game *g, vector *out)
     }
 }
 
+static const int GAME_EVAL_P[64] = 
+{
+      0,   0,   0,   0,   0,   0,   0,   0, 
+      5,  10,  10, -20, -20,  10,  10,   5, 
+      5,  -5, -10,   0,   0, -10,  -5,   5, 
+      0,   0,   0,  20,  20,   0,   0,   0, 
+      5,   5,  10,  25,  25,  10,   5,   5, 
+     10,  10,  20,  30,  30,  20,  10,  10, 
+     50,  50,  50,  50,  50,  50,  50,  50, 
+      0,   0,   0,   0,   0,   0,   0,   0
+};
+
+static const int GAME_EVAL_N[64] = 
+{
+    -50, -40, -30, -30, -30, -30, -40, -50, 
+    -40, -20,   0,   5,   5,   0, -20, -40, 
+    -30,   5,  10,  15,  15,  10,   5, -30, 
+    -30,   0,  15,  20,  20,  15,   0, -30, 
+    -30,   5,  15,  20,  20,  15,   5, -30, 
+    -30,   0,  10,  15,  15,  10,   0, -30, 
+    -40, -20,   0,   0,   0,   0, -20, -40, 
+    -50, -40, -30, -30, -30, -30, -40, -50 
+};
+
+static const int GAME_EVAL_B[64] = 
+{
+    -20, -10, -10, -10, -10, -10, -10, -20, 
+    -10,   5,   0,   0,   0,   0,   5, -10, 
+    -10,  10,  10,  10,  10,  10,  10, -10, 
+    -10,   0,  10,  10,  10,  10,   0, -10, 
+    -10,   5,   5,  10,  10,   5,   5, -10, 
+    -10,   0,   5,  10,  10,   5,   0, -10, 
+    -10,   0,   0,   0,   0,   0,   0, -10, 
+    -20, -10, -10, -10, -10, -10, -10, -20 
+};
+
+static const int GAME_EVAL_R[64] = 
+{
+      0,   0,   0,   5,   5,   0,   0,   0, 
+     -5,   0,   0,   0,   0,   0,   0,  -5, 
+     -5,   0,   0,   0,   0,   0,   0,  -5, 
+     -5,   0,   0,   0,   0,   0,   0,  -5, 
+     -5,   0,   0,   0,   0,   0,   0,  -5, 
+     -5,   0,   0,   0,   0,   0,   0,  -5, 
+      5,  10,  10,  10,  10,  10,  10,   5, 
+      0,   0,   0,   0,   0,   0,   0,   0 
+};
+
+static const int GAME_EVAL_Q[64] = 
+{
+    -20, -10, -10,  -5,  -5, -10, -10, -20, 
+    -10,   0,   5,   0,   0,   5,   0, -10, 
+    -10,   0,   5,   5,   5,   5,   0, -10, 
+      0,   0,   5,   5,   5,   5,   0,   0, 
+      0,   0,   5,   5,   5,   5,   0,   0, 
+    -10,   0,   5,   5,   5,   5,   0, -10, 
+    -10,   0,   0,   0,   0,   0,   0, -10, 
+    -20, -10, -10,  -5,  -5, -10, -10, -20, 
+};
+
+static const int GAME_EVAL_K[64] = 
+{
+     20,  30,  10,   0,   0,  10,  30,  20, 
+     20,  20,   0,   0,   0,   0,  20,  20, 
+    -10, -20, -20, -20, -20, -20, -20, -10, 
+    -20, -30, -30, -40, -40, -30, -30, -20, 
+    -30, -40, -40, -50, -50, -40, -40, -30, 
+    -30, -40, -40, -50, -50, -40, -40, -30, 
+    -30, -40, -40, -50, -50, -40, -40, -30, 
+    -30, -40, -40, -50, -50, -40, -40, -30, 
+};
+
+static inline int game_eval_bitboard(bitboard pcs, const int eval[64]) 
+{
+    int sum = 0; 
+
+    BITBOARD_FOR_EACH_BIT(pcs, 
+    {
+        sum += eval[sq]; 
+    });
+
+    return sum; 
+}
+
+static inline int game_evaluate(const game *g, int num_moves) 
+{
+    int eval = 0; 
+
+    if (num_moves == 0) 
+    {
+        if (g->in_check) 
+        {
+            // lower value the farther out the mate is (prioritize faster mates)
+            return 100000 * (-1 + 2 * g->turn) - g->ply; 
+        }
+        else 
+        {
+            // stalemate
+            return 0; 
+        }
+    }
+
+    // material 
+    eval += 100 * (bitboard_pop_count(g->pieces[PIECE_WP]) - bitboard_pop_count(g->pieces[PIECE_BP])); 
+    eval += 310 * (bitboard_pop_count(g->pieces[PIECE_WN]) - bitboard_pop_count(g->pieces[PIECE_BN])); 
+    eval += 320 * (bitboard_pop_count(g->pieces[PIECE_WB]) - bitboard_pop_count(g->pieces[PIECE_BB])); 
+    eval += 500 * (bitboard_pop_count(g->pieces[PIECE_WR]) - bitboard_pop_count(g->pieces[PIECE_BR])); 
+    eval += 900 * (bitboard_pop_count(g->pieces[PIECE_WQ]) - bitboard_pop_count(g->pieces[PIECE_BQ])); 
+    eval += 10000 * (bitboard_pop_count(g->pieces[PIECE_WK]) - bitboard_pop_count(g->pieces[PIECE_BK])); 
+
+    // bishop pair 
+    eval += 15 * ((bitboard_pop_count(g->pieces[PIECE_WB]) >= 2) - (bitboard_pop_count(g->pieces[PIECE_BB]) >= 2)); 
+
+    eval += game_eval_bitboard(g->pieces[PIECE_WP], GAME_EVAL_P); 
+    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BP]), GAME_EVAL_P); 
+
+    eval += game_eval_bitboard(g->pieces[PIECE_WN], GAME_EVAL_N); 
+    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BN]), GAME_EVAL_N); 
+
+    eval += game_eval_bitboard(g->pieces[PIECE_WB], GAME_EVAL_B); 
+    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BB]), GAME_EVAL_B); 
+
+    eval += game_eval_bitboard(g->pieces[PIECE_WR], GAME_EVAL_R); 
+    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BR]), GAME_EVAL_R); 
+
+    eval += game_eval_bitboard(g->pieces[PIECE_WQ], GAME_EVAL_Q); 
+    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BQ]), GAME_EVAL_Q); 
+
+    eval += game_eval_bitboard(g->pieces[PIECE_WK], GAME_EVAL_K); 
+    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BK]), GAME_EVAL_K); 
+
+    return eval; 
+}
+
 static void game_print(const game *g) 
 {
     static const char *empty = "."; 
@@ -884,6 +1023,7 @@ static void game_print(const game *g)
     printf("En passant: %s\n", g->en_passant == SQUARE_NONE ? "(none)" : square_string(g->en_passant)); 
     printf("In check: %s\n", g->in_check ? "yes" : "no"); 
     printf("# moves: %zu\n", num_moves); 
+    printf("Static eval: %.2f\n", game_evaluate(g, num_moves) * 0.01); 
     printf("%s to move\n", g->turn ? "Black" : "White"); 
 
     // for (size_t i = 0; i < num_moves; i++) 
@@ -942,4 +1082,131 @@ static inline uint64_t game_perft(game *g, int depth)
 
     vector_destroy(&moves); 
     return total; 
+}
+
+typedef struct pv_line pv_line; 
+struct pv_line 
+{
+    size_t n_moves; 
+    move moves[128]; 
+};
+
+static inline int game_quiescence(game *g, int alpha, int beta, int depth, vector *moves) 
+{
+    size_t start = moves->size; 
+
+    game_generate_moves(g, moves); 
+
+    int stand_pat = game_sign(g) * game_evaluate(g, moves->size - start); 
+
+    if (stand_pat >= beta) 
+    {
+        vector_pop_to_size(moves, start); 
+        return beta; 
+    }
+    if (stand_pat > alpha) 
+    {
+        alpha = stand_pat; 
+    }
+
+    if (depth >= 1) 
+    {
+        for (size_t i = start; i < moves->size; i++) 
+        {
+            move mv = VECTOR_AT_TYPE(moves, move, i); 
+
+            // only consider captures 
+            if (move_takes_en_passant(mv) | bitboard_at(g->colors[color_get_other(g->turn)], move_get_to_square(mv))) 
+            {
+                game_push_move(g, mv); 
+                int score = -game_quiescence(g, -beta, -alpha, depth - 1, moves); 
+                game_pop_move(g); 
+
+                if (score >= beta) 
+                {
+                    vector_pop_to_size(moves, start); 
+                    return beta; 
+                }
+                if (score > alpha) 
+                {
+                    alpha = score; 
+                }
+            }
+        }
+    }
+
+    vector_pop_to_size(moves, start); 
+    return alpha; 
+}
+
+static inline int game_negamax(game *g, int alpha, int beta, int depth, vector *moves, pv_line *pv) 
+{
+    pv_line line; 
+    size_t start = moves->size; 
+
+    game_generate_moves(g, moves); 
+    int num_moves = moves->size - start; 
+
+    if (num_moves == 0 || depth <= 0) 
+    {
+        pv->n_moves = 0; 
+        vector_pop_to_size(moves, start); 
+        return game_quiescence(g, alpha, beta, 32, moves); 
+    }
+
+    for (size_t i = start; i < moves->size; i++) 
+    {
+        game_push_move(g, VECTOR_AT_TYPE(moves, move, i)); 
+        int eval = -game_negamax(g, -beta, -alpha, depth - 1, moves, &line); 
+        game_pop_move(g); 
+
+        if (eval >= beta) 
+        {
+            vector_pop_to_size(moves, start); 
+            return beta; 
+        }
+
+        if (VECTOR_AT_TYPE(moves, move, i) == 0) 
+        {
+            printf("what\n"); 
+            fflush(stdout); 
+        }
+
+        if (eval > alpha) 
+        {
+            alpha = eval; 
+            pv->moves[0] = VECTOR_AT_TYPE(moves, move, i); 
+            memcpy(pv->moves + 1, line.moves, line.n_moves * sizeof(move)); 
+            pv->n_moves = line.n_moves + 1; 
+        }
+    }
+
+    vector_pop_to_size(moves, start); 
+    return alpha; 
+}
+
+static inline void game_search(game *g, int search_depth, vector *pv, int *eval) 
+{
+    vector moves; 
+    VECTOR_CREATE_TYPE(&moves, move); 
+
+    pv_line line; 
+    for (int depth = 1; depth <= search_depth; depth++) 
+    {
+        vector_clear(&moves); 
+        int eval = game_negamax(g, -INT_MAX, INT_MAX, depth, &moves, &line); 
+        printf("info depth %d seldepth %zu multipv 1 score cp %d nodes 1 nps 1 pv ", depth, line.n_moves, eval); 
+        for (size_t i = 0; i < line.n_moves; i++) 
+        {
+            move_print_end(line.moves[i], " "); 
+        }
+        printf("\n"); 
+
+        fflush(stdout); 
+    }
+
+    printf("bestmove "); 
+    move_print_end(line.moves[0], "\n"); 
+
+    vector_destroy(&moves); 
 }

@@ -6,6 +6,7 @@
 
 #define VECTOR_CREATE_TYPE(v, type) vector_create(v, sizeof(type))
 #define VECTOR_PUSH_TYPE(v, type, value) do { type vector_tmp_value = (value); vector_push(v, &vector_tmp_value); } while (0)
+#define VECTOR_INSERT_TYPE(v, type, index, value) do { type vector_tmp_value = (value); vector_insert(v, index, &vector_tmp_value); } while (0)
 #define VECTOR_AT_TYPE(v, type, index) *(type *) vector_at(v, index) 
 
 typedef struct vector vector; 
@@ -90,6 +91,14 @@ static inline void vector_get(const vector *v, size_t index, void *out)
 static inline void vector_set(vector *v, size_t index, const void *in) 
 {
     memcpy(vector_at(v, index), in, v->elem_size); 
+}
+
+static inline void vector_insert(vector *v, size_t index, const void *in) 
+{
+    vector_reserve(v, v->size + 1); 
+    memmove(vector_at(v, index + 1), vector_at(v, index), v->elem_size * (v->size - index)); 
+    v->size++; 
+    vector_set(v, index, in); 
 }
 
 static inline void vector_clear(vector *v) 
