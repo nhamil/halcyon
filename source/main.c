@@ -45,7 +45,7 @@ bool uci_command_isready(game *g)
 bool uci_command_position(game *g) 
 {
     vector moves; 
-    VECTOR_CREATE_TYPE(&moves, move); 
+    CREATE_VEC(&moves, move); 
 
     const char *token = uci_next_token(); 
 
@@ -53,7 +53,7 @@ bool uci_command_position(game *g)
 
     if (uci_equals(token, "startpos")) 
     {
-        game_load_fen(g, GAME_STARTING_FEN); 
+        load_fen(g, START_FEN); 
         token = uci_next_token(); 
     }
     else if (uci_equals(token, "fen")) 
@@ -70,17 +70,17 @@ bool uci_command_position(game *g)
         }
         // token is NULL or "moves" at this point 
 
-        game_load_fen(g, fen); 
+        load_fen(g, fen); 
     }
 
     if (uci_equals(token, "moves")) 
     {
         while (token = uci_next_token()) 
         {
-            vector_clear(&moves); 
-            game_generate_moves(g, &moves); 
+            clear_vec(&moves); 
+            gen_moves(g, &moves); 
 
-            piece promote = PIECE_P; 
+            piece promote = PC_P; 
 
             if (strlen(token) == 4) 
             {
@@ -99,10 +99,10 @@ bool uci_command_position(game *g)
                 }
                 else 
                 {
-                    if (token[4] == 'q') promote = PIECE_Q; 
-                    if (token[4] == 'r') promote = PIECE_R; 
-                    if (token[4] == 'b') promote = PIECE_B; 
-                    if (token[4] == 'n') promote = PIECE_N; 
+                    if (token[4] == 'q') promote = PC_Q; 
+                    if (token[4] == 'r') promote = PC_R; 
+                    if (token[4] == 'b') promote = PC_B; 
+                    if (token[4] == 'n') promote = PC_N; 
                 }
             }
             else 
@@ -110,31 +110,31 @@ bool uci_command_position(game *g)
                 success = false; goto done; 
             }
 
-            square from = square_make(token[0] - 'a', token[1] - '1'); 
-            square to = square_make(token[2] - 'a', token[3] - '1'); 
+            square from = make_sq(token[0] - 'a', token[1] - '1'); 
+            square to = make_sq(token[2] - 'a', token[3] - '1'); 
 
-            printf("%s (%s) to %s\n", square_string(from), piece_string(game_piece_at(g, from)), square_string(to)); 
+            printf("%s (%s) to %s\n", str_sq(from), str_pc(pc_at(g, from)), str_sq(to)); 
 
             // if promote is still pawn, then it wasn't promoted -> get the real original piece
-            if (promote == PIECE_P) 
+            if (promote == PC_P) 
             {
-                promote = piece_get_colorless(game_piece_at(g, from)); 
+                promote = get_no_col(pc_at(g, from)); 
             }
 
-            promote = piece_make_colored(promote, g->turn); 
+            promote = make_pc(promote, g->turn); 
 
-            printf("Piece: %s\n", piece_string(promote)); 
+            printf("Piece: %s\n", str_pc(promote)); 
 
             // make sure the complete move is legal 
             bool found = false; 
             for (size_t i = 0; i < moves.size; i++) 
             {
-                move m = VECTOR_AT_TYPE(&moves, move, i); 
-                move_print(m); 
-                if (move_get_from_square(m) == from && move_get_to_square(m) == to && move_get_promotion_piece(m) == promote) 
+                move m = AT_VEC(&moves, move, i); 
+                print_move(m); 
+                if (from_sq(m) == from && to_sq(m) == to && pro_pc(m) == promote) 
                 {
                     found = true; 
-                    game_push_move(g, m); 
+                    push_move(g, m); 
                 }
             }
 
@@ -150,10 +150,10 @@ bool uci_command_position(game *g)
 done: 
     if (!success) 
     {
-        game_load_fen(g, GAME_STARTING_FEN); 
+        load_fen(g, START_FEN); 
     }
 
-    vector_destroy(&moves); 
+    destroy_vec(&moves); 
     return success; 
 }
 
@@ -185,11 +185,11 @@ bool uci_command_go(game *g)
 
     int eval = 0; 
     vector pv; 
-    VECTOR_CREATE_TYPE(&pv, move); 
+    CREATE_VEC(&pv, move); 
 
-    game_search(g, depth, &pv, &eval); 
+    search(g, depth, &pv, &eval); 
 
-    vector_destroy(&pv); 
+    destroy_vec(&pv); 
     return true; 
 }
 
@@ -221,7 +221,7 @@ int main(void)
     fflush(stdout); 
 
     game g; 
-    game_create_fen(&g, GAME_STARTING_FEN); 
+    create_game_fen(&g, START_FEN); 
 
     FILE *tmp = fopen("C:\\Users\\Nicholas\\Documents\\Code\\chess-engine\\build\\input.txt", "a"); 
     fprintf(tmp, "NEW RUN\n"); 
@@ -239,6 +239,6 @@ int main(void)
 
     fclose(tmp); 
 
-    game_destroy(&g); 
+    destroy_game(&g); 
     return 0; 
 }

@@ -2,58 +2,58 @@
 
 #include <stdint.h> 
 
-#define COLOR_W 0 
-#define COLOR_B 1 
+#define COL_W 0 
+#define COL_B 1 
 
-#define PIECE_P 0
-#define PIECE_N 1
-#define PIECE_B 2
-#define PIECE_R 3
-#define PIECE_Q 4
-#define PIECE_K 5
-#define PIECE_WP 0
-#define PIECE_WN 1
-#define PIECE_WB 2
-#define PIECE_WR 3
-#define PIECE_WQ 4
-#define PIECE_WK 5
-#define PIECE_BP 6
-#define PIECE_BN 7
-#define PIECE_BB 8
-#define PIECE_BR 9
-#define PIECE_BQ 10
-#define PIECE_BK 11
-#define PIECE_COUNT 12
+#define PC_P 0
+#define PC_N 1
+#define PC_B 2
+#define PC_R 3
+#define PC_Q 4
+#define PC_K 5
+#define PC_WP 0
+#define PC_WN 1
+#define PC_WB 2
+#define PC_WR 3
+#define PC_WQ 4
+#define PC_WK 5
+#define PC_BP 6
+#define PC_BN 7
+#define PC_BB 8
+#define PC_BR 9
+#define PC_BQ 10
+#define PC_BK 11
+#define PC_CNT 12
 
 typedef int color; 
 typedef int piece; 
 
-static inline color color_get_other(color c) 
+static inline color opp_col(color c) 
 {
     return c ^ 1; 
 }
 
-static inline color piece_get_color(piece p) 
+static inline color get_col(piece p) 
 {
     return p >= 6; 
 }
 
-static inline piece piece_get_colorless(piece p) 
+static inline piece get_no_col(piece p) 
 {
     return p - (p >= 6) * 6; 
 }
 
-static inline piece piece_make_colored(piece colorless, color col) 
+static inline piece make_pc(piece colorless, color col) 
 {
     return colorless + col * 6; 
 }
 
-static inline piece piece_make_recolor(piece p, color col) 
+static inline piece recolor(piece p, color col) 
 {
-    return piece_make_colored(piece_get_colorless(p), col); 
+    return make_pc(get_no_col(p), col); 
 }
 
-static inline const char *piece_string(piece p) 
+static inline const char *str_pc(piece p) 
 {
     static const char *STR[] = 
     {
@@ -63,7 +63,7 @@ static inline const char *piece_string(piece p)
     return STR[p]; 
 }
 
-static inline const char *piece_string_colorless(piece p) 
+static inline const char *str_pc_no_col(piece p) 
 {
     static const char *STR[] = 
     {

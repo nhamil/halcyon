@@ -13,7 +13,7 @@
 
 typedef int castle_flags; 
 
-static const char *castle_string(castle_flags cf) 
+static const char *str_castle(castle_flags cf) 
 {
     static const char *STR[] = 
     {

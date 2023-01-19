@@ -16,98 +16,98 @@
 // from:0-5 to:6-11 piece:12-15 promote:16-19 ep:20-25 take_ep:26 castle:27-29
 typedef uint32_t move; 
 
-static inline move move_make(square from, square to, piece pc, piece promote) 
+static inline move make_move(square from, square to, piece pc, piece promote) 
 {
     return from | to << 6 | pc << 12 | promote << 16; 
 }
 
-static inline move move_make_allow_en_passant(square from, square to, piece pc, square ep) 
+static inline move make_move_allow_ep(square from, square to, piece pc, square ep) 
 {
-    return move_make(from, to, pc, pc) | ep << 20; 
+    return make_move(from, to, pc, pc) | ep << 20; 
 }
 
-static inline move move_make_take_en_passant(square from, square to, piece pc, bool take) 
+static inline move make_move_ep(square from, square to, piece pc, bool take) 
 {
-    return move_make(from, to, pc, pc) | take << 26; 
+    return make_move(from, to, pc, pc) | take << 26; 
 }
 
-static inline move move_make_castle(square from, square to, piece pc, int castle_index) 
+static inline move make_move_castle(square from, square to, piece pc, int castle_index) 
 {
-    return move_make(from, to, pc, pc) | castle_index << 27; 
+    return make_move(from, to, pc, pc) | castle_index << 27; 
 }
 
-static inline square move_get_from_square(move m) 
+static inline square from_sq(move m) 
 {
     return m & 63; 
 }
 
-static inline square move_get_to_square(move m) 
+static inline square to_sq(move m) 
 {
     return (m >> 6) & 63; 
 }
 
-static inline piece move_get_from_piece(move m) 
+static inline piece from_pc(move m) 
 {
     return (m >> 12) & 15; 
 }
 
-static inline int move_get_castle(move m) 
+static inline int castle_idx(move m) 
 {
     return (m >> 27) & 7; 
 }
 
-static inline square move_get_en_passant_square(move m) 
+static inline square ep_square(move m) 
 {
     return (m >> 20) & 63; 
 }
 
-static inline bool move_takes_en_passant(move m) 
+static inline bool takes_ep(move m) 
 {
     return (m >> 26) & 1; 
 }
 
-static inline piece move_get_promotion_piece(move m) 
+static inline piece pro_pc(move m) 
 {
     return (m >> 16) & 15; 
 }
 
-static inline bool move_has_promotion(move m) 
+static inline bool has_pro(move m) 
 {
-    return move_get_from_piece(m) != move_get_promotion_piece(m); 
+    return from_pc(m) != pro_pc(m); 
 }
 
-static void move_print(move m) 
+static void print_move(move m) 
 {
-    if (move_has_promotion(m)) 
+    if (has_pro(m)) 
     {
-        printf("%16x %s%s%s\n", m, square_string(move_get_from_square(m)), square_string(move_get_to_square(m)), piece_string_colorless(move_get_promotion_piece(m))); 
+        printf("%16x %s%s%s\n", m, str_sq(from_sq(m)), str_sq(to_sq(m)), str_pc_no_col(pro_pc(m))); 
     }
     else 
     {
-        printf("%16x %s%s\n", m, square_string(move_get_from_square(m)), square_string(move_get_to_square(m))); 
+        printf("%16x %s%s\n", m, str_sq(from_sq(m)), str_sq(to_sq(m))); 
     }
 }
 
-static void move_print_end(move m, const char *end) 
+static void print_move_end(move m, const char *end) 
 {
-    if (move_has_promotion(m)) 
+    if (has_pro(m)) 
     {
-        printf("%s%s%s%s", square_string(move_get_from_square(m)), square_string(move_get_to_square(m)), piece_string_colorless(move_get_promotion_piece(m)), end); 
+        printf("%s%s%s%s", str_sq(from_sq(m)), str_sq(to_sq(m)), str_pc_no_col(pro_pc(m)), end); 
     }
     else 
     {
-        printf("%s%s%s", square_string(move_get_from_square(m)), square_string(move_get_to_square(m)), end); 
+        printf("%s%s%s", str_sq(from_sq(m)), str_sq(to_sq(m)), end); 
     }
 }
 
-static int move_snprintf(move m, char *out, size_t n) 
+static int snprintf_move(move m, char *out, size_t n) 
 {
-    if (move_has_promotion(m)) 
+    if (has_pro(m)) 
     {
-        return snprintf(out, n, "%s%s%s", square_string(move_get_from_square(m)), square_string(move_get_to_square(m)), piece_string_colorless(move_get_promotion_piece(m))); 
+        return snprintf(out, n, "%s%s%s", str_sq(from_sq(m)), str_sq(to_sq(m)), str_pc_no_col(pro_pc(m))); 
     }
     else 
     {
-       return snprintf(out, n, "%s%s", square_string(move_get_from_square(m)), square_string(move_get_to_square(m))); 
+       return snprintf(out, n, "%s%s", str_sq(from_sq(m)), str_sq(to_sq(m))); 
     }
 }

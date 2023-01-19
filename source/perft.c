@@ -20,14 +20,14 @@ struct perft_data
     const uint64_t expected[10]; 
 };
 
-bool perft(const char *name, const char *fen, const uint64_t *expected) 
+bool run_perft(const char *name, const char *fen, const uint64_t *expected) 
 {
     total++; 
 
     bool ret = true; 
 
     game g; 
-    game_create_fen(&g, fen); 
+    create_game_fen(&g, fen); 
 
     printf("%s\n%s\n", name, fen); 
     game_print(&g); 
@@ -36,7 +36,7 @@ bool perft(const char *name, const char *fen, const uint64_t *expected)
     while (expected[++i] > 0) 
     {
         clock_t c = clock(); 
-        uint64_t total = game_perft(&g, i);
+        uint64_t total = perft(&g, i);
         clock_t c2 = clock(); 
 
         double time = (double) (c2 - c) / CLOCKS_PER_SEC; 
@@ -55,7 +55,7 @@ bool perft(const char *name, const char *fen, const uint64_t *expected)
     printf("DONE\n\n"); 
 
 cleanup: 
-    game_destroy(&g); 
+    destroy_game(&g); 
     return ret; 
 }
 
@@ -206,7 +206,7 @@ int main(void)
         char name[64]; 
         snprintf(name, 64, "Position %d / %d", i+1, N); 
 
-        res += perft(name, tests[i].fen, tests[i].expected); 
+        res += run_perft(name, tests[i].fen, tests[i].expected); 
     }
 
     printf("%d / %d passed\n", res, total); 

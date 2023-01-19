@@ -24,9 +24,9 @@ typedef struct game game;
  * ....this square is not in between an attacker and the king (past the attacker) 
  * ....and therefore is not pinned to this square
  */
-#define GAME_TARGET_SQUARES ( \
+#define TARGET_SQUARES ( \
     ok_squares & ( \
-        dirs[pin_idx[sq]] | (BITBOARD_ALL * \
+        dirs[pin_idx[sq]] | (ALL_BITS * \
             ( \
                 ((~pinned >> pin_idx[sq]) & 1) | \
                 ((dirs[pin_idx[sq]] & (1ULL << sq)) == 0) \
@@ -35,62 +35,62 @@ typedef struct game game;
     ) \
 )
 
-#define GAME_STARTING_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+#define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 struct game 
 {
-    bitboard pieces[PIECE_COUNT]; 
-    bitboard colors[2]; 
-    bitboard check; 
+    bboard pieces[PC_CNT]; 
+    bboard colors[2]; 
+    bboard check; 
     castle_flags castle; 
-    square en_passant; 
+    square ep; 
     bool in_check; 
 
-    vector history; 
+    vector hist; 
     int ply; 
     color turn; 
 };
 
-static void game_reset(game *g) 
+static void reset_game(game *g) 
 {
-    vector_clear(&g->history); 
+    clear_vec(&g->hist); 
     memset(&g->pieces, 0, sizeof(g->pieces)); 
     memset(&g->colors, 0, sizeof(g->colors)); 
-    g->check = BITBOARD_NONE; 
+    g->check = NO_BITS; 
     g->castle = CASTLE_NONE; 
-    g->en_passant = SQUARE_NONE; 
+    g->ep = NO_SQ; 
     g->in_check = false; 
     g->ply = 0; 
-    g->turn = COLOR_W; 
+    g->turn = COL_W; 
 }
 
-static void game_create(game *g) 
+static void create_game(game *g) 
 {
-    vector_create(&g->history, offsetof(game, history)); 
-    game_reset(g); 
+    create_vec(&g->hist, offsetof(game, hist)); 
+    reset_game(g); 
 }
 
-static void game_destroy(game *g) 
+static void destroy_game(game *g) 
 {
-    vector_destroy(&g->history); 
+    destroy_vec(&g->hist); 
 }
 
-static void game_load_fen(game *g, const char *fen) 
+static void load_fen(game *g, const char *fen) 
 {
-    game_reset(g); 
+    reset_game(g); 
 
     // decrement once so simple incrementing while loop 
     // starts at the first character
     fen--; 
 
     int mode = 0, turn = 0; 
-    square sq = SQUARE_A1; 
+    square sq = A1; 
     while (*++fen) 
     {
         if (*fen == ' ') 
         {
             mode++; 
-            sq = SQUARE_A1; 
+            sq = A1; 
             continue; 
         }
         switch (mode) 
@@ -99,40 +99,40 @@ static void game_load_fen(game *g, const char *fen)
                 switch (*fen) 
                 {
                     case 'P': 
-                        g->pieces[PIECE_WP] = bitboard_set(g->pieces[PIECE_WP], square_flip_rank(sq++)); 
+                        g->pieces[PC_WP] = set_bit(g->pieces[PC_WP], rrank(sq++)); 
                         break; 
                     case 'p': 
-                        g->pieces[PIECE_BP] = bitboard_set(g->pieces[PIECE_BP], square_flip_rank(sq++)); 
+                        g->pieces[PC_BP] = set_bit(g->pieces[PC_BP], rrank(sq++)); 
                         break; 
                     case 'N': 
-                        g->pieces[PIECE_WN] = bitboard_set(g->pieces[PIECE_WN], square_flip_rank(sq++)); 
+                        g->pieces[PC_WN] = set_bit(g->pieces[PC_WN], rrank(sq++)); 
                         break; 
                     case 'n': 
-                        g->pieces[PIECE_BN] = bitboard_set(g->pieces[PIECE_BN], square_flip_rank(sq++)); 
+                        g->pieces[PC_BN] = set_bit(g->pieces[PC_BN], rrank(sq++)); 
                         break; 
                     case 'B': 
-                        g->pieces[PIECE_WB] = bitboard_set(g->pieces[PIECE_WB], square_flip_rank(sq++)); 
+                        g->pieces[PC_WB] = set_bit(g->pieces[PC_WB], rrank(sq++)); 
                         break; 
                     case 'b': 
-                        g->pieces[PIECE_BB] = bitboard_set(g->pieces[PIECE_BB], square_flip_rank(sq++)); 
+                        g->pieces[PC_BB] = set_bit(g->pieces[PC_BB], rrank(sq++)); 
                         break; 
                     case 'R': 
-                        g->pieces[PIECE_WR] = bitboard_set(g->pieces[PIECE_WR], square_flip_rank(sq++)); 
+                        g->pieces[PC_WR] = set_bit(g->pieces[PC_WR], rrank(sq++)); 
                         break; 
                     case 'r': 
-                        g->pieces[PIECE_BR] = bitboard_set(g->pieces[PIECE_BR], square_flip_rank(sq++)); 
+                        g->pieces[PC_BR] = set_bit(g->pieces[PC_BR], rrank(sq++)); 
                         break; 
                     case 'Q': 
-                        g->pieces[PIECE_WQ] = bitboard_set(g->pieces[PIECE_WQ], square_flip_rank(sq++)); 
+                        g->pieces[PC_WQ] = set_bit(g->pieces[PC_WQ], rrank(sq++)); 
                         break; 
                     case 'q': 
-                        g->pieces[PIECE_BQ] = bitboard_set(g->pieces[PIECE_BQ], square_flip_rank(sq++)); 
+                        g->pieces[PC_BQ] = set_bit(g->pieces[PC_BQ], rrank(sq++)); 
                         break; 
                     case 'K': 
-                        g->pieces[PIECE_WK] = bitboard_set(g->pieces[PIECE_WK], square_flip_rank(sq++)); 
+                        g->pieces[PC_WK] = set_bit(g->pieces[PC_WK], rrank(sq++)); 
                         break; 
                     case 'k': 
-                        g->pieces[PIECE_BK] = bitboard_set(g->pieces[PIECE_BK], square_flip_rank(sq++)); 
+                        g->pieces[PC_BK] = set_bit(g->pieces[PC_BK], rrank(sq++)); 
                         break; 
                     case '8': 
                     case '7': 
@@ -198,8 +198,8 @@ static void game_load_fen(game *g, const char *fen)
                     case 'f': 
                     case 'g': 
                     case 'h': 
-                        sq = square_make(*fen - 'a', square_rank(sq)); 
-                        g->en_passant = sq; 
+                        sq = make_sq(*fen - 'a', get_rank(sq)); 
+                        g->ep = sq; 
                         break; 
                     case '1': 
                     case '2': 
@@ -209,17 +209,17 @@ static void game_load_fen(game *g, const char *fen)
                     case '6': 
                     case '7': 
                     case '8': 
-                        sq = square_make(square_file(sq), *fen - '1'); 
-                        g->en_passant = sq; 
+                        sq = make_sq(get_file(sq), *fen - '1'); 
+                        g->ep = sq; 
                         break; 
                     case '-': 
-                        sq = SQUARE_NONE; 
-                        g->en_passant = sq; 
+                        sq = NO_SQ; 
+                        g->ep = sq; 
                         break; 
                     default: 
                         printf("Unknown FEN character (en passant): %c\n", *fen); 
-                        sq = SQUARE_NONE; 
-                        g->en_passant = sq; 
+                        sq = NO_SQ; 
+                        g->ep = sq; 
                         break; 
                 }
                 break; 
@@ -240,8 +240,8 @@ static void game_load_fen(game *g, const char *fen)
                         break; 
                     default: 
                         printf("Unknown FEN character (halfmove): %c\n", *fen); 
-                        sq = SQUARE_NONE; 
-                        g->en_passant = sq; 
+                        sq = NO_SQ; 
+                        g->ep = sq; 
                         break; 
                 }
                 break; 
@@ -262,8 +262,8 @@ static void game_load_fen(game *g, const char *fen)
                         break; 
                     default: 
                         printf("Unknown FEN character (turn): %c\n", *fen); 
-                        sq = SQUARE_NONE; 
-                        g->en_passant = sq; 
+                        sq = NO_SQ; 
+                        g->ep = sq; 
                         break; 
                 }
                 break; 
@@ -273,113 +273,113 @@ static void game_load_fen(game *g, const char *fen)
 
     g->turn = g->ply & 1; 
 
-    for (piece p = PIECE_P; p <= PIECE_K; p++) 
+    for (piece p = PC_P; p <= PC_K; p++) 
     {
-        g->colors[COLOR_W] |= g->pieces[piece_make_colored(p, COLOR_W)]; 
-        g->colors[COLOR_B] |= g->pieces[piece_make_colored(p, COLOR_B)]; 
+        g->colors[COL_W] |= g->pieces[make_pc(p, COL_W)]; 
+        g->colors[COL_B] |= g->pieces[make_pc(p, COL_B)]; 
     }
 }
 
-static void game_create_fen(game *g, const char *fen) 
+static void create_game_fen(game *g, const char *fen) 
 {
-    game_create(g); 
-    game_load_fen(g, fen); 
+    create_game(g); 
+    load_fen(g, fen); 
 }
 
-static inline int game_sign(const game *g) 
+static inline int col_sign(const game *g) 
 {
     return 1 - 2 * g->turn; 
 }
 
 // assumes there is a white piece on the square, otherwise returns WP
-static inline piece game_white_piece_at(const game *g, square sq) 
+static inline piece w_pc_at(const game *g, square sq) 
 {
     piece p = 0; 
-    p |= bitboard_at(g->pieces[PIECE_WP], sq) * PIECE_WP; 
-    p |= bitboard_at(g->pieces[PIECE_WN], sq) * PIECE_WN; 
-    p |= bitboard_at(g->pieces[PIECE_WB], sq) * PIECE_WB; 
-    p |= bitboard_at(g->pieces[PIECE_WR], sq) * PIECE_WR; 
-    p |= bitboard_at(g->pieces[PIECE_WQ], sq) * PIECE_WQ; 
-    p |= bitboard_at(g->pieces[PIECE_WK], sq) * PIECE_WK; 
+    p |= get_bit(g->pieces[PC_WP], sq) * PC_WP; 
+    p |= get_bit(g->pieces[PC_WN], sq) * PC_WN; 
+    p |= get_bit(g->pieces[PC_WB], sq) * PC_WB; 
+    p |= get_bit(g->pieces[PC_WR], sq) * PC_WR; 
+    p |= get_bit(g->pieces[PC_WQ], sq) * PC_WQ; 
+    p |= get_bit(g->pieces[PC_WK], sq) * PC_WK; 
     return p; 
 }
 
 // assumes there is a black piece on the square, otherwise returns WP
-static inline piece game_black_piece_at(const game *g, square sq) 
+static inline piece b_pc_at(const game *g, square sq) 
 {
     piece p = 0; 
-    p |= bitboard_at(g->pieces[PIECE_BP], sq) * PIECE_BP; 
-    p |= bitboard_at(g->pieces[PIECE_BN], sq) * PIECE_BN; 
-    p |= bitboard_at(g->pieces[PIECE_BB], sq) * PIECE_BB; 
-    p |= bitboard_at(g->pieces[PIECE_BR], sq) * PIECE_BR; 
-    p |= bitboard_at(g->pieces[PIECE_BQ], sq) * PIECE_BQ; 
-    p |= bitboard_at(g->pieces[PIECE_BK], sq) * PIECE_BK; 
+    p |= get_bit(g->pieces[PC_BP], sq) * PC_BP; 
+    p |= get_bit(g->pieces[PC_BN], sq) * PC_BN; 
+    p |= get_bit(g->pieces[PC_BB], sq) * PC_BB; 
+    p |= get_bit(g->pieces[PC_BR], sq) * PC_BR; 
+    p |= get_bit(g->pieces[PC_BQ], sq) * PC_BQ; 
+    p |= get_bit(g->pieces[PC_BK], sq) * PC_BK; 
     return p; 
 }
 
 // assumes there is a piece on the square, otherwise returns WP 
-static inline piece game_piece_at(const game *g, square sq) 
+static inline piece pc_at(const game *g, square sq) 
 {
-    return game_white_piece_at(g, sq) | game_black_piece_at(g, sq); 
+    return w_pc_at(g, sq) | b_pc_at(g, sq); 
 }
 
-static inline void game_pop_move(game *g) 
+static inline void pop_move(game *g) 
 {
-    vector_get(&g->history, g->history.size - 1, g); 
-    vector_pop(&g->history); 
+    get_vec(&g->hist, g->hist.size - 1, g); 
+    pop_vec(&g->hist); 
     g->ply--; 
-    g->turn = color_get_other(g->turn); 
+    g->turn = opp_col(g->turn); 
 }
 
-static inline bool game_in_check(const game *g, color for_color, bitboard check_king, bitboard ignore, bitboard add) 
+static inline bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, bboard add) 
 {
     color col = for_color; 
-    color opp = color_get_other(col); 
+    color opp = opp_col(col); 
 
     // check if any of these squares are attacked 
-    bitboard target = check_king; 
+    bboard target = check_king; 
 
     // blockers include both colors' pieces other than the target squares 
-    bitboard occupants = (((g->colors[col] & ~target) | g->colors[opp]) & ~ignore) | add; 
+    bboard occupants = (((g->colors[col] & ~target) | g->colors[opp]) & ~ignore) | add; 
 
-    bitboard attacks = BITBOARD_NONE; 
-    bitboard tmp; 
+    bboard attacks = NO_BITS; 
+    bboard tmp; 
 
-    BITBOARD_FOR_EACH_BIT(target, 
+    FOR_EACH_BIT(target, 
     {
         // pawn 
-        if (col == COLOR_W) 
+        if (col == COL_W) 
         {
             // check for black pawns north of the king 
-            tmp  = bitboard_shift_nw(target); 
-            tmp |= bitboard_shift_ne(target); 
-            attacks |= tmp & ((g->pieces[PIECE_BP] & ~ignore)); 
+            tmp  = shift_nw(target); 
+            tmp |= shift_ne(target); 
+            attacks |= tmp & ((g->pieces[PC_BP] & ~ignore)); 
         }
         else 
         {
             // check for white pawns south of the king 
-            tmp  = bitboard_shift_sw(target); 
-            tmp |= bitboard_shift_se(target); 
-            attacks |= tmp & ((g->pieces[PIECE_WP] & ~ignore)); 
+            tmp  = shift_sw(target); 
+            tmp |= shift_se(target); 
+            attacks |= tmp & ((g->pieces[PC_WP] & ~ignore)); 
         }
 
         // knight 
-        tmp = BITBOARD_KNIGHT_MOVES[sq]; 
-        attacks |= tmp & g->pieces[piece_make_colored(PIECE_N, opp)]; 
+        tmp = MOVES_N[sq]; 
+        attacks |= tmp & g->pieces[make_pc(PC_N, opp)]; 
 
         // bishop (and queen)
-        tmp  = bitboard_cast_ray(sq, BITBOARD_SLIDE_DIAG[square_diagonal(sq)], occupants); 
-        tmp |= bitboard_cast_ray(sq, BITBOARD_SLIDE_ANTI[square_antidiagonal(sq)], occupants); 
-        attacks |= tmp & (g->pieces[piece_make_colored(PIECE_B, opp)] | g->pieces[piece_make_colored(PIECE_Q, opp)]); 
+        tmp  = cast_ray(sq, SLIDE_DIAG[get_diag(sq)], occupants); 
+        tmp |= cast_ray(sq, SLIDE_ANTI[get_anti(sq)], occupants); 
+        attacks |= tmp & (g->pieces[make_pc(PC_B, opp)] | g->pieces[make_pc(PC_Q, opp)]); 
 
         // rook (and queen)
-        tmp  = bitboard_cast_ray(sq, BITBOARD_SLIDE_FILE[square_file(sq)], occupants); 
-        tmp |= bitboard_cast_ray(sq, BITBOARD_SLIDE_RANK[square_rank(sq)], occupants); 
-        attacks |= tmp & (g->pieces[piece_make_colored(PIECE_R, opp)] | g->pieces[piece_make_colored(PIECE_Q, opp)]); 
+        tmp  = cast_ray(sq, SLIDE_FILE[get_file(sq)], occupants); 
+        tmp |= cast_ray(sq, SLIDE_RANK[get_rank(sq)], occupants); 
+        attacks |= tmp & (g->pieces[make_pc(PC_R, opp)] | g->pieces[make_pc(PC_Q, opp)]); 
 
         // king 
-        tmp = BITBOARD_KING_MOVES[sq]; 
-        attacks |= tmp & g->pieces[piece_make_colored(PIECE_K, opp)]; 
+        tmp = MOVES_K[sq]; 
+        attacks |= tmp & g->pieces[make_pc(PC_K, opp)]; 
 
         if (attacks) return true; 
     });
@@ -388,447 +388,447 @@ static inline bool game_in_check(const game *g, color for_color, bitboard check_
 }
 
 // does not check if the move is legal 
-static void game_push_move(game *g, move m) 
+static void push_move(game *g, move m) 
 {
     // save current state 
-    vector_push(&g->history, g); 
+    push_vec(&g->hist, g); 
 
-    square from = move_get_from_square(m); 
-    square to = move_get_to_square(m); 
+    square from = from_sq(m); 
+    square to = to_sq(m); 
     square rm_tgt = to; // remove opponent's piece on this square (can be different from `to` if en passant)
-    square new_ep = move_get_en_passant_square(m); 
+    square new_ep = ep_square(m); 
 
-    piece pc = move_get_from_piece(m); 
-    piece pro = move_get_promotion_piece(m); 
+    piece pc = from_pc(m); 
+    piece pro = pro_pc(m); 
     piece tgt; 
 
     // note: tgt will be WP if rm_tgt is empty 
-    if (g->turn == COLOR_W) 
+    if (g->turn == COL_W) 
     {
-        rm_tgt -= 8 * move_takes_en_passant(m); // target piece is south (behind the capturing pawn) if ep
-        tgt = game_black_piece_at(g, rm_tgt); 
+        rm_tgt -= 8 * takes_ep(m); // target piece is south (behind the capturing pawn) if ep
+        tgt = b_pc_at(g, rm_tgt); 
     }
     else // B
     {
-        rm_tgt += 8 * move_takes_en_passant(m); // target piece is north (behind the capturing pawn) if ep
-        tgt = game_white_piece_at(g, rm_tgt); 
+        rm_tgt += 8 * takes_ep(m); // target piece is north (behind the capturing pawn) if ep
+        tgt = w_pc_at(g, rm_tgt); 
     }
 
     // take moving piece off the board 
-    g->pieces[pc] = bitboard_clear(g->pieces[pc], from); 
+    g->pieces[pc] = clear_bits(g->pieces[pc], from); 
 
     // WP if rm_tgt is empty, but this is okay because if pc is WP it will re-enable this square right after 
-    g->pieces[tgt] = bitboard_clear(g->pieces[tgt], rm_tgt); 
+    g->pieces[tgt] = clear_bits(g->pieces[tgt], rm_tgt); 
 
     // place piece onto new square 
-    g->pieces[pro] = bitboard_set(g->pieces[pro], to); 
+    g->pieces[pro] = set_bit(g->pieces[pro], to); 
 
-    color cur_col = g->turn, opp_col = color_get_other(cur_col); 
+    color cur_col = g->turn, oth_col = opp_col(cur_col); 
 
     // remove rooks from aggregate (in case of castling) 
-    g->colors[COLOR_W] ^= g->pieces[PIECE_WR]; 
-    g->colors[COLOR_B] ^= g->pieces[PIECE_BR]; 
+    g->colors[COL_W] ^= g->pieces[PC_WR]; 
+    g->colors[COL_B] ^= g->pieces[PC_BR]; 
 
-    int castle = move_get_castle(m); 
-    g->check = g->pieces[piece_make_colored(PIECE_K, cur_col)] | BITBOARD_CASTLE_TARGETS[castle]; 
+    int castle = castle_idx(m); 
+    g->check = g->pieces[make_pc(PC_K, cur_col)] | CASTLE_TARGETS[castle]; 
 
     // move the rooks when castling 
-    g->pieces[PIECE_WR] = (g->pieces[PIECE_WR] & BITBOARD_CASTLE_KEEP_WR[castle]) | BITBOARD_CASTLE_ADD_WR[castle]; 
-    g->pieces[PIECE_BR] = (g->pieces[PIECE_BR] & BITBOARD_CASTLE_KEEP_BR[castle]) | BITBOARD_CASTLE_ADD_BR[castle]; 
+    g->pieces[PC_WR] = (g->pieces[PC_WR] & CASTLE_KEEP_WR[castle]) | CASTLE_ADD_WR[castle]; 
+    g->pieces[PC_BR] = (g->pieces[PC_BR] & CASTLE_KEEP_BR[castle]) | CASTLE_ADD_BR[castle]; 
 
     castle_flags rem_cf = CASTLE_NONE; 
     // no castling if the king moves
-    rem_cf |= CASTLE_W  * (pc == PIECE_WK); 
-    rem_cf |= CASTLE_B  * (pc == PIECE_BK); 
+    rem_cf |= CASTLE_W  * (pc == PC_WK); 
+    rem_cf |= CASTLE_B  * (pc == PC_BK); 
     // no castling if the rook moves or is captured
-    rem_cf |= CASTLE_WK * ((from == SQUARE_H1) | (to == SQUARE_H1)); 
-    rem_cf |= CASTLE_WQ * ((from == SQUARE_A1) | (to == SQUARE_A1)); 
-    rem_cf |= CASTLE_BK * ((from == SQUARE_H8) | (to == SQUARE_H8)); 
-    rem_cf |= CASTLE_BQ * ((from == SQUARE_A8) | (to == SQUARE_A8)); 
+    rem_cf |= CASTLE_WK * ((from == H1) | (to == H1)); 
+    rem_cf |= CASTLE_WQ * ((from == A1) | (to == A1)); 
+    rem_cf |= CASTLE_BK * ((from == H8) | (to == H8)); 
+    rem_cf |= CASTLE_BQ * ((from == A8) | (to == A8)); 
 
     // remove castling rights if necessary 
     g->castle &= ~rem_cf; 
 
     // re-add rooks from aggregate (in case of castling) 
-    g->colors[COLOR_W] ^= g->pieces[PIECE_WR]; 
-    g->colors[COLOR_B] ^= g->pieces[PIECE_BR]; 
+    g->colors[COL_W] ^= g->pieces[PC_WR]; 
+    g->colors[COL_B] ^= g->pieces[PC_BR]; 
 
     // update aggregate piece tracking 
-    g->colors[cur_col] = bitboard_clear(g->colors[cur_col], from); 
-    g->colors[opp_col] = bitboard_clear(g->colors[opp_col], rm_tgt); 
-    g->colors[cur_col] = bitboard_set(g->colors[cur_col], to); 
+    g->colors[cur_col] = clear_bits(g->colors[cur_col], from); 
+    g->colors[oth_col] = clear_bits(g->colors[oth_col], rm_tgt); 
+    g->colors[cur_col] = set_bit(g->colors[cur_col], to); 
 
     // update rest of state 
-    g->en_passant = new_ep; 
+    g->ep = new_ep; 
     g->ply++; 
-    g->turn = color_get_other(g->turn); 
+    g->turn = opp_col(g->turn); 
 
     // useful to know if the new player is in check 
-    g->in_check = game_in_check(g, g->turn, g->pieces[piece_make_colored(PIECE_K, g->turn)], BITBOARD_NONE, BITBOARD_NONE); 
+    g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
 }
 
-static inline void game_movegen_push_bitboard_moves(bitboard b, square from, piece pc, vector *out) 
+static inline void gen_push(bboard b, square from, piece pc, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, 
+    FOR_EACH_BIT(b, 
     {
-        VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, pc)); 
+        PUSH_VEC(out, move, make_move(from, sq, pc, pc)); 
     });
 }
 
-static inline void game_movegen_push_safe_moves(const game *g, bitboard b, square from, piece pc, vector *out) 
+static inline void gen_push_safe(const game *g, bboard b, square from, piece pc, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, 
+    FOR_EACH_BIT(b, 
     {
-        if (!game_in_check(g, g->turn, bitboard_make_position(sq), bitboard_make_position(from), BITBOARD_NONE)) 
+        if (!in_check(g, g->turn, make_pos(sq), make_pos(from), NO_BITS)) 
         {
-            VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, pc)); 
+            PUSH_VEC(out, move, make_move(from, sq, pc, pc)); 
         }
     });
 }
 
-static inline void game_movegen_push_castle_move(square from, square to, piece pc, int castle_index, vector *out) 
+static inline void gen_push_castle(square from, square to, piece pc, int castle_index, vector *out) 
 {
-    VECTOR_PUSH_TYPE(out, move, move_make_castle(from, to, pc, castle_index)); 
+    PUSH_VEC(out, move, make_move_castle(from, to, pc, castle_index)); 
 }
 
-static inline void game_movegen_push_allow_ep_moves(bitboard b, square from, piece pc, int d_sq, vector *out) 
+static inline void movegen_push_ep(bboard b, square from, piece pc, int d_sq, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, 
+    FOR_EACH_BIT(b, 
     {
-        VECTOR_PUSH_TYPE(out, move, move_make_allow_en_passant(from, sq, pc, sq + d_sq)); 
+        PUSH_VEC(out, move, make_move_allow_ep(from, sq, pc, sq + d_sq)); 
     });
 }
 
-static inline void game_movegen_push_promotion_moves(bitboard b, square from, piece pc, color col, vector *out) 
+static inline void gen_push_pro(bboard b, square from, piece pc, color col, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, 
+    FOR_EACH_BIT(b, 
     {
-        VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, piece_make_colored(PIECE_Q, col))); 
-        VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, piece_make_colored(PIECE_R, col))); 
-        VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, piece_make_colored(PIECE_B, col))); 
-        VECTOR_PUSH_TYPE(out, move, move_make(from, sq, pc, piece_make_colored(PIECE_N, col))); 
+        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_Q, col))); 
+        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_R, col))); 
+        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_B, col))); 
+        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_N, col))); 
     });
 }
 
-static inline void game_movegen_push_might_take_en_passant_moves(const game *g, bitboard b, square from, piece pc, square ep, vector *out) 
+static inline void gen_push_take_ep(const game *g, bboard b, square from, piece pc, square ep, vector *out) 
 {
-    BITBOARD_FOR_EACH_BIT(b, 
+    FOR_EACH_BIT(b, 
     {
         if (sq != ep) 
         {
-            VECTOR_PUSH_TYPE(out, move, move_make_take_en_passant(from, sq, pc, false)); 
+            PUSH_VEC(out, move, make_move_ep(from, sq, pc, false)); 
         }
-        else if (piece_get_color(pc) == COLOR_W) 
+        else if (get_col(pc) == COL_W) 
         {
-            if (!game_in_check(g, COLOR_W, g->pieces[PIECE_WK], bitboard_make_position(from) | bitboard_make_position(ep - 8), bitboard_make_position(ep))) 
+            if (!in_check(g, COL_W, g->pieces[PC_WK], make_pos(from) | make_pos(ep - 8), make_pos(ep))) 
             {
-                VECTOR_PUSH_TYPE(out, move, move_make_take_en_passant(from, sq, pc, true)); 
+                PUSH_VEC(out, move, make_move_ep(from, sq, pc, true)); 
             }
         }
-        else // COLOR_B  
+        else // COL_B  
         {
-            if (!game_in_check(g, COLOR_B, g->pieces[PIECE_BK], bitboard_make_position(from) | bitboard_make_position(ep + 8), bitboard_make_position(ep))) 
+            if (!in_check(g, COL_B, g->pieces[PC_BK], make_pos(from) | make_pos(ep + 8), make_pos(ep))) 
             {
-                VECTOR_PUSH_TYPE(out, move, move_make_take_en_passant(from, sq, pc, true)); 
+                PUSH_VEC(out, move, make_move_ep(from, sq, pc, true)); 
             }
         }
     });
 }
 
-static inline void game_movegen_add_pawn_moves(const game *g, color col, bitboard ok_squares, const bitboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
+static inline void gen_p(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
 {
-    bitboard empty = ~(g->colors[COLOR_W] | g->colors[COLOR_B]); 
-    bitboard ep = (g->en_passant != SQUARE_NONE) * bitboard_make_position(g->en_passant); 
-    bitboard cur_pos, attack, target_squares; 
+    bboard empty = ~(g->colors[COL_W] | g->colors[COL_B]); 
+    bboard ep = (g->ep != NO_SQ) * make_pos(g->ep); 
+    bboard cur_pos, attack, target_squares; 
 
-    if (col == COLOR_W) 
+    if (col == COL_W) 
     {
-        BITBOARD_FOR_EACH_BIT(g->pieces[PIECE_WP], 
+        FOR_EACH_BIT(g->pieces[PC_WP], 
         {
-            cur_pos = bitboard_make_position(sq); 
+            cur_pos = make_pos(sq); 
 
             // move forward if square is empty 
-            attack = bitboard_shift_n(cur_pos) & empty; 
+            attack = shift_n(cur_pos) & empty; 
 
             // attack left if there is a piece or en passant
-            attack |= bitboard_shift_nw(cur_pos) & (g->colors[COLOR_B] | ep); 
+            attack |= shift_nw(cur_pos) & (g->colors[COL_B] | ep); 
 
             // attack right if there is a piece or en passant
-            attack |= bitboard_shift_ne(cur_pos) & (g->colors[COLOR_B] | ep); 
+            attack |= shift_ne(cur_pos) & (g->colors[COL_B] | ep); 
 
-            target_squares = GAME_TARGET_SQUARES; 
+            target_squares = TARGET_SQUARES; 
             attack &= target_squares; 
 
             // move 2 squares if on starting square 
-            game_movegen_push_allow_ep_moves((square_rank(sq) == 1) * (bitboard_shift_nn(cur_pos) & empty & bitboard_shift_n(empty) & target_squares), sq, PIECE_WP, -8, out); 
+            movegen_push_ep((get_rank(sq) == 1) * (shift_nn(cur_pos) & empty & shift_n(empty) & target_squares), sq, PC_WP, -8, out); 
 
             // add non-promoting moves to list 
-            game_movegen_push_might_take_en_passant_moves(g, attack & BITBOARD_NO_8_RANK, sq, PIECE_WP, g->en_passant, out); 
+            gen_push_take_ep(g, attack & NO_RANK_8, sq, PC_WP, g->ep, out); 
 
             // add promoting moves to list 
-            game_movegen_push_promotion_moves(attack & BITBOARD_8_RANK, sq, PIECE_WP, COLOR_W, out); 
+            gen_push_pro(attack & RANK_8, sq, PC_WP, COL_W, out); 
         });
     }
     else 
     {
-        BITBOARD_FOR_EACH_BIT(g->pieces[PIECE_BP], 
+        FOR_EACH_BIT(g->pieces[PC_BP], 
         {
-            cur_pos = bitboard_make_position(sq); 
+            cur_pos = make_pos(sq); 
 
             // move forward if square is empty 
-            attack = bitboard_shift_s(cur_pos) & empty; 
+            attack = shift_s(cur_pos) & empty; 
 
             // attack left if there is a piece or en passant
-            attack |= bitboard_shift_sw(cur_pos) & (g->colors[COLOR_W] | ep); 
+            attack |= shift_sw(cur_pos) & (g->colors[COL_W] | ep); 
 
             // attack right if there is a piece or en passant
-            attack |= bitboard_shift_se(cur_pos) & (g->colors[COLOR_W] | ep); 
+            attack |= shift_se(cur_pos) & (g->colors[COL_W] | ep); 
 
-            target_squares = GAME_TARGET_SQUARES; 
+            target_squares = TARGET_SQUARES; 
             attack &= target_squares; 
 
             // move 2 squares if on starting square 
-            game_movegen_push_allow_ep_moves((square_rank(sq) == 6) * (bitboard_shift_ss(cur_pos) & empty & bitboard_shift_s(empty) & target_squares), sq, PIECE_BP, 8, out); 
+            movegen_push_ep((get_rank(sq) == 6) * (shift_ss(cur_pos) & empty & shift_s(empty) & target_squares), sq, PC_BP, 8, out); 
 
             // add non-promoting moves to list 
-            game_movegen_push_might_take_en_passant_moves(g, attack & BITBOARD_NO_1_RANK, sq, PIECE_BP, g->en_passant, out); 
+            gen_push_take_ep(g, attack & NO_RANK_1, sq, PC_BP, g->ep, out); 
 
             // add promoting moves to list 
-            game_movegen_push_promotion_moves(attack & BITBOARD_1_RANK, sq, PIECE_BP, COLOR_B, out); 
+            gen_push_pro(attack & RANK_1, sq, PC_BP, COL_B, out); 
         });
     }
 }
 
-static inline void game_movegen_remove_illegal_moves(const game *state, size_t start, vector *out) 
+static inline void gen_rem_illegal(const game *state, size_t start, vector *out) 
 {
     game *g = (game *) state; 
     size_t i = start; 
 
     while (i < out->size) 
     {
-        game_push_move(g, VECTOR_AT_TYPE(out, move, i)); 
+        push_move(g, AT_VEC(out, move, i)); 
 
-        if (game_in_check(g, color_get_other(g->turn), g->check, BITBOARD_NONE, BITBOARD_NONE)) 
+        if (in_check(g, opp_col(g->turn), g->check, NO_BITS, NO_BITS)) 
         {
-            vector_set(out, i, vector_at(out, out->size - 1)); 
-            vector_pop(out); 
+            set_vec(out, i, at_vec(out, out->size - 1)); 
+            pop_vec(out); 
         }
         else 
         {
             i++; 
         }
 
-        game_pop_move(g); 
+        pop_move(g); 
     }
 }
 
-static inline void game_movegen_add_king_moves(const game *g, color col, vector *out) 
+static inline void gen_k(const game *g, color col, vector *out) 
 {
-    bitboard occupants = g->colors[COLOR_W] | g->colors[COLOR_B]; 
-    bitboard not_cur_col = ~g->colors[col]; 
-    bitboard attack; 
+    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
+    bboard not_cur_col = ~g->colors[col]; 
+    bboard attack; 
 
-    piece pc = piece_make_colored(PIECE_K, col); 
-    BITBOARD_FOR_EACH_BIT(g->pieces[pc], 
+    piece pc = make_pc(PC_K, col); 
+    FOR_EACH_BIT(g->pieces[pc], 
     {
-        attack = BITBOARD_KING_MOVES[sq] & not_cur_col; 
-        game_movegen_push_safe_moves(g, attack, sq, pc, out); 
+        attack = MOVES_K[sq] & not_cur_col; 
+        gen_push_safe(g, attack, sq, pc, out); 
 
-        int c_wk = 0 != (color_get_other(col) * ((g->castle & CASTLE_WK) != 0) * ((occupants & BITBOARD_EMPTY_WK) == 0)); 
-        int c_wq = 0 != (color_get_other(col) * ((g->castle & CASTLE_WQ) != 0) * ((occupants & BITBOARD_EMPTY_WQ) == 0)); 
-        int c_bk = 0 != (col * ((g->castle & CASTLE_BK) != 0) * ((occupants & BITBOARD_EMPTY_BK) == 0)); 
-        int c_bq = 0 != (col * ((g->castle & CASTLE_BQ) != 0) * ((occupants & BITBOARD_EMPTY_BQ) == 0)); 
+        int c_wk = 0 != (opp_col(col) * ((g->castle & CASTLE_WK) != 0) * ((occupants & EMPTY_WK) == 0)); 
+        int c_wq = 0 != (opp_col(col) * ((g->castle & CASTLE_WQ) != 0) * ((occupants & EMPTY_WQ) == 0)); 
+        int c_bk = 0 != (col * ((g->castle & CASTLE_BK) != 0) * ((occupants & EMPTY_BK) == 0)); 
+        int c_bq = 0 != (col * ((g->castle & CASTLE_BQ) != 0) * ((occupants & EMPTY_BQ) == 0)); 
 
-        if (c_wk && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_WK], BITBOARD_NONE, BITBOARD_NONE)) 
+        if (c_wk && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_WK], NO_BITS, NO_BITS)) 
         {
-            game_movegen_push_castle_move(SQUARE_E1, SQUARE_G1, PIECE_WK, MOVE_CASTLE_WK, out); 
+            gen_push_castle(E1, G1, PC_WK, MOVE_CASTLE_WK, out); 
         }
 
-        if (c_wq && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_WQ], BITBOARD_NONE, BITBOARD_NONE)) 
+        if (c_wq && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_WQ], NO_BITS, NO_BITS)) 
         {
-            game_movegen_push_castle_move(SQUARE_E1, SQUARE_C1, PIECE_WK, MOVE_CASTLE_WQ, out); 
+            gen_push_castle(E1, C1, PC_WK, MOVE_CASTLE_WQ, out); 
         }
 
-        if (c_bk && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_BK], BITBOARD_NONE, BITBOARD_NONE)) 
+        if (c_bk && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_BK], NO_BITS, NO_BITS)) 
         {
-            game_movegen_push_castle_move(SQUARE_E8, SQUARE_G8, PIECE_BK, MOVE_CASTLE_BK, out); 
+            gen_push_castle(E8, G8, PC_BK, MOVE_CASTLE_BK, out); 
         }
 
-        if (c_bq && !game_in_check(g, col, g->pieces[pc] | BITBOARD_CASTLE_TARGETS[MOVE_CASTLE_BQ], BITBOARD_NONE, BITBOARD_NONE)) 
+        if (c_bq && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_BQ], NO_BITS, NO_BITS)) 
         {
-            game_movegen_push_castle_move(SQUARE_E8, SQUARE_C8, PIECE_BK, MOVE_CASTLE_BQ, out); 
+            gen_push_castle(E8, C8, PC_BK, MOVE_CASTLE_BQ, out); 
         }
     });
 }
 
-static inline void game_movegen_add_knight_moves(const game *g, color col, bitboard ok_squares, const bitboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
+static inline void gen_n(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
 {
     // empty squares 
-    bitboard not_cur_col = ~g->colors[col]; 
-    bitboard attack; 
+    bboard not_cur_col = ~g->colors[col]; 
+    bboard attack; 
 
-    piece pc = piece_make_colored(PIECE_N, col); 
-    BITBOARD_FOR_EACH_BIT(g->pieces[pc], 
+    piece pc = make_pc(PC_N, col); 
+    FOR_EACH_BIT(g->pieces[pc], 
     {
-        attack = BITBOARD_KNIGHT_MOVES[sq] & not_cur_col; 
-        attack &= GAME_TARGET_SQUARES;  
-        game_movegen_push_bitboard_moves(attack, sq, pc, out); 
+        attack = MOVES_N[sq] & not_cur_col; 
+        attack &= TARGET_SQUARES;  
+        gen_push(attack, sq, pc, out); 
     });
 }
 
-static inline void game_movegen_add_bishop_moves(const game *g, color col, bitboard ok_squares, const bitboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
+static inline void gen_b(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
 {
-    bitboard not_cur_col = ~g->colors[col]; 
-    bitboard occupants = g->colors[COLOR_W] | g->colors[COLOR_B]; 
-    bitboard attack; 
+    bboard not_cur_col = ~g->colors[col]; 
+    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
+    bboard attack; 
 
-    piece pc = piece_make_colored(PIECE_B, col); 
-    BITBOARD_FOR_EACH_BIT(g->pieces[pc], 
+    piece pc = make_pc(PC_B, col); 
+    FOR_EACH_BIT(g->pieces[pc], 
     {
-        attack  = bitboard_cast_ray(sq, BITBOARD_SLIDE_DIAG[square_diagonal(sq)], occupants); 
-        attack |= bitboard_cast_ray(sq, BITBOARD_SLIDE_ANTI[square_antidiagonal(sq)], occupants); 
+        attack  = cast_ray(sq, SLIDE_DIAG[get_diag(sq)], occupants); 
+        attack |= cast_ray(sq, SLIDE_ANTI[get_anti(sq)], occupants); 
         attack &= not_cur_col; 
-        attack &= GAME_TARGET_SQUARES; 
-        game_movegen_push_bitboard_moves(attack, sq, pc, out); 
+        attack &= TARGET_SQUARES; 
+        gen_push(attack, sq, pc, out); 
     })
 }
 
-static inline void game_movegen_add_rook_moves(const game *g, color col, bitboard ok_squares, const bitboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
+static inline void gen_r(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
 {
-    bitboard not_cur_col = ~g->colors[col]; 
-    bitboard occupants = g->colors[COLOR_W] | g->colors[COLOR_B]; 
-    bitboard attack; 
+    bboard not_cur_col = ~g->colors[col]; 
+    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
+    bboard attack; 
 
-    piece pc = piece_make_colored(PIECE_R, col); 
-    BITBOARD_FOR_EACH_BIT(g->pieces[pc], 
+    piece pc = make_pc(PC_R, col); 
+    FOR_EACH_BIT(g->pieces[pc], 
     {
-        attack  = bitboard_cast_ray(sq, BITBOARD_SLIDE_FILE[square_file(sq)], occupants); 
-        attack |= bitboard_cast_ray(sq, BITBOARD_SLIDE_RANK[square_rank(sq)], occupants); 
+        attack  = cast_ray(sq, SLIDE_FILE[get_file(sq)], occupants); 
+        attack |= cast_ray(sq, SLIDE_RANK[get_rank(sq)], occupants); 
         attack &= not_cur_col; 
-        attack &= GAME_TARGET_SQUARES; 
+        attack &= TARGET_SQUARES; 
 
-        game_movegen_push_bitboard_moves(attack, sq, pc, out); 
+        gen_push(attack, sq, pc, out); 
     })
 }
 
-static inline void game_movegen_add_queen_moves(const game *g, color col, bitboard ok_squares, const bitboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
+static inline void gen_q(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
 {
-    bitboard not_cur_col = ~g->colors[col]; 
-    bitboard occupants = g->colors[COLOR_W] | g->colors[COLOR_B]; 
-    bitboard attack; 
+    bboard not_cur_col = ~g->colors[col]; 
+    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
+    bboard attack; 
 
-    piece pc = piece_make_colored(PIECE_Q, col); 
-    BITBOARD_FOR_EACH_BIT(g->pieces[pc], 
+    piece pc = make_pc(PC_Q, col); 
+    FOR_EACH_BIT(g->pieces[pc], 
     {
-        attack  = bitboard_cast_ray(sq, BITBOARD_SLIDE_FILE[square_file(sq)], occupants); 
-        attack |= bitboard_cast_ray(sq, BITBOARD_SLIDE_RANK[square_rank(sq)], occupants); 
-        attack |= bitboard_cast_ray(sq, BITBOARD_SLIDE_DIAG[square_diagonal(sq)], occupants); 
-        attack |= bitboard_cast_ray(sq, BITBOARD_SLIDE_ANTI[square_antidiagonal(sq)], occupants); 
+        attack  = cast_ray(sq, SLIDE_FILE[get_file(sq)], occupants); 
+        attack |= cast_ray(sq, SLIDE_RANK[get_rank(sq)], occupants); 
+        attack |= cast_ray(sq, SLIDE_DIAG[get_diag(sq)], occupants); 
+        attack |= cast_ray(sq, SLIDE_ANTI[get_anti(sq)], occupants); 
         attack &= not_cur_col; 
-        attack &= GAME_TARGET_SQUARES; 
-        game_movegen_push_bitboard_moves(attack, sq, pc, out); 
+        attack &= TARGET_SQUARES; 
+        gen_push(attack, sq, pc, out); 
     })
 }
 
-static void game_generate_moves(const game *g, vector *out) 
+static void gen_moves(const game *g, vector *out) 
 {
     color col = g->turn; 
-    color opp = color_get_other(col); 
+    color opp = opp_col(col); 
 
-    bitboard target = g->pieces[piece_make_colored(PIECE_K, col)]; 
-    bitboard col_occ = g->colors[col]; 
-    bitboard opp_occ = g->colors[opp]; 
-    bitboard opp_rocc = bitboard_reverse(opp_occ); 
+    bboard target = g->pieces[make_pc(PC_K, col)]; 
+    bboard col_occ = g->colors[col]; 
+    bboard opp_occ = g->colors[opp]; 
+    bboard opp_rocc = rev(opp_occ); 
 
-    bitboard opp_card = g->pieces[piece_make_colored(PIECE_R, opp)] | g->pieces[piece_make_colored(PIECE_Q, opp)]; 
-    bitboard opp_diag = g->pieces[piece_make_colored(PIECE_B, opp)] | g->pieces[piece_make_colored(PIECE_Q, opp)]; 
+    bboard opp_card = g->pieces[make_pc(PC_R, opp)] | g->pieces[make_pc(PC_Q, opp)]; 
+    bboard opp_diag = g->pieces[make_pc(PC_B, opp)] | g->pieces[make_pc(PC_Q, opp)]; 
 
-    square sq = bitboard_least_significant_bit(target), rsq = 63 - sq; 
+    square sq = lsb(target), rsq = 63 - sq; 
 
-    bitboard dirs[BITBOARD_CHECK_COUNT]; 
-    uint8_t blocking[BITBOARD_CHECK_DIR_COUNT]; 
+    bboard dirs[CHECK_CNT]; 
+    uint8_t blocking[CHECK_DIR_CNT]; 
 
     uint16_t attacked = 0; 
     uint16_t pinned = 0; 
 
     // diagonal movement to occupied square (ignoring current color pieces and including non-relevant enemy pieces)
-    dirs[BITBOARD_CHECK_DIR_NW] = bitboard_cast_positive_ray(sq, BITBOARD_SLIDE_ANTI[square_antidiagonal(sq)], opp_occ); 
-    dirs[BITBOARD_CHECK_DIR_SE] = bitboard_reverse(bitboard_cast_positive_ray(rsq, BITBOARD_SLIDE_ANTI[square_antidiagonal(rsq)], opp_rocc)); 
-    dirs[BITBOARD_CHECK_DIR_NE] = bitboard_cast_positive_ray(sq, BITBOARD_SLIDE_DIAG[square_diagonal(sq)], opp_occ); 
-    dirs[BITBOARD_CHECK_DIR_SW] = bitboard_reverse(bitboard_cast_positive_ray(rsq, BITBOARD_SLIDE_DIAG[square_diagonal(rsq)], opp_rocc)); 
+    dirs[CHECK_DIR_NW] = cast_pos_ray(sq, SLIDE_ANTI[get_anti(sq)], opp_occ); 
+    dirs[CHECK_DIR_SE] = rev(cast_pos_ray(rsq, SLIDE_ANTI[get_anti(rsq)], opp_rocc)); 
+    dirs[CHECK_DIR_NE] = cast_pos_ray(sq, SLIDE_DIAG[get_diag(sq)], opp_occ); 
+    dirs[CHECK_DIR_SW] = rev(cast_pos_ray(rsq, SLIDE_DIAG[get_diag(rsq)], opp_rocc)); 
 
     // cardinal movement to occupied square (ignoring current color pieces and including non-relevant enemy pieces)
-    dirs[BITBOARD_CHECK_DIR_N] = bitboard_cast_positive_ray(sq, BITBOARD_SLIDE_FILE[square_file(sq)], opp_occ); 
-    dirs[BITBOARD_CHECK_DIR_S] = bitboard_reverse(bitboard_cast_positive_ray(rsq, BITBOARD_SLIDE_FILE[square_file(rsq)], opp_rocc)); 
-    dirs[BITBOARD_CHECK_DIR_E] = bitboard_cast_positive_ray(sq, BITBOARD_SLIDE_RANK[square_rank(sq)], opp_occ); 
-    dirs[BITBOARD_CHECK_DIR_W] = bitboard_reverse(bitboard_cast_positive_ray(rsq, BITBOARD_SLIDE_RANK[square_rank(rsq)], opp_rocc)); 
+    dirs[CHECK_DIR_N] = cast_pos_ray(sq, SLIDE_FILE[get_file(sq)], opp_occ); 
+    dirs[CHECK_DIR_S] = rev(cast_pos_ray(rsq, SLIDE_FILE[get_file(rsq)], opp_rocc)); 
+    dirs[CHECK_DIR_E] = cast_pos_ray(sq, SLIDE_RANK[get_rank(sq)], opp_occ); 
+    dirs[CHECK_DIR_W] = rev(cast_pos_ray(rsq, SLIDE_RANK[get_rank(rsq)], opp_rocc)); 
 
     // knight 
-    dirs[BITBOARD_CHECK_PIECE_N] = BITBOARD_KNIGHT_MOVES[sq] & g->pieces[piece_make_colored(PIECE_N, opp)]; 
+    dirs[CHECK_PC_N] = MOVES_N[sq] & g->pieces[make_pc(PC_N, opp)]; 
 
     // pawn 
-    if (col == COLOR_W) 
+    if (col == COL_W) 
     {
-        dirs[BITBOARD_CHECK_PIECE_P]  = bitboard_shift_nw(target); 
-        dirs[BITBOARD_CHECK_PIECE_P] |= bitboard_shift_ne(target); 
+        dirs[CHECK_PC_P]  = shift_nw(target); 
+        dirs[CHECK_PC_P] |= shift_ne(target); 
     }
     else 
     {
-        dirs[BITBOARD_CHECK_PIECE_P]  = bitboard_shift_sw(target); 
-        dirs[BITBOARD_CHECK_PIECE_P] |= bitboard_shift_se(target); 
+        dirs[CHECK_PC_P]  = shift_sw(target); 
+        dirs[CHECK_PC_P] |= shift_se(target); 
     }
-    dirs[BITBOARD_CHECK_PIECE_P] &= g->pieces[piece_make_colored(PIECE_P, opp)]; 
+    dirs[CHECK_PC_P] &= g->pieces[make_pc(PC_P, opp)]; 
 
     // determine number of blockers (assuming that the direction has an attacker) 
-    blocking[BITBOARD_CHECK_DIR_N] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_N] & col_occ); 
-    blocking[BITBOARD_CHECK_DIR_S] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_S] & col_occ); 
-    blocking[BITBOARD_CHECK_DIR_E] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_E] & col_occ); 
-    blocking[BITBOARD_CHECK_DIR_W] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_W] & col_occ); 
-    blocking[BITBOARD_CHECK_DIR_NE] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_NE] & col_occ); 
-    blocking[BITBOARD_CHECK_DIR_NW] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_NW] & col_occ); 
-    blocking[BITBOARD_CHECK_DIR_SE] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_SE] & col_occ); 
-    blocking[BITBOARD_CHECK_DIR_SW] = bitboard_pop_count(dirs[BITBOARD_CHECK_DIR_SW] & col_occ); 
+    blocking[CHECK_DIR_N] = popcnt(dirs[CHECK_DIR_N] & col_occ); 
+    blocking[CHECK_DIR_S] = popcnt(dirs[CHECK_DIR_S] & col_occ); 
+    blocking[CHECK_DIR_E] = popcnt(dirs[CHECK_DIR_E] & col_occ); 
+    blocking[CHECK_DIR_W] = popcnt(dirs[CHECK_DIR_W] & col_occ); 
+    blocking[CHECK_DIR_NE] = popcnt(dirs[CHECK_DIR_NE] & col_occ); 
+    blocking[CHECK_DIR_NW] = popcnt(dirs[CHECK_DIR_NW] & col_occ); 
+    blocking[CHECK_DIR_SE] = popcnt(dirs[CHECK_DIR_SE] & col_occ); 
+    blocking[CHECK_DIR_SW] = popcnt(dirs[CHECK_DIR_SW] & col_occ); 
 
     // first figure out which directions have an attacker (ignore current color pinned pieces)
 
     // directions might hit a non-attacking opponent piece, or even no piece at all
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_N] & opp_card) != 0) & (blocking[BITBOARD_CHECK_DIR_N] <= 1)) << BITBOARD_CHECK_DIR_N; 
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_S] & opp_card) != 0) & (blocking[BITBOARD_CHECK_DIR_S] <= 1)) << BITBOARD_CHECK_DIR_S; 
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_E] & opp_card) != 0) & (blocking[BITBOARD_CHECK_DIR_E] <= 1)) << BITBOARD_CHECK_DIR_E; 
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_W] & opp_card) != 0) & (blocking[BITBOARD_CHECK_DIR_W] <= 1)) << BITBOARD_CHECK_DIR_W; 
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_NE] & opp_diag) != 0) & (blocking[BITBOARD_CHECK_DIR_NE] <= 1)) << BITBOARD_CHECK_DIR_NE; 
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_NW] & opp_diag) != 0) & (blocking[BITBOARD_CHECK_DIR_NW] <= 1)) << BITBOARD_CHECK_DIR_NW; 
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_SE] & opp_diag) != 0) & (blocking[BITBOARD_CHECK_DIR_SE] <= 1)) << BITBOARD_CHECK_DIR_SE; 
-    attacked |= (((dirs[BITBOARD_CHECK_DIR_SW] & opp_diag) != 0) & (blocking[BITBOARD_CHECK_DIR_SW] <= 1)) << BITBOARD_CHECK_DIR_SW;
+    attacked |= (((dirs[CHECK_DIR_N] & opp_card) != 0) & (blocking[CHECK_DIR_N] <= 1)) << CHECK_DIR_N; 
+    attacked |= (((dirs[CHECK_DIR_S] & opp_card) != 0) & (blocking[CHECK_DIR_S] <= 1)) << CHECK_DIR_S; 
+    attacked |= (((dirs[CHECK_DIR_E] & opp_card) != 0) & (blocking[CHECK_DIR_E] <= 1)) << CHECK_DIR_E; 
+    attacked |= (((dirs[CHECK_DIR_W] & opp_card) != 0) & (blocking[CHECK_DIR_W] <= 1)) << CHECK_DIR_W; 
+    attacked |= (((dirs[CHECK_DIR_NE] & opp_diag) != 0) & (blocking[CHECK_DIR_NE] <= 1)) << CHECK_DIR_NE; 
+    attacked |= (((dirs[CHECK_DIR_NW] & opp_diag) != 0) & (blocking[CHECK_DIR_NW] <= 1)) << CHECK_DIR_NW; 
+    attacked |= (((dirs[CHECK_DIR_SE] & opp_diag) != 0) & (blocking[CHECK_DIR_SE] <= 1)) << CHECK_DIR_SE; 
+    attacked |= (((dirs[CHECK_DIR_SW] & opp_diag) != 0) & (blocking[CHECK_DIR_SW] <= 1)) << CHECK_DIR_SW;
     // there are already checked against correct opponent pieces and cannot be blocked 
-    attacked |= (dirs[BITBOARD_CHECK_PIECE_N] != 0) << BITBOARD_CHECK_PIECE_N; 
-    attacked |= (dirs[BITBOARD_CHECK_PIECE_P] != 0) << BITBOARD_CHECK_PIECE_P; 
+    attacked |= (dirs[CHECK_PC_N] != 0) << CHECK_PC_N; 
+    attacked |= (dirs[CHECK_PC_P] != 0) << CHECK_PC_P; 
 
     // determine pins 
 
     // these need to have an attacker, and exactly one friendly piece in the way 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_N) & (blocking[BITBOARD_CHECK_DIR_N] == 1)) << BITBOARD_CHECK_DIR_N; 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_S) & (blocking[BITBOARD_CHECK_DIR_S] == 1)) << BITBOARD_CHECK_DIR_S; 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_E) & (blocking[BITBOARD_CHECK_DIR_E] == 1)) << BITBOARD_CHECK_DIR_E; 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_W) & (blocking[BITBOARD_CHECK_DIR_W] == 1)) << BITBOARD_CHECK_DIR_W; 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_NE) & (blocking[BITBOARD_CHECK_DIR_NE] == 1)) << BITBOARD_CHECK_DIR_NE; 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_NW) & (blocking[BITBOARD_CHECK_DIR_NW] == 1)) << BITBOARD_CHECK_DIR_NW; 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_SE) & (blocking[BITBOARD_CHECK_DIR_SE] == 1)) << BITBOARD_CHECK_DIR_SE; 
-    pinned |= ((attacked >> BITBOARD_CHECK_DIR_SW) & (blocking[BITBOARD_CHECK_DIR_SW] == 1)) << BITBOARD_CHECK_DIR_SW; 
+    pinned |= ((attacked >> CHECK_DIR_N) & (blocking[CHECK_DIR_N] == 1)) << CHECK_DIR_N; 
+    pinned |= ((attacked >> CHECK_DIR_S) & (blocking[CHECK_DIR_S] == 1)) << CHECK_DIR_S; 
+    pinned |= ((attacked >> CHECK_DIR_E) & (blocking[CHECK_DIR_E] == 1)) << CHECK_DIR_E; 
+    pinned |= ((attacked >> CHECK_DIR_W) & (blocking[CHECK_DIR_W] == 1)) << CHECK_DIR_W; 
+    pinned |= ((attacked >> CHECK_DIR_NE) & (blocking[CHECK_DIR_NE] == 1)) << CHECK_DIR_NE; 
+    pinned |= ((attacked >> CHECK_DIR_NW) & (blocking[CHECK_DIR_NW] == 1)) << CHECK_DIR_NW; 
+    pinned |= ((attacked >> CHECK_DIR_SE) & (blocking[CHECK_DIR_SE] == 1)) << CHECK_DIR_SE; 
+    pinned |= ((attacked >> CHECK_DIR_SW) & (blocking[CHECK_DIR_SW] == 1)) << CHECK_DIR_SW; 
 
     attacked &= ~pinned; 
 
-    int n_checks = bitboard_pop_count_16(attacked); 
+    int n_checks = popcnt_16(attacked); 
 
     if (n_checks == 0) 
     {
         // all moves 
-        game_movegen_add_pawn_moves(g, col, BITBOARD_ALL, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_knight_moves(g, col, BITBOARD_ALL, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_bishop_moves(g, col, BITBOARD_ALL, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_rook_moves(g, col, BITBOARD_ALL, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_queen_moves(g, col, BITBOARD_ALL, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_king_moves(g, col, out); 
+        gen_p(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
+        gen_n(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
+        gen_b(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
+        gen_r(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
+        gen_q(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
+        gen_k(g, col, out); 
     }
     else if (n_checks == 1) 
     {
@@ -838,23 +838,23 @@ static void game_generate_moves(const game *g, vector *out)
         //   all squares that block or capture the piece
         // knight or pawn: 
         //   only allows capturing the piece (as it cannot be blocked)
-        bitboard target_squares = dirs[bitboard_least_significant_bit(attacked)]; 
+        bboard target_squares = dirs[lsb(attacked)]; 
 
-        game_movegen_add_pawn_moves(g, col, target_squares | ((g->en_passant != SQUARE_NONE) * bitboard_make_position(g->en_passant)), dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_knight_moves(g, col, target_squares, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_bishop_moves(g, col, target_squares, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_rook_moves(g, col, target_squares, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_queen_moves(g, col, target_squares, dirs, pinned, BITBOARD_PIN_INDEX[sq], out); 
-        game_movegen_add_king_moves(g, col, out); 
+        gen_p(g, col, target_squares | ((g->ep != NO_SQ) * make_pos(g->ep)), dirs, pinned, PIN_IDX[sq], out); 
+        gen_n(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
+        gen_b(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
+        gen_r(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
+        gen_q(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
+        gen_k(g, col, out); 
     }
     else // double check: must move the king 
     {
         // move king 
-        game_movegen_add_king_moves(g, col, out); 
+        gen_k(g, col, out); 
     }
 }
 
-static const int GAME_EVAL_P[64] = 
+static const int EVAL_P[64] = 
 {
       0,   0,   0,   0,   0,   0,   0,   0, 
       5,  10,  10, -20, -20,  10,  10,   5, 
@@ -866,7 +866,7 @@ static const int GAME_EVAL_P[64] =
       0,   0,   0,   0,   0,   0,   0,   0
 };
 
-static const int GAME_EVAL_N[64] = 
+static const int EVAL_N[64] = 
 {
     -50, -40, -30, -30, -30, -30, -40, -50, 
     -40, -20,   0,   5,   5,   0, -20, -40, 
@@ -878,7 +878,7 @@ static const int GAME_EVAL_N[64] =
     -50, -40, -30, -30, -30, -30, -40, -50 
 };
 
-static const int GAME_EVAL_B[64] = 
+static const int EVAL_B[64] = 
 {
     -20, -10, -10, -10, -10, -10, -10, -20, 
     -10,   5,   0,   0,   0,   0,   5, -10, 
@@ -890,7 +890,7 @@ static const int GAME_EVAL_B[64] =
     -20, -10, -10, -10, -10, -10, -10, -20 
 };
 
-static const int GAME_EVAL_R[64] = 
+static const int EVAL_R[64] = 
 {
       0,   0,   0,   5,   5,   0,   0,   0, 
      -5,   0,   0,   0,   0,   0,   0,  -5, 
@@ -902,7 +902,7 @@ static const int GAME_EVAL_R[64] =
       0,   0,   0,   0,   0,   0,   0,   0 
 };
 
-static const int GAME_EVAL_Q[64] = 
+static const int EVAL_Q[64] = 
 {
     -20, -10, -10,  -5,  -5, -10, -10, -20, 
     -10,   0,   5,   0,   0,   5,   0, -10, 
@@ -914,7 +914,7 @@ static const int GAME_EVAL_Q[64] =
     -20, -10, -10,  -5,  -5, -10, -10, -20, 
 };
 
-static const int GAME_EVAL_K[64] = 
+static const int EVAL_K[64] = 
 {
      20,  30,  10,   0,   0,  10,  30,  20, 
      20,  20,   0,   0,   0,   0,  20,  20, 
@@ -926,11 +926,11 @@ static const int GAME_EVAL_K[64] =
     -30, -40, -40, -50, -50, -40, -40, -30, 
 };
 
-static inline int game_eval_bitboard(bitboard pcs, const int eval[64]) 
+static inline int eval_bb(bboard pcs, const int eval[64]) 
 {
     int sum = 0; 
 
-    BITBOARD_FOR_EACH_BIT(pcs, 
+    FOR_EACH_BIT(pcs, 
     {
         sum += eval[sq]; 
     });
@@ -938,7 +938,7 @@ static inline int game_eval_bitboard(bitboard pcs, const int eval[64])
     return sum; 
 }
 
-static inline int game_evaluate(const game *g, int num_moves) 
+static inline int eval(const game *g, int num_moves) 
 {
     int eval = 0; 
 
@@ -957,33 +957,33 @@ static inline int game_evaluate(const game *g, int num_moves)
     }
 
     // material 
-    eval += 100 * (bitboard_pop_count(g->pieces[PIECE_WP]) - bitboard_pop_count(g->pieces[PIECE_BP])); 
-    eval += 310 * (bitboard_pop_count(g->pieces[PIECE_WN]) - bitboard_pop_count(g->pieces[PIECE_BN])); 
-    eval += 320 * (bitboard_pop_count(g->pieces[PIECE_WB]) - bitboard_pop_count(g->pieces[PIECE_BB])); 
-    eval += 500 * (bitboard_pop_count(g->pieces[PIECE_WR]) - bitboard_pop_count(g->pieces[PIECE_BR])); 
-    eval += 900 * (bitboard_pop_count(g->pieces[PIECE_WQ]) - bitboard_pop_count(g->pieces[PIECE_BQ])); 
-    eval += 10000 * (bitboard_pop_count(g->pieces[PIECE_WK]) - bitboard_pop_count(g->pieces[PIECE_BK])); 
+    eval += 100 * (popcnt(g->pieces[PC_WP]) - popcnt(g->pieces[PC_BP])); 
+    eval += 310 * (popcnt(g->pieces[PC_WN]) - popcnt(g->pieces[PC_BN])); 
+    eval += 320 * (popcnt(g->pieces[PC_WB]) - popcnt(g->pieces[PC_BB])); 
+    eval += 500 * (popcnt(g->pieces[PC_WR]) - popcnt(g->pieces[PC_BR])); 
+    eval += 900 * (popcnt(g->pieces[PC_WQ]) - popcnt(g->pieces[PC_BQ])); 
+    eval += 10000 * (popcnt(g->pieces[PC_WK]) - popcnt(g->pieces[PC_BK])); 
 
     // bishop pair 
-    eval += 15 * ((bitboard_pop_count(g->pieces[PIECE_WB]) >= 2) - (bitboard_pop_count(g->pieces[PIECE_BB]) >= 2)); 
+    eval += 15 * ((popcnt(g->pieces[PC_WB]) >= 2) - (popcnt(g->pieces[PC_BB]) >= 2)); 
 
-    eval += game_eval_bitboard(g->pieces[PIECE_WP], GAME_EVAL_P); 
-    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BP]), GAME_EVAL_P); 
+    eval += eval_bb(g->pieces[PC_WP], EVAL_P); 
+    eval -= eval_bb(rrow(g->pieces[PC_BP]), EVAL_P); 
 
-    eval += game_eval_bitboard(g->pieces[PIECE_WN], GAME_EVAL_N); 
-    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BN]), GAME_EVAL_N); 
+    eval += eval_bb(g->pieces[PC_WN], EVAL_N); 
+    eval -= eval_bb(rrow(g->pieces[PC_BN]), EVAL_N); 
 
-    eval += game_eval_bitboard(g->pieces[PIECE_WB], GAME_EVAL_B); 
-    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BB]), GAME_EVAL_B); 
+    eval += eval_bb(g->pieces[PC_WB], EVAL_B); 
+    eval -= eval_bb(rrow(g->pieces[PC_BB]), EVAL_B); 
 
-    eval += game_eval_bitboard(g->pieces[PIECE_WR], GAME_EVAL_R); 
-    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BR]), GAME_EVAL_R); 
+    eval += eval_bb(g->pieces[PC_WR], EVAL_R); 
+    eval -= eval_bb(rrow(g->pieces[PC_BR]), EVAL_R); 
 
-    eval += game_eval_bitboard(g->pieces[PIECE_WQ], GAME_EVAL_Q); 
-    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BQ]), GAME_EVAL_Q); 
+    eval += eval_bb(g->pieces[PC_WQ], EVAL_Q); 
+    eval -= eval_bb(rrow(g->pieces[PC_BQ]), EVAL_Q); 
 
-    eval += game_eval_bitboard(g->pieces[PIECE_WK], GAME_EVAL_K); 
-    eval -= game_eval_bitboard(bitboard_reverse_rows(g->pieces[PIECE_BK]), GAME_EVAL_K); 
+    eval += eval_bb(g->pieces[PC_WK], EVAL_K); 
+    eval -= eval_bb(rrow(g->pieces[PC_BK]), EVAL_K); 
 
     return eval; 
 }
@@ -993,8 +993,8 @@ static void game_print(const game *g)
     static const char *empty = "."; 
 
     vector moves; 
-    VECTOR_CREATE_TYPE(&moves, move); 
-    game_generate_moves(g, &moves);  
+    CREATE_VEC(&moves, move); 
+    gen_moves(g, &moves);  
     size_t num_moves = moves.size; 
 
     printf("  +-----------------+\n"); 
@@ -1003,13 +1003,13 @@ static void game_print(const game *g)
         printf("%d | ", rank + 1); 
         for (int file = 0; file < 8; file++) 
         {
-            square sq = square_make(file, rank); 
+            square sq = make_sq(file, rank); 
             const char *str = empty; 
-            for (piece p = 0; p < PIECE_COUNT; p++) 
+            for (piece p = 0; p < PC_CNT; p++) 
             {
-                if (bitboard_at(g->pieces[p], sq)) 
+                if (get_bit(g->pieces[p], sq)) 
                 {
-                    str = piece_string(p); 
+                    str = str_pc(p); 
                 }
             }
 
@@ -1019,46 +1019,46 @@ static void game_print(const game *g)
     }
     printf("  +-----------------+\n"); 
     printf("    A B C D E F G H  \n"); 
-    printf("Castling: %s\n", castle_string(g->castle)); 
-    printf("En passant: %s\n", g->en_passant == SQUARE_NONE ? "(none)" : square_string(g->en_passant)); 
+    printf("Castling: %s\n", str_castle(g->castle)); 
+    printf("En passant: %s\n", g->ep == NO_SQ ? "(none)" : str_sq(g->ep)); 
     printf("In check: %s\n", g->in_check ? "yes" : "no"); 
     printf("# moves: %zu\n", num_moves); 
-    printf("Static eval: %.2f\n", game_evaluate(g, num_moves) * 0.01); 
+    printf("Static eval: %.2f\n", eval(g, num_moves) * 0.01); 
     printf("%s to move\n", g->turn ? "Black" : "White"); 
 
     // for (size_t i = 0; i < num_moves; i++) 
     // {
-    //     move_print(VECTOR_AT_TYPE(&moves, move, i)); 
+    //     print_move(AT_VEC(&moves, move, i)); 
     // }
 
-    vector_destroy(&moves); 
+    destroy_vec(&moves); 
 }
 
-static inline uint64_t game_perft_internal(game *g, vector *moves, int depth, bool verbose) 
+static inline uint64_t perft_(game *g, vector *moves, int depth, bool verbose) 
 {
     uint64_t total = 0, start = moves->size, size; 
 
     if (depth > 1) 
     {
-        game_generate_moves(g, moves); 
+        gen_moves(g, moves); 
         size = moves->size; 
 
         // game_print(g); 
 
         for (size_t i = start; i < size; i++) 
         {
-            game_push_move(g, VECTOR_AT_TYPE(moves, move, i)); 
-            total += game_perft_internal(g, moves, depth - 1, false); 
-            game_pop_move(g); 
+            push_move(g, AT_VEC(moves, move, i)); 
+            total += perft_(g, moves, depth - 1, false); 
+            pop_move(g); 
         }
 
-        vector_pop_to_size(moves, start); 
+        pop_vec_to_size(moves, start); 
     }
     else if (depth == 1) 
     {
-        game_generate_moves(g, moves); 
+        gen_moves(g, moves); 
         total += moves->size - start; 
-        vector_pop_to_size(moves, start); 
+        pop_vec_to_size(moves, start); 
     }
     else 
     {
@@ -1073,14 +1073,14 @@ static inline uint64_t game_perft_internal(game *g, vector *moves, int depth, bo
     return total; 
 }
 
-static inline uint64_t game_perft(game *g, int depth) 
+static inline uint64_t perft(game *g, int depth) 
 {
     vector moves; 
-    VECTOR_CREATE_TYPE(&moves, move); 
+    CREATE_VEC(&moves, move); 
 
-    uint64_t total = game_perft_internal(g, &moves, depth, true); 
+    uint64_t total = perft_(g, &moves, depth, true); 
 
-    vector_destroy(&moves); 
+    destroy_vec(&moves); 
     return total; 
 }
 
@@ -1091,17 +1091,17 @@ struct pv_line
     move moves[128]; 
 };
 
-static inline int game_quiescence(game *g, int alpha, int beta, int depth, vector *moves) 
+static inline int qsearch(game *g, int alpha, int beta, int depth, vector *moves) 
 {
     size_t start = moves->size; 
 
-    game_generate_moves(g, moves); 
+    gen_moves(g, moves); 
 
-    int stand_pat = game_sign(g) * game_evaluate(g, moves->size - start); 
+    int stand_pat = col_sign(g) * eval(g, moves->size - start); 
 
     if (stand_pat >= beta) 
     {
-        vector_pop_to_size(moves, start); 
+        pop_vec_to_size(moves, start); 
         return beta; 
     }
     if (stand_pat > alpha) 
@@ -1113,18 +1113,18 @@ static inline int game_quiescence(game *g, int alpha, int beta, int depth, vecto
     {
         for (size_t i = start; i < moves->size; i++) 
         {
-            move mv = VECTOR_AT_TYPE(moves, move, i); 
+            move mv = AT_VEC(moves, move, i); 
 
             // only consider captures 
-            if (move_takes_en_passant(mv) | bitboard_at(g->colors[color_get_other(g->turn)], move_get_to_square(mv))) 
+            if (takes_ep(mv) | get_bit(g->colors[opp_col(g->turn)], to_sq(mv))) 
             {
-                game_push_move(g, mv); 
-                int score = -game_quiescence(g, -beta, -alpha, depth - 1, moves); 
-                game_pop_move(g); 
+                push_move(g, mv); 
+                int score = -qsearch(g, -beta, -alpha, depth - 1, moves); 
+                pop_move(g); 
 
                 if (score >= beta) 
                 {
-                    vector_pop_to_size(moves, start); 
+                    pop_vec_to_size(moves, start); 
                     return beta; 
                 }
                 if (score > alpha) 
@@ -1135,38 +1135,38 @@ static inline int game_quiescence(game *g, int alpha, int beta, int depth, vecto
         }
     }
 
-    vector_pop_to_size(moves, start); 
+    pop_vec_to_size(moves, start); 
     return alpha; 
 }
 
-static inline int game_negamax(game *g, int alpha, int beta, int depth, vector *moves, pv_line *pv) 
+static inline int negamax(game *g, int alpha, int beta, int depth, vector *moves, pv_line *pv) 
 {
     pv_line line; 
     size_t start = moves->size; 
 
-    game_generate_moves(g, moves); 
+    gen_moves(g, moves); 
     int num_moves = moves->size - start; 
 
     if (num_moves == 0 || depth <= 0) 
     {
         pv->n_moves = 0; 
-        vector_pop_to_size(moves, start); 
-        return game_quiescence(g, alpha, beta, 32, moves); 
+        pop_vec_to_size(moves, start); 
+        return qsearch(g, alpha, beta, 32, moves); 
     }
 
     for (size_t i = start; i < moves->size; i++) 
     {
-        game_push_move(g, VECTOR_AT_TYPE(moves, move, i)); 
-        int eval = -game_negamax(g, -beta, -alpha, depth - 1, moves, &line); 
-        game_pop_move(g); 
+        push_move(g, AT_VEC(moves, move, i)); 
+        int eval = -negamax(g, -beta, -alpha, depth - 1, moves, &line); 
+        pop_move(g); 
 
         if (eval >= beta) 
         {
-            vector_pop_to_size(moves, start); 
+            pop_vec_to_size(moves, start); 
             return beta; 
         }
 
-        if (VECTOR_AT_TYPE(moves, move, i) == 0) 
+        if (AT_VEC(moves, move, i) == 0) 
         {
             printf("what\n"); 
             fflush(stdout); 
@@ -1175,30 +1175,30 @@ static inline int game_negamax(game *g, int alpha, int beta, int depth, vector *
         if (eval > alpha) 
         {
             alpha = eval; 
-            pv->moves[0] = VECTOR_AT_TYPE(moves, move, i); 
+            pv->moves[0] = AT_VEC(moves, move, i); 
             memcpy(pv->moves + 1, line.moves, line.n_moves * sizeof(move)); 
             pv->n_moves = line.n_moves + 1; 
         }
     }
 
-    vector_pop_to_size(moves, start); 
+    pop_vec_to_size(moves, start); 
     return alpha; 
 }
 
-static inline void game_search(game *g, int search_depth, vector *pv, int *eval) 
+static inline void search(game *g, int search_depth, vector *pv, int *eval) 
 {
     vector moves; 
-    VECTOR_CREATE_TYPE(&moves, move); 
+    CREATE_VEC(&moves, move); 
 
     pv_line line; 
     for (int depth = 1; depth <= search_depth; depth++) 
     {
-        vector_clear(&moves); 
-        int eval = game_negamax(g, -INT_MAX, INT_MAX, depth, &moves, &line); 
+        clear_vec(&moves); 
+        int eval = negamax(g, -INT_MAX, INT_MAX, depth, &moves, &line); 
         printf("info depth %d seldepth %zu multipv 1 score cp %d nodes 1 nps 1 pv ", depth, line.n_moves, eval); 
         for (size_t i = 0; i < line.n_moves; i++) 
         {
-            move_print_end(line.moves[i], " "); 
+            print_move_end(line.moves[i], " "); 
         }
         printf("\n"); 
 
@@ -1206,7 +1206,7 @@ static inline void game_search(game *g, int search_depth, vector *pv, int *eval)
     }
 
     printf("bestmove "); 
-    move_print_end(line.moves[0], "\n"); 
+    print_move_end(line.moves[0], "\n"); 
 
-    vector_destroy(&moves); 
+    destroy_vec(&moves); 
 }
