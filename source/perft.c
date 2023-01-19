@@ -30,7 +30,7 @@ bool run_perft(const char *name, const char *fen, const uint64_t *expected)
     create_game_fen(&g, fen); 
 
     printf("%s\n%s\n", name, fen); 
-    game_print(&g); 
+    print_game(&g); 
 
     int i = -1; 
     while (expected[++i] > 0) 

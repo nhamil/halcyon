@@ -159,7 +159,7 @@ done:
 
 bool uci_command_print(game *g) 
 {
-    game_print(g); 
+    print_game(g); 
     return true; 
 }
 
