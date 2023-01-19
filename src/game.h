@@ -49,6 +49,10 @@ void pop_move(game *g);
 // does not check if the move is legal 
 void push_move(game *g, move m); 
 
+void pop_null_move(game *g); 
+
+void push_null_move(game *g); 
+
 void gen_moves(const game *g, vector *out); 
 
 int eval(const game *g, int num_moves); 

@@ -403,6 +403,28 @@ void pop_move(game *g)
     g->turn = opp_col(g->turn); 
 }
 
+void push_null_move(game *g) 
+{
+    g->nodes++; 
+
+    push_vec(&g->hist, g); 
+
+    color cur_col = g->turn; 
+
+    g->check = g->pieces[make_pc(PC_K, cur_col)]; 
+    g->ep = NO_SQ; 
+    g->ply++; 
+    g->turn = opp_col(cur_col); 
+
+    // see if next player is in check 
+    g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
+}
+
+void pop_null_move(game *g) 
+{
+    pop_move(g); 
+}
+
 static inline void gen_push(bboard b, square from, piece pc, vector *out) 
 {
     FOR_EACH_BIT(b, 
