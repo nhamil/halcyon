@@ -32,6 +32,7 @@ void reset_game(game *g)
     g->in_check = false; 
     g->ply = 0; 
     g->turn = COL_W; 
+    g->nodes = 0; 
 }
 
 void create_game(game *g) 
@@ -315,6 +316,8 @@ bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, 
 // does not check if the move is legal 
 void push_move(game *g, move m) 
 {
+    g->nodes++; 
+
     // save current state 
     push_vec(&g->hist, g); 
 
@@ -787,78 +790,6 @@ void gen_moves(const game *g, vector *out)
     }
 }
 
-static const int EVAL_P[64] = 
-{
-      0,   0,   0,   0,   0,   0,   0,   0, 
-      5,  10,  10, -20, -20,  10,  10,   5, 
-      5,  -5, -10,   0,   0, -10,  -5,   5, 
-      0,   0,   0,  20,  20,   0,   0,   0, 
-      5,   5,  10,  25,  25,  10,   5,   5, 
-     10,  10,  20,  30,  30,  20,  10,  10, 
-     50,  50,  50,  50,  50,  50,  50,  50, 
-      0,   0,   0,   0,   0,   0,   0,   0
-};
-
-static const int EVAL_N[64] = 
-{
-    -50, -40, -30, -30, -30, -30, -40, -50, 
-    -40, -20,   0,   5,   5,   0, -20, -40, 
-    -30,   5,  10,  15,  15,  10,   5, -30, 
-    -30,   0,  15,  20,  20,  15,   0, -30, 
-    -30,   5,  15,  20,  20,  15,   5, -30, 
-    -30,   0,  10,  15,  15,  10,   0, -30, 
-    -40, -20,   0,   0,   0,   0, -20, -40, 
-    -50, -40, -30, -30, -30, -30, -40, -50 
-};
-
-static const int EVAL_B[64] = 
-{
-    -20, -10, -10, -10, -10, -10, -10, -20, 
-    -10,   5,   0,   0,   0,   0,   5, -10, 
-    -10,  10,  10,  10,  10,  10,  10, -10, 
-    -10,   0,  10,  10,  10,  10,   0, -10, 
-    -10,   5,   5,  10,  10,   5,   5, -10, 
-    -10,   0,   5,  10,  10,   5,   0, -10, 
-    -10,   0,   0,   0,   0,   0,   0, -10, 
-    -20, -10, -10, -10, -10, -10, -10, -20 
-};
-
-static const int EVAL_R[64] = 
-{
-      0,   0,   0,   5,   5,   0,   0,   0, 
-     -5,   0,   0,   0,   0,   0,   0,  -5, 
-     -5,   0,   0,   0,   0,   0,   0,  -5, 
-     -5,   0,   0,   0,   0,   0,   0,  -5, 
-     -5,   0,   0,   0,   0,   0,   0,  -5, 
-     -5,   0,   0,   0,   0,   0,   0,  -5, 
-      5,  10,  10,  10,  10,  10,  10,   5, 
-      0,   0,   0,   0,   0,   0,   0,   0 
-};
-
-static const int EVAL_Q[64] = 
-{
-    -20, -10, -10,  -5,  -5, -10, -10, -20, 
-    -10,   0,   5,   0,   0,   5,   0, -10, 
-    -10,   0,   5,   5,   5,   5,   0, -10, 
-      0,   0,   5,   5,   5,   5,   0,   0, 
-      0,   0,   5,   5,   5,   5,   0,   0, 
-    -10,   0,   5,   5,   5,   5,   0, -10, 
-    -10,   0,   0,   0,   0,   0,   0, -10, 
-    -20, -10, -10,  -5,  -5, -10, -10, -20, 
-};
-
-static const int EVAL_K[64] = 
-{
-     20,  30,  10,   0,   0,  10,  30,  20, 
-     20,  20,   0,   0,   0,   0,  20,  20, 
-    -10, -20, -20, -20, -20, -20, -20, -10, 
-    -20, -30, -30, -40, -40, -30, -30, -20, 
-    -30, -40, -40, -50, -50, -40, -40, -30, 
-    -30, -40, -40, -50, -50, -40, -40, -30, 
-    -30, -40, -40, -50, -50, -40, -40, -30, 
-    -30, -40, -40, -50, -50, -40, -40, -30, 
-};
-
 static inline int eval_bb(bboard pcs, const int eval[64]) 
 {
     int sum = 0; 
@@ -880,7 +811,7 @@ int eval(const game *g, int num_moves)
         if (g->in_check) 
         {
             // lower value the farther out the mate is (prioritize faster mates)
-            return 100000 * (-1 + 2 * g->turn) - g->ply; 
+            return (100000 - g->ply) * (-1 + 2 * g->turn); 
         }
         else 
         {
@@ -900,23 +831,23 @@ int eval(const game *g, int num_moves)
     // bishop pair 
     eval += 15 * ((popcnt(g->pieces[PC_WB]) >= 2) - (popcnt(g->pieces[PC_BB]) >= 2)); 
 
-    eval += eval_bb(g->pieces[PC_WP], EVAL_P); 
-    eval -= eval_bb(rrow(g->pieces[PC_BP]), EVAL_P); 
+    eval += eval_bb(g->pieces[PC_WP], PC_SQ[PC_P]); 
+    eval -= eval_bb(rrow(g->pieces[PC_BP]), PC_SQ[PC_P]); 
 
-    eval += eval_bb(g->pieces[PC_WN], EVAL_N); 
-    eval -= eval_bb(rrow(g->pieces[PC_BN]), EVAL_N); 
+    eval += eval_bb(g->pieces[PC_WN], PC_SQ[PC_N]); 
+    eval -= eval_bb(rrow(g->pieces[PC_BN]), PC_SQ[PC_N]); 
 
-    eval += eval_bb(g->pieces[PC_WB], EVAL_B); 
-    eval -= eval_bb(rrow(g->pieces[PC_BB]), EVAL_B); 
+    eval += eval_bb(g->pieces[PC_WB], PC_SQ[PC_B]); 
+    eval -= eval_bb(rrow(g->pieces[PC_BB]), PC_SQ[PC_B]); 
 
-    eval += eval_bb(g->pieces[PC_WR], EVAL_R); 
-    eval -= eval_bb(rrow(g->pieces[PC_BR]), EVAL_R); 
+    eval += eval_bb(g->pieces[PC_WR], PC_SQ[PC_R]); 
+    eval -= eval_bb(rrow(g->pieces[PC_BR]), PC_SQ[PC_R]); 
 
-    eval += eval_bb(g->pieces[PC_WQ], EVAL_Q); 
-    eval -= eval_bb(rrow(g->pieces[PC_BQ]), EVAL_Q); 
+    eval += eval_bb(g->pieces[PC_WQ], PC_SQ[PC_Q]); 
+    eval -= eval_bb(rrow(g->pieces[PC_BQ]), PC_SQ[PC_Q]); 
 
-    eval += eval_bb(g->pieces[PC_WK], EVAL_K); 
-    eval -= eval_bb(rrow(g->pieces[PC_BK]), EVAL_K); 
+    eval += eval_bb(g->pieces[PC_WK], PC_SQ[PC_K]); 
+    eval -= eval_bb(rrow(g->pieces[PC_BK]), PC_SQ[PC_K]); 
 
     return eval; 
 }

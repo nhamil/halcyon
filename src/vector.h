@@ -105,3 +105,21 @@ static inline void clear_vec(vector *v)
 {
     v->size = 0; 
 }
+
+static inline void swap_vec(vector *v, size_t a, size_t b) 
+{
+    char tmp[v->elem_size]; 
+    get_vec(v, a, tmp); 
+    get_vec(v, b, at_vec(v, a)); 
+    set_vec(v, b, tmp); 
+}
+
+static inline void sort_vec(vector *v, int (*cmp)(const void *, const void *, void *), void *ctx) 
+{
+    qsort_s(v->data, v->size, v->elem_size, cmp, ctx); 
+}
+
+static inline void sort_vec_start(vector *v, size_t start, int (*cmp)(const void *, const void *, void *), void *ctx) 
+{
+    qsort_s(at_vec(v, start), v->size - start, v->elem_size, cmp, ctx); 
+}

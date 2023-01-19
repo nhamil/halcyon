@@ -246,7 +246,7 @@ static inline int get_bit(bboard b, square sq)
 
 static inline bboard set_bit(bboard b, square sq) 
 {
-    return (b & ~(1ULL << sq)) | (1ULL << sq); 
+    return b | (1ULL << sq); 
 }
 
 static inline bboard clear_bits(bboard b, square sq) 

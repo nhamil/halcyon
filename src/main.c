@@ -114,12 +114,12 @@ bool uci_cmd_position(game *g)
             square from = make_sq(token[0] - 'a', token[1] - '1'); 
             square to = make_sq(token[2] - 'a', token[3] - '1'); 
 
-            printf("%s (%s) to %s\n", str_sq(from), str_pc(pc_at(g, from)), str_sq(to)); 
+            printf("%s (%s) to %s\n", str_sq(from), str_pc(pc_at_or_wp(g, from)), str_sq(to)); 
 
             // if promote is still pawn, then it wasn't promoted -> get the real original piece
             if (promote == PC_P) 
             {
-                promote = get_no_col(pc_at(g, from)); 
+                promote = get_no_col(pc_at_or_wp(g, from)); 
             }
 
             promote = make_pc(promote, g->turn); 
@@ -179,7 +179,7 @@ bool uci_cmd_go(game *g)
 
     if (depth <= 0) 
     {
-        depth = 10; 
+        depth = 100; 
     }
 
     printf("info string Searching with max depth of %d\n", depth); 
