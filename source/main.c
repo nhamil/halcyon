@@ -28,7 +28,7 @@ bool uci_equals(const char *a, const char *b)
     return strcmp(a, b) == 0; 
 }
 
-bool uci_command_uci(game *g) 
+bool uci_cmd_uci(game *g) 
 {
     printf("id name chess-engine 0.1\n"); 
     printf("id author Nicholas Hamilton\n"); 
@@ -36,13 +36,13 @@ bool uci_command_uci(game *g)
     return true; 
 }
 
-bool uci_command_isready(game *g) 
+bool uci_cmd_isready(game *g) 
 {
     printf("readyok\n"); 
     return true; 
 }
 
-bool uci_command_position(game *g) 
+bool uci_cmd_position(game *g) 
 {
     vector moves; 
     CREATE_VEC(&moves, move); 
@@ -157,13 +157,13 @@ done:
     return success; 
 }
 
-bool uci_command_print(game *g) 
+bool uci_cmd_print(game *g) 
 {
     print_game(g); 
     return true; 
 }
 
-bool uci_command_go(game *g) 
+bool uci_cmd_go(game *g) 
 {
     const char *token; 
     int depth = -1; 
@@ -178,7 +178,7 @@ bool uci_command_go(game *g)
 
     if (depth <= 0) 
     {
-        depth = 4; 
+        depth = 10; 
     }
 
     printf("info string Searching with max depth of %d\n", depth); 
@@ -205,11 +205,11 @@ bool uci_parse(game *g, const char *orig_cmd)
     if (token) 
     {
         if (uci_equals(token, "quit")) exit(0); 
-        if (uci_equals(token, "uci")) return uci_command_uci(g); 
-        if (uci_equals(token, "isready")) return uci_command_isready(g); 
-        if (uci_equals(token, "position")) return uci_command_position(g); 
-        if (uci_equals(token, "d")) return uci_command_print(g); 
-        if (uci_equals(token, "go")) return uci_command_go(g); 
+        if (uci_equals(token, "uci")) return uci_cmd_uci(g); 
+        if (uci_equals(token, "isready")) return uci_cmd_isready(g); 
+        if (uci_equals(token, "position")) return uci_cmd_position(g); 
+        if (uci_equals(token, "d")) return uci_cmd_print(g); 
+        if (uci_equals(token, "go")) return uci_cmd_go(g); 
     }
 
     return false; 
