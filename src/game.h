@@ -55,8 +55,10 @@ void print_game(const game *g);
 
 uint64_t perft(game *g, int depth); 
 
-void search(game *g, int search_depth, vector *pv, int *eval); 
-
+static inline int col_sign(const game *g) 
+{
+    return 1 - 2 * g->turn; 
+}
 
 // assumes there is a white piece on the square, otherwise returns WP
 static inline piece w_pc_at(const game *g, square sq) 

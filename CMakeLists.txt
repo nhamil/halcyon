@@ -14,7 +14,8 @@ set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops")
 include_directories(source) 
 
 set(sources 
-    src/game.c
+    src/game.c 
+    src/search.c 
 )
 
 add_executable(engine src/main.c ${sources})

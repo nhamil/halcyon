@@ -11,6 +11,7 @@
 #include "move.h"
 #include "piece.h"
 #include "random.h" 
+#include "search.h" 
 #include "square.h"
 #include "vector.h" 
 
