@@ -41,11 +41,6 @@ static int cmp_moves(void *ctx, const void *ma, const void *mb)
     int va = move_val(g, a); 
     int vb = move_val(g, b); 
 
-    // printf("cmp "); 
-    // print_move_end(a, " "); 
-    // print_move_end(b, " "); 
-    // printf("%d\n", (va < vb) - (va > vb)); 
-
     // descending order 
     return (va < vb) - (va > vb); 
 }
@@ -124,7 +119,7 @@ struct pv_line
     move moves[128]; 
 };
 
-static inline int negamax(search_data *sd, game *g, int alpha, int beta, int depth, vector *moves, pv_line *pv) 
+static inline int negamax(search_data *sd, game *g, int alpha, int beta, int depth, bool null_move, vector *moves, pv_line *pv) 
 {
     pv_line line; 
     size_t start = moves->size; 
@@ -148,6 +143,28 @@ static inline int negamax(search_data *sd, game *g, int alpha, int beta, int dep
         return qsearch(sd, g, alpha, beta, 32, moves); 
     }
 
+    if (null_move) 
+    {
+        const int R = 2; 
+        // don't do null move if: 
+        // - depth is too shallow 
+        // - in check 
+        // - either side has only pawns 
+        if (depth >= 1 + R && !g->in_check && !any_side_k_p(g)) 
+        {
+            push_null_move(g); 
+            int eval = -negamax(sd, g, -beta, -beta + 1, depth - 1 - R, false, moves, pv); 
+            pop_null_move(g); 
+
+            if (eval >= beta) 
+            {
+                pv->n_moves = 0; 
+                pop_vec_to_size(moves, start); 
+                return beta; 
+            }
+        }
+    }
+
     for (size_t i = start; i < moves->size; i++) 
     {
         size_t best_i = i; 
@@ -164,7 +181,7 @@ static inline int negamax(search_data *sd, game *g, int alpha, int beta, int dep
         swap_vec(moves, i, best_i); 
 
         push_move(g, AT_VEC(moves, move, i)); 
-        int eval = -negamax(sd, g, -beta, -alpha, depth - 1, moves, &line); 
+        int eval = -negamax(sd, g, -beta, -alpha, depth - 1, null_move, moves, &line); 
         pop_move(g); 
 
         if (eval >= beta) 
@@ -207,7 +224,8 @@ void search(game *g, int search_depth, vector *pv, int *eval)
 
         clear_vec(&moves); 
         clock_t start = clock(); 
-        int eval = negamax(&sd, g, -INT_MAX, INT_MAX, depth, &moves, &line); 
+        int eval = negamax(&sd, g, -EVAL_MAX, EVAL_MAX, depth, true, &moves, &line); 
+
         clock_t end = clock(); 
 
         float duration = (end - start); 

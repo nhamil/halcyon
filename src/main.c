@@ -179,7 +179,7 @@ bool uci_cmd_go(game *g)
 
     if (depth <= 0) 
     {
-        depth = 100; 
+        depth = 8; 
     }
 
     printf("info string Searching with max depth of %d\n", depth); 

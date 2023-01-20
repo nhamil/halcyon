@@ -324,7 +324,7 @@ void push_move(game *g, move m)
     square from = from_sq(m); 
     square to = to_sq(m); 
     square rm_tgt = to; // remove opponent's piece on this square (can be different from `to` if en passant)
-    square new_ep = ep_square(m); 
+    square new_ep = ep_sq(m); 
 
     piece pc = from_pc(m); 
     piece pro = pro_pc(m); 

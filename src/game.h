@@ -14,6 +14,8 @@
 
 typedef struct game game; 
 
+#define EVAL_MAX (INT_MAX - 10)
+
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 struct game 
@@ -111,6 +113,13 @@ static inline bool no_pc_at(const game *g, square sq)
 static inline bool is_capture(const game *g, move mv) 
 {
     return takes_ep(mv) | get_bit(g->colors[opp_col(g->turn)], to_sq(mv)); 
+}
+
+static inline bool any_side_k_p(const game *g) 
+{
+    const bool w_kp = g->colors[COL_W] == (g->pieces[PC_WK] | g->pieces[PC_WP]); 
+    const bool b_kp = g->colors[COL_B] == (g->pieces[PC_BK] | g->pieces[PC_BP]); 
+    return w_kp | b_kp;  
 }
 
 static const int PC_SQ[][64] = 

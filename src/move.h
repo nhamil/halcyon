@@ -56,7 +56,7 @@ static inline int castle_idx(move m)
     return (m >> 27) & 7; 
 }
 
-static inline square ep_square(move m) 
+static inline square ep_sq(move m) 
 {
     return (m >> 20) & 63; 
 }
