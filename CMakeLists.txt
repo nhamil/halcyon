@@ -7,7 +7,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-set(CMAKE_C_FLAGS "-Wall -Wextra -pedantic -m64 -Wno-unused-function -Wno-unused-result -Wno-unused-label")
+set(CMAKE_C_FLAGS "--std=c11 -Wall -Wextra -pedantic -m64 -Wno-unused-function -Wno-unused-result -Wno-unused-label")
 set(CMAKE_C_FLAGS_DEBUG "-g")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops")
 
