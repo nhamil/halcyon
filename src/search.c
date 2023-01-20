@@ -32,24 +32,6 @@ static inline int move_val(const game *g, move mv)
     return 10 * VALUES[get_no_col(pc_at_or_wp(g, to_sq(mv)))] - VALUES[pc_type]; 
 }
 
-static int cmp_moves(void *ctx, const void *ma, const void *mb) 
-{
-    const game *g = ctx; 
-    move a = *(move *) ma; 
-    move b = *(move *) mb; 
-
-    int va = move_val(g, a); 
-    int vb = move_val(g, b); 
-
-    // descending order 
-    return (va < vb) - (va > vb); 
-}
-
-void reorder_moves(const game *g, vector *moves, size_t start) 
-{
-    sort_vec_start(moves, start, cmp_moves, g); 
-}
-
 static inline int qsearch(search_data *sd, game *g, int alpha, int beta, int depth, vector *moves) 
 {
     size_t start = moves->size; 
