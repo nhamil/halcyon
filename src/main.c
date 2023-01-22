@@ -49,6 +49,12 @@ bool uci_cmd_isready(void)
     return true; 
 }
 
+bool uci_cmd_ucinewgame(void) 
+{
+    stop_search_thread(&engine); 
+    load_fen(&uci_game, START_FEN); 
+}
+
 bool uci_cmd_position(void) 
 {
     vector moves; 
@@ -267,6 +273,7 @@ bool uci_parse(const char *orig_cmd)
     if (token) 
     {
         if (uci_equals(token, "quit")) exit(0); 
+        if (uci_equals(token, "ucinewgame")) return uci_cmd_ucinewgame(); 
         if (uci_equals(token, "uci")) return uci_cmd_uci(); 
         if (uci_equals(token, "isready")) return uci_cmd_isready(); 
         if (uci_equals(token, "position")) return uci_cmd_position(); 
