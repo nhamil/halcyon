@@ -13,10 +13,16 @@ set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops")
 
 include_directories(source) 
 
+set(THREADS_PREFER_PTHREAD_FLAG ON)
+find_package(Threads REQUIRED)
+
 set(sources 
     src/game.c 
     src/search.c 
 )
 
 add_executable(halcyon src/main.c ${sources})
+target_link_libraries(halcyon Threads::Threads) 
+
 add_executable(perft src/perft.c ${sources})
+target_link_libraries(perft Threads::Threads) 
