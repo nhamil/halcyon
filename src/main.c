@@ -288,7 +288,7 @@ bool uci_parse(const char *orig_cmd)
 
 int main(void) 
 {
-    printf("%s\n", ENGINE_NAME); 
+    printf("%s by Nicholas Hamilton\n", ENGINE_NAME); 
     fflush(stdout); 
 
     // log = fopen("input.txt", "a"); 
