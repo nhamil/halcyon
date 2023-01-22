@@ -53,6 +53,7 @@ bool uci_cmd_ucinewgame(void)
 {
     stop_search_thread(&engine); 
     load_fen(&uci_game, START_FEN); 
+    return true; 
 }
 
 bool uci_cmd_position(void) 
@@ -290,8 +291,8 @@ int main(void)
     printf("%s\n", ENGINE_NAME); 
     fflush(stdout); 
 
-    log = fopen("C:\\Users\\Nicholas\\Documents\\Code\\chess-engine\\build\\input.txt", "a"); 
-    fprintf(log, "NEW RUN\n"); 
+    // log = fopen("input.txt", "a"); 
+    // fprintf(log, "NEW RUN\n"); 
 
     create_game_fen(&uci_game, START_FEN); 
     create_search_thread(&engine); 
@@ -301,13 +302,13 @@ int main(void)
     {
         fflush(stdout); 
         fgets(input, UCI_MAX_INPUT, stdin); 
-        fprintf(log, "%s", input); 
-        fflush(log); 
+        // fprintf(log, "%s", input); 
+        // fflush(log); 
         input[strlen(input) - 1] = '\0'; 
         if (!uci_parse(input)) printf("Unknown command: '%s'\n", input); 
     }
 
-    fclose(log); 
+    // fclose(log); 
 
     destroy_game(&uci_game); 
     destroy_search_thread(&engine); 
