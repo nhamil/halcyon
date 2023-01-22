@@ -27,6 +27,15 @@ static inline void create_vec(vector *v, size_t elem_size)
     v->data = malloc(v->capacity * elem_size); 
 }
 
+static inline void create_vec_copy(vector *v, const vector *src) 
+{
+    v->size = src->size; 
+    v->capacity = src->capacity; 
+    v->elem_size = src->elem_size; 
+    v->data = malloc(v->capacity * v->elem_size); 
+    memcpy(v->data, src->data, v->size); 
+}
+
 static inline void destroy_vec(vector *v) 
 {
     free(v->data); 

@@ -41,6 +41,20 @@ void create_game(game *g)
     reset_game(g); 
 }
 
+void create_game_copy(game *g, const game *src) 
+{
+    create_vec_copy(&g->hist, &src->hist); 
+    memcpy(&g->pieces, &src->pieces, sizeof(g->pieces)); 
+    memcpy(&g->colors, &src->colors, sizeof(g->colors)); 
+    g->check = src->check; 
+    g->castle = src->castle; 
+    g->ep = src->ep; 
+    g->in_check = src->in_check; 
+    g->ply = src->ply; 
+    g->turn = src->turn; 
+    g->nodes = src->nodes; 
+}
+
 void destroy_game(game *g) 
 {
     destroy_vec(&g->hist); 

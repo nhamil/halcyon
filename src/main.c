@@ -15,7 +15,13 @@
 #include "square.h"
 #include "vector.h" 
 
+#define ENGINE_NAME "Halcyon 0.1"
+
 #define UCI_MAX_INPUT 4096
+
+FILE *log; 
+game uci_game; 
+search_thread engine; 
 
 const char *uci_next_token(void) 
 {
@@ -29,24 +35,26 @@ bool uci_equals(const char *a, const char *b)
     return strcmp(a, b) == 0; 
 }
 
-bool uci_cmd_uci(game *g) 
+bool uci_cmd_uci(void) 
 {
-    printf("id name chess-engine 0.1\n"); 
+    printf("id name %s\n", ENGINE_NAME); 
     printf("id author Nicholas Hamilton\n"); 
     printf("uciok\n"); 
     return true; 
 }
 
-bool uci_cmd_isready(game *g) 
+bool uci_cmd_isready(void) 
 {
     printf("readyok\n"); 
     return true; 
 }
 
-bool uci_cmd_position(game *g) 
+bool uci_cmd_position(void) 
 {
     vector moves; 
     CREATE_VEC(&moves, move); 
+
+    game *g = &uci_game; 
 
     const char *token = uci_next_token(); 
 
@@ -158,16 +166,18 @@ done:
     return success; 
 }
 
-bool uci_cmd_print(game *g) 
+bool uci_cmd_print(void) 
 {
-    print_game(g); 
+    print_game(&uci_game); 
     return true; 
 }
 
-bool uci_cmd_go(game *g) 
+bool uci_cmd_go(void) 
 {
     const char *token; 
-    int depth = -1; 
+    int depth = INF_DEPTH, time_ms = INF_TIME; 
+    int movetime = INF_TIME; 
+    int wtime = INF_TIME, btime = INF_TIME, sidetime = INF_TIME; 
 
     while (token = uci_next_token()) 
     {
@@ -175,26 +185,77 @@ bool uci_cmd_go(game *g)
         {
             depth = atoi(token); 
         }
+        if (uci_equals(token, "movetime") && (token = uci_next_token())) 
+        {
+            movetime = atoi(token); 
+        }
+        if (uci_equals(token, "wtime") && (token = uci_next_token())) 
+        {
+            wtime = atoi(token); 
+            if (uci_game.turn == COL_W) sidetime = wtime; 
+        }
+        if (uci_equals(token, "btime") && (token = uci_next_token())) 
+        {
+            btime = atoi(token); 
+            if (uci_game.turn == COL_B) sidetime = btime; 
+        }
     }
 
-    if (depth <= 0) 
+    if (depth > 0) 
     {
-        depth = 8; 
+        printf("info string Searching with max depth of %d\n", depth); 
+    }
+    else 
+    {
+        printf("info string Searching with no depth\n"); 
     }
 
-    printf("info string Searching with max depth of %d\n", depth); 
+    if (movetime > 0) 
+    {
+        time_ms = movetime; 
+    }
 
-    int eval = 0; 
-    vector pv; 
-    CREATE_VEC(&pv, move); 
+    if (sidetime > 0) 
+    {
+        int inv_scale = (int) (10 - 0.05 * uci_game.ply); 
+        if (inv_scale < 2) inv_scale = 2; 
 
-    search(g, depth, &pv, &eval); 
+        int total_time = sidetime - 1000; 
+        if (total_time < 10) total_time = 10; 
 
-    destroy_vec(&pv); 
+        int tgt_time = (int) (total_time / inv_scale); 
+        if (tgt_time > 0) 
+        {
+            time_ms = tgt_time; 
+            printf("info string Using %dms out of %dms to think\n", time_ms, sidetime); 
+            fflush(stdout); 
+        }
+    }
+
+    if (time_ms > 0) 
+    {
+        printf("info string Searching with max time of %dms\n", time_ms); 
+    }
+    else 
+    {
+        printf("info string Searching with no time limit\n"); 
+    }
+    fflush(stdout); 
+
+    search_params params; 
+    init_search_params(&params, &uci_game, depth, time_ms); 
+
+    search(&engine, &params); 
     return true; 
 }
 
-bool uci_parse(game *g, const char *orig_cmd) 
+bool uci_cmd_stop(void) 
+{
+    stop_search_thread(&engine); 
+    return true; 
+}
+
+bool uci_parse(const char *orig_cmd) 
 {
     // remove spaces at the beginning
     while (*orig_cmd && *orig_cmd == ' ') orig_cmd++; 
@@ -206,11 +267,12 @@ bool uci_parse(game *g, const char *orig_cmd)
     if (token) 
     {
         if (uci_equals(token, "quit")) exit(0); 
-        if (uci_equals(token, "uci")) return uci_cmd_uci(g); 
-        if (uci_equals(token, "isready")) return uci_cmd_isready(g); 
-        if (uci_equals(token, "position")) return uci_cmd_position(g); 
-        if (uci_equals(token, "d")) return uci_cmd_print(g); 
-        if (uci_equals(token, "go")) return uci_cmd_go(g); 
+        if (uci_equals(token, "uci")) return uci_cmd_uci(); 
+        if (uci_equals(token, "isready")) return uci_cmd_isready(); 
+        if (uci_equals(token, "position")) return uci_cmd_position(); 
+        if (uci_equals(token, "d")) return uci_cmd_print(); 
+        if (uci_equals(token, "go")) return uci_cmd_go(); 
+        if (uci_equals(token, "stop")) return uci_cmd_stop(); 
     }
 
     return false; 
@@ -218,28 +280,29 @@ bool uci_parse(game *g, const char *orig_cmd)
 
 int main(void) 
 {
-    printf("chess-engine 0.1\n"); 
+    printf("%s\n", ENGINE_NAME); 
     fflush(stdout); 
 
-    game g; 
-    create_game_fen(&g, START_FEN); 
+    log = fopen("C:\\Users\\Nicholas\\Documents\\Code\\chess-engine\\build\\input.txt", "a"); 
+    fprintf(log, "NEW RUN\n"); 
 
-    FILE *tmp = fopen("C:\\Users\\Nicholas\\Documents\\Code\\chess-engine\\build\\input.txt", "a"); 
-    fprintf(tmp, "NEW RUN\n"); 
+    create_game_fen(&uci_game, START_FEN); 
+    create_search_thread(&engine); 
 
     char input[UCI_MAX_INPUT]; 
     while (true) 
     {
         fflush(stdout); 
         fgets(input, UCI_MAX_INPUT, stdin); 
-        fprintf(tmp, "%s", input); 
-        fflush(tmp); 
+        fprintf(log, "%s", input); 
+        fflush(log); 
         input[strlen(input) - 1] = '\0'; 
-        if (!uci_parse(&g, input)) printf("Unknown command: '%s'\n", input); 
+        if (!uci_parse(input)) printf("Unknown command: '%s'\n", input); 
     }
 
-    fclose(tmp); 
+    fclose(log); 
 
-    destroy_game(&g); 
+    destroy_game(&uci_game); 
+    destroy_search_thread(&engine); 
     return 0; 
 }

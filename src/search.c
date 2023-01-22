@@ -4,16 +4,6 @@
 
 typedef struct search_data search_data; 
 
-struct search_data 
-{
-    uint64_t nodes; 
-};
-
-void init_search(search_data *sd) 
-{
-    sd->nodes = 0; 
-}
-
 static inline int move_val(const game *g, move mv) 
 {
     static const int VALUES[] = 
@@ -32,12 +22,31 @@ static inline int move_val(const game *g, move mv)
     return 10 * VALUES[get_no_col(pc_at_or_wp(g, to_sq(mv)))] - VALUES[pc_type]; 
 }
 
-static inline int qsearch(search_data *sd, game *g, int alpha, int beta, int depth, vector *moves) 
+static inline int qsearch(search_thread *thread, game *g, int alpha, int beta, int depth, vector *moves) 
 {
     size_t start = moves->size; 
 
     gen_moves(g, moves); 
     // reorder_moves(g, moves, start); 
+
+    // if (thread->should_exit || (thread->tgt_time >= 0 && clock() > thread->end_at)) 
+    // {
+    //     if (thread->pv.n_moves) 
+    //     {
+    //         printf("bestmove "); 
+    //         print_move_end(thread->pv.moves[0], "\n"); 
+    //         fflush(stdout); 
+    //     }
+    //     else 
+    //     {
+    //         // no best move 
+    //         printf("bestmove a1a1\n"); 
+    //         fflush(stdout); 
+    //     }
+        
+    //     destroy_vec(moves); 
+    //     pthread_exit(NULL); 
+    // }
 
     int stand_pat = col_sign(g) * eval(g, moves->size - start); 
 
@@ -74,7 +83,7 @@ static inline int qsearch(search_data *sd, game *g, int alpha, int beta, int dep
             if (is_capture(g, mv)) 
             {
                 push_move(g, mv); 
-                int score = -qsearch(sd, g, -beta, -alpha, depth - 1, moves); 
+                int score = -qsearch(thread, g, -beta, -alpha, depth - 1, moves); 
                 pop_move(g); 
 
                 if (score >= beta) 
@@ -94,14 +103,7 @@ static inline int qsearch(search_data *sd, game *g, int alpha, int beta, int dep
     return alpha; 
 }
 
-typedef struct pv_line pv_line; 
-struct pv_line 
-{
-    size_t n_moves; 
-    move moves[128]; 
-};
-
-static inline int negamax(search_data *sd, game *g, int alpha, int beta, int depth, bool null_move, vector *moves, pv_line *pv) 
+static inline int negamax(search_thread *thread, game *g, int alpha, int beta, int depth, bool null_move, vector *moves, pv_line *pv) 
 {
     pv_line line; 
     size_t start = moves->size; 
@@ -109,6 +111,25 @@ static inline int negamax(search_data *sd, game *g, int alpha, int beta, int dep
     gen_moves(g, moves); 
     // reorder_moves(g, moves, start); 
     int num_moves = moves->size - start; 
+
+    if (thread->should_exit || (thread->tgt_time >= 0 && clock() > thread->end_at)) 
+    {
+        if (thread->pv.n_moves) 
+        {
+            printf("bestmove "); 
+            print_move_end(thread->pv.moves[0], "\n"); 
+            fflush(stdout); 
+        }
+        else 
+        {
+            // no best move 
+            printf("bestmove a1a1\n"); 
+            fflush(stdout); 
+        }
+
+        destroy_vec(moves); 
+        pthread_exit(NULL); 
+    }
 
     // for (size_t i = start; i < moves->size; i++) 
     // {
@@ -122,7 +143,7 @@ static inline int negamax(search_data *sd, game *g, int alpha, int beta, int dep
     {
         pv->n_moves = 0; 
         pop_vec_to_size(moves, start); 
-        return qsearch(sd, g, alpha, beta, 32, moves); 
+        return qsearch(thread, g, alpha, beta, 32, moves); 
     }
 
     if (null_move) 
@@ -135,7 +156,7 @@ static inline int negamax(search_data *sd, game *g, int alpha, int beta, int dep
         if (depth >= 1 + R && !g->in_check && !any_side_k_p(g)) 
         {
             push_null_move(g); 
-            int eval = -negamax(sd, g, -beta, -beta + 1, depth - 1 - R, false, moves, pv); 
+            int eval = -negamax(thread, g, -beta, -beta + 1, depth - 1 - R, false, moves, pv); 
             pop_null_move(g); 
 
             if (eval >= beta) 
@@ -163,19 +184,13 @@ static inline int negamax(search_data *sd, game *g, int alpha, int beta, int dep
         swap_vec(moves, i, best_i); 
 
         push_move(g, AT_VEC(moves, move, i)); 
-        int eval = -negamax(sd, g, -beta, -alpha, depth - 1, null_move, moves, &line); 
+        int eval = -negamax(thread, g, -beta, -alpha, depth - 1, null_move, moves, &line); 
         pop_move(g); 
 
         if (eval >= beta) 
         {
             pop_vec_to_size(moves, start); 
             return beta; 
-        }
-
-        if (AT_VEC(moves, move, i) == 0) 
-        {
-            printf("what\n"); 
-            fflush(stdout); 
         }
 
         if (eval > alpha) 
@@ -191,22 +206,24 @@ static inline int negamax(search_data *sd, game *g, int alpha, int beta, int dep
     return alpha; 
 }
 
-void search(game *g, int search_depth, vector *pv, int *eval) 
+void run_search(search_thread *thread) 
 {
     vector moves; 
     CREATE_VEC(&moves, move); 
 
     clock_t search_start = clock(); 
 
-    pv_line line; 
-    for (int depth = 1; depth <= search_depth; depth++) 
-    {
-        search_data sd; 
-        init_search(&sd); 
+    game *g = &thread->board; 
 
+    int tgt_depth = thread->tgt_depth; 
+    if (tgt_depth < 0) tgt_depth = INT_MAX; 
+
+    pv_line line; 
+    for (int depth = 1; depth <= tgt_depth; depth++) 
+    {
         clear_vec(&moves); 
         clock_t start = clock(); 
-        int eval = negamax(&sd, g, -EVAL_MAX, EVAL_MAX, depth, true, &moves, &line); 
+        int evaluation = negamax(thread, g, -EVAL_MAX, EVAL_MAX, depth, true, &moves, &line); 
 
         clock_t end = clock(); 
 
@@ -219,18 +236,109 @@ void search(game *g, int search_depth, vector *pv, int *eval)
         if (start_duration <= 0) start_duration = 1; 
         start_duration /= CLOCKS_PER_SEC / 1000; 
 
-        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, line.n_moves, eval, start_duration, g->nodes, nps); 
+        thread->pv = line; 
+        thread->nodes = g->nodes; 
+        thread->nps = (uint64_t) nps; 
+        thread->depth = depth; 
+        thread->eval = eval; 
+
+        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, line.n_moves, evaluation, start_duration, g->nodes, nps); 
         for (size_t i = 0; i < line.n_moves; i++) 
         {
             print_move_end(line.moves[i], " "); 
         }
         printf("\n"); 
-
         fflush(stdout); 
     }
 
+    thread->running = false; 
+
     printf("bestmove "); 
     print_move_end(line.moves[0], "\n"); 
+    fflush(stdout); 
 
     destroy_vec(&moves); 
+}
+
+static void *start_pthread_search(void *data) 
+{
+    search_thread *st = data; 
+    run_search(st); 
+
+    return NULL; 
+}
+
+void create_search_thread(search_thread *st) 
+{
+    memset(st, 0, sizeof(search_thread)); 
+
+    // board should always be initialized
+    create_game(&st->board); 
+
+    pthread_mutex_init(&st->lock, NULL); 
+} 
+
+void destroy_search_thread(search_thread *st) 
+{
+    stop_search_thread(st); 
+    destroy_game(&st->board); 
+    pthread_mutex_destroy(&st->lock); 
+}
+
+void stop_search_thread(search_thread *st) 
+{
+    if (st->running) 
+    {
+        st->should_exit = true; 
+        pthread_join(st->thread, NULL); 
+
+        st->running = false; 
+
+        // if (st->pv.n_moves) 
+        // {
+        //     printf("bestmove "); 
+        //     print_move_end(st->pv.moves[0], "\n"); 
+        //     fflush(stdout); 
+        // }
+        // else 
+        // {
+        //     // no best move 
+        //     printf("bestmove a1a1\n"); 
+        //     fflush(stdout); 
+        // }
+
+        printf("info string Stopped search\n"); 
+    }
+    else 
+    {
+        printf("info string No search to stop\n"); 
+    }
+
+    st->should_exit = false; 
+    fflush(stdout); 
+}
+
+void search(search_thread *st, search_params *params) 
+{
+    stop_search_thread(st); 
+
+    st->pv.n_moves = 0; 
+    st->nodes = 0; 
+    st->nps = 0; 
+    st->depth = 0; 
+    st->eval = 0; 
+    st->running = true; 
+
+    st->tgt_depth = params->depth; 
+    st->tgt_time = params->time_ms; 
+    st->should_exit = false; 
+    if (st->tgt_time >= 0) 
+    {
+        st->end_at = clock() + st->tgt_time * CLOCKS_PER_SEC / 1000; 
+    }
+
+    destroy_game(&st->board); 
+    create_game_copy(&st->board, params->board); 
+
+    pthread_create(&st->thread, NULL, start_pthread_search, st); 
 }

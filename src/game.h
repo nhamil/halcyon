@@ -39,6 +39,8 @@ void create_game(game *g);
 
 void create_game_fen(game *g, const char *fen); 
 
+void create_game_copy(game *g, const game *from_game); 
+
 void destroy_game(game *g); 
 
 void reset_game(game *g); 

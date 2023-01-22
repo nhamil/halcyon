@@ -18,5 +18,5 @@ set(sources
     src/search.c 
 )
 
-add_executable(engine src/main.c ${sources})
+add_executable(halcyon src/main.c ${sources})
 add_executable(perft src/perft.c ${sources})
