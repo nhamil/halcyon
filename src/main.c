@@ -129,7 +129,7 @@ bool uci_cmd_position(void)
             square from = make_sq(token[0] - 'a', token[1] - '1'); 
             square to = make_sq(token[2] - 'a', token[3] - '1'); 
 
-            printf("%s (%s) to %s\n", str_sq(from), str_pc(pc_at_or_wp(g, from)), str_sq(to)); 
+            // printf("%s (%s) to %s\n", str_sq(from), str_pc(pc_at_or_wp(g, from)), str_sq(to)); 
 
             // if promote is still pawn, then it wasn't promoted -> get the real original piece
             if (promote == PC_P) 
@@ -139,14 +139,14 @@ bool uci_cmd_position(void)
 
             promote = make_pc(promote, g->turn); 
 
-            printf("Piece: %s\n", str_pc(promote)); 
+            // printf("Piece: %s\n", str_pc(promote)); 
 
             // make sure the complete move is legal 
             bool found = false; 
             for (size_t i = 0; i < moves.size; i++) 
             {
                 move m = AT_VEC(&moves, move, i); 
-                print_move(m); 
+                // print_move(m); 
                 if (from_sq(m) == from && to_sq(m) == to && pro_pc(m) == promote) 
                 {
                     found = true; 
@@ -157,7 +157,7 @@ bool uci_cmd_position(void)
             // keep previous legal moves, only ignore remaining 
             if (!found) 
             {
-                printf("Could not find move '%s'\n", token); 
+                printf("info string Could not find move '%s'\n", token); 
                 goto done; 
             }
         }
