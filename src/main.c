@@ -217,11 +217,6 @@ bool uci_cmd_go(void)
         printf("info string Searching with no depth\n"); 
     }
 
-    if (movetime > 0) 
-    {
-        time_ms = movetime; 
-    }
-
     if (sidetime > 0) 
     {
         int inv_scale = (int) (10 - 0.05 * uci_game.ply); 
@@ -237,6 +232,17 @@ bool uci_cmd_go(void)
             printf("info string Using %dms out of %dms to think\n", time_ms, sidetime); 
             fflush(stdout); 
         }
+    }
+
+    if (time_ms > 20000) 
+    {
+        // limit to <= 20sec if time remaining is given 
+        time_ms = 20000; 
+    }
+
+    if (movetime > 0) 
+    {
+        time_ms = movetime; 
     }
 
     if (time_ms > 0) 
