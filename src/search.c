@@ -162,12 +162,13 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
 
     for (size_t i = start; i < moves->size; i++) 
     {
+        move mv; 
         int next_pv_idx = -1; 
         size_t best_i = i; 
         int mv_val = move_val(g, AT_VEC(moves, move, i)); 
         for (size_t j = i + 1; j < moves->size; j++) 
         {
-            move mv = AT_VEC(moves, move, j); 
+            mv = AT_VEC(moves, move, j); 
             if (pv_idx >= 0 && (size_t) pv_idx < thread->pv.n_moves && mv == thread->pv.moves[pv_idx]) 
             {
                 best_i = j; 
@@ -187,8 +188,28 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
         }
         swap_vec(moves, i, best_i); 
 
-        push_move(g, AT_VEC(moves, move, i)); 
-        int eval = -negamax(thread, g, -beta, -alpha, depth - 1, null_move, next_pv_idx, moves, &line); 
+        mv = AT_VEC(moves, move, i); 
+
+        // don't reduce if: 
+        // - in last PV
+        // - capture 
+        // - promotion 
+        // - TODO gives check 
+        // - depth < 3
+        int sub_depth = -1; 
+        bool can_lmr = true; 
+        can_lmr &= (i - start) >= 4; 
+        can_lmr &= pv_idx == -1; 
+        can_lmr &= !is_capture(g, mv); 
+        can_lmr &= from_pc(mv) == pro_pc(mv); 
+        can_lmr &= depth >= 3; 
+        if (can_lmr) 
+        {
+            sub_depth--; 
+        }
+
+        push_move(g, mv); 
+        int eval = -negamax(thread, g, -beta, -alpha, depth + sub_depth, null_move, next_pv_idx, moves, &line); 
         pop_move(g); 
 
         if (eval >= beta) 
@@ -200,7 +221,7 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
         if (eval > alpha) 
         {
             alpha = eval; 
-            pv->moves[0] = AT_VEC(moves, move, i); 
+            pv->moves[0] = mv; 
             memcpy(pv->moves + 1, line.moves, line.n_moves * sizeof(move)); 
             pv->n_moves = line.n_moves + 1; 
         }
