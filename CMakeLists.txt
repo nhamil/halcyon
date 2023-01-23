@@ -5,6 +5,8 @@ set(EXE_VERSION "0.2")
 
 find_package(Git REQUIRED)
 execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --abbrev-ref HEAD OUTPUT_VARIABLE BRANCH_NAME OUTPUT_STRIP_TRAILING_WHITESPACE)
+string(REPLACE "-" "" BRANCH_NAME ${BRANCH_NAME})
+string(REPLACE "_" "" BRANCH_NAME ${BRANCH_NAME})
 if(BRANCH_NAME STREQUAL "master") 
     set(BRANCH_NAME "")
 endif()
