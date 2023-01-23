@@ -15,7 +15,9 @@
 #include "square.h"
 #include "vector.h" 
 
-#define ENGINE_NAME "Halcyon 0.1"
+#ifndef ENGINE_NAME 
+    #define ENGINE_NAME "Halcyon"
+#endif 
 
 #define UCI_MAX_INPUT 4096
 
