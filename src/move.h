@@ -80,11 +80,11 @@ static void print_move(move m)
 {
     if (has_pro(m)) 
     {
-        printf("%16x %s%s%s\n", m, str_sq(from_sq(m)), str_sq(to_sq(m)), str_pc_no_col(pro_pc(m))); 
+        printf("%s%s%s\n", str_sq(from_sq(m)), str_sq(to_sq(m)), str_pc_no_col(pro_pc(m))); 
     }
     else 
     {
-        printf("%16x %s%s\n", m, str_sq(from_sq(m)), str_sq(to_sq(m))); 
+        printf("%s%s\n", str_sq(from_sq(m)), str_sq(to_sq(m))); 
     }
 }
 

@@ -103,7 +103,7 @@ static inline int qsearch(search_thread *thread, game *g, int alpha, int beta, i
     return alpha; 
 }
 
-static inline int negamax(search_thread *thread, game *g, int alpha, int beta, int depth, bool null_move, vector *moves, pv_line *pv) 
+static inline int negamax(search_thread *thread, game *g, int alpha, int beta, int depth, bool null_move, int pv_idx, vector *moves, pv_line *pv) 
 {
     pv_line line; 
     size_t start = moves->size; 
@@ -131,14 +131,6 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
         pthread_exit(NULL); 
     }
 
-    // for (size_t i = start; i < moves->size; i++) 
-    // {
-    //     move mv = AT_VEC(moves, move, i); 
-    //     print_move_end(mv, " "); 
-    //     printf("%d\n", move_val(g, mv)); 
-    // }
-    // return 0; 
-
     if (num_moves == 0 || depth <= 0) 
     {
         pv->n_moves = 0; 
@@ -156,7 +148,7 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
         if (depth >= 1 + R && !g->in_check && !any_side_k_p(g)) 
         {
             push_null_move(g); 
-            int eval = -negamax(thread, g, -beta, -beta + 1, depth - 1 - R, false, moves, pv); 
+            int eval = -negamax(thread, g, -beta, -beta + 1, depth - 1 - R, false, -1, moves, pv); 
             pop_null_move(g); 
 
             if (eval >= beta) 
@@ -170,21 +162,33 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
 
     for (size_t i = start; i < moves->size; i++) 
     {
+        int next_pv_idx = -1; 
         size_t best_i = i; 
         int mv_val = move_val(g, AT_VEC(moves, move, i)); 
         for (size_t j = i + 1; j < moves->size; j++) 
         {
-            int j_val = move_val(g, AT_VEC(moves, move, j)); 
-            if (j_val > mv_val) 
+            move mv = AT_VEC(moves, move, j); 
+            if (pv_idx >= 0 && (size_t) pv_idx < thread->pv.n_moves && mv == thread->pv.moves[pv_idx]) 
             {
-                mv_val = j_val; 
                 best_i = j; 
+                next_pv_idx = pv_idx + 1; 
+                break; 
             }
+            else 
+            {
+                int j_val = move_val(g, mv); 
+                if (j_val > mv_val) 
+                {
+                    mv_val = j_val; 
+                    best_i = j; 
+                }
+            }
+            
         }
         swap_vec(moves, i, best_i); 
 
         push_move(g, AT_VEC(moves, move, i)); 
-        int eval = -negamax(thread, g, -beta, -alpha, depth - 1, null_move, moves, &line); 
+        int eval = -negamax(thread, g, -beta, -alpha, depth - 1, null_move, next_pv_idx, moves, &line); 
         pop_move(g); 
 
         if (eval >= beta) 
@@ -215,6 +219,8 @@ void run_search(search_thread *thread)
 
     game *g = &thread->board; 
 
+    thread->pv.n_moves = 0; 
+
     int tgt_depth = thread->tgt_depth; 
     if (tgt_depth < 0) tgt_depth = INT_MAX; 
 
@@ -223,7 +229,7 @@ void run_search(search_thread *thread)
     {
         clear_vec(&moves); 
         clock_t start = clock(); 
-        int eval = negamax(thread, g, -EVAL_MAX, EVAL_MAX, depth, true, &moves, &line); 
+        int eval = negamax(thread, g, -EVAL_MAX, EVAL_MAX, depth, true, 0, &moves, &line); 
 
         clock_t end = clock(); 
 
@@ -243,9 +249,9 @@ void run_search(search_thread *thread)
         thread->eval = eval; 
 
         printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, line.n_moves, eval, start_duration, g->nodes, nps); 
-        for (size_t i = 0; i < line.n_moves; i++) 
+        for (size_t i = 0; i < thread->pv.n_moves; i++) 
         {
-            print_move_end(line.moves[i], " "); 
+            print_move_end(thread->pv.moves[i], " "); 
         }
         printf("\n"); 
         fflush(stdout); 
