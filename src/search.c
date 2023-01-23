@@ -203,6 +203,7 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
         can_lmr &= !is_capture(g, mv); 
         can_lmr &= from_pc(mv) == pro_pc(mv); 
         can_lmr &= depth >= 3; 
+        can_lmr &= get_no_col(from_pc(mv)) != PC_P; 
         if (can_lmr) 
         {
             sub_depth--; 
