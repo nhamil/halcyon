@@ -838,7 +838,7 @@ static inline int eval_bb(bboard pcs, const int eval[64])
     return sum; 
 }
 
-int eval(const game *g, int num_moves) 
+int evaluate(const game *g, int num_moves) 
 {
     int eval = 0; 
 
@@ -923,7 +923,7 @@ void print_game(const game *g)
     printf("En passant: %s\n", g->ep == NO_SQ ? "(none)" : str_sq(g->ep)); 
     printf("In check: %s\n", g->in_check ? "yes" : "no"); 
     printf("# moves: %zu\n", num_moves); 
-    printf("Static eval: %.2f\n", eval(g, num_moves) * 0.01); 
+    printf("Static eval: %.2f\n", evaluate(g, num_moves) * 0.01); 
     printf("%s to move\n", g->turn ? "Black" : "White"); 
 
     destroy_vec(&moves); 

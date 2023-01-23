@@ -21,7 +21,6 @@
 
 #define UCI_MAX_INPUT 4096
 
-FILE *log; 
 game uci_game; 
 search_thread engine; 
 
@@ -93,7 +92,7 @@ bool uci_cmd_position(void)
 
     if (uci_equals(token, "moves")) 
     {
-        while (token = uci_next_token()) 
+        while ((token = uci_next_token())) 
         {
             clear_vec(&moves); 
             gen_moves(g, &moves); 
@@ -188,7 +187,7 @@ bool uci_cmd_go(void)
     int movetime = INF_TIME; 
     int wtime = INF_TIME, btime = INF_TIME, sidetime = INF_TIME; 
 
-    while (token = uci_next_token()) 
+    while ((token = uci_next_token())) 
     {
         if (uci_equals(token, "depth") && (token = uci_next_token())) 
         {
@@ -299,9 +298,6 @@ int main(void)
     printf("%s by Nicholas Hamilton\n", ENGINE_NAME); 
     fflush(stdout); 
 
-    // log = fopen("input.txt", "a"); 
-    // fprintf(log, "NEW RUN\n"); 
-
     create_game_fen(&uci_game, START_FEN); 
     create_search_thread(&engine); 
 
@@ -310,13 +306,9 @@ int main(void)
     {
         fflush(stdout); 
         fgets(input, UCI_MAX_INPUT, stdin); 
-        // fprintf(log, "%s", input); 
-        // fflush(log); 
         input[strlen(input) - 1] = '\0'; 
         if (!uci_parse(input)) printf("Unknown command: '%s'\n", input); 
     }
-
-    // fclose(log); 
 
     destroy_game(&uci_game); 
     destroy_search_thread(&engine); 

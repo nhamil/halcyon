@@ -48,7 +48,7 @@ static inline int qsearch(search_thread *thread, game *g, int alpha, int beta, i
     //     pthread_exit(NULL); 
     // }
 
-    int stand_pat = col_sign(g) * eval(g, moves->size - start); 
+    int stand_pat = col_sign(g) * evaluate(g, moves->size - start); 
 
     if (stand_pat >= beta) 
     {
@@ -223,7 +223,7 @@ void run_search(search_thread *thread)
     {
         clear_vec(&moves); 
         clock_t start = clock(); 
-        int evaluation = negamax(thread, g, -EVAL_MAX, EVAL_MAX, depth, true, &moves, &line); 
+        int eval = negamax(thread, g, -EVAL_MAX, EVAL_MAX, depth, true, &moves, &line); 
 
         clock_t end = clock(); 
 
@@ -242,7 +242,7 @@ void run_search(search_thread *thread)
         thread->depth = depth; 
         thread->eval = eval; 
 
-        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, line.n_moves, evaluation, start_duration, g->nodes, nps); 
+        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, line.n_moves, eval, start_duration, g->nodes, nps); 
         for (size_t i = 0; i < line.n_moves; i++) 
         {
             print_move_end(line.moves[i], " "); 

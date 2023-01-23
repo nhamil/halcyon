@@ -60,7 +60,7 @@ void push_null_move(game *g);
 
 void gen_moves(const game *g, vector *out); 
 
-int eval(const game *g, int num_moves); 
+int evaluate(const game *g, int num_moves); 
 
 void print_game(const game *g); 
 
