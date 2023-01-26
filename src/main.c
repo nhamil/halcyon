@@ -22,7 +22,7 @@
 #define UCI_MAX_INPUT 4096
 
 game uci_game; 
-search_thread engine; 
+search_ctx engine; 
 
 const char *uci_next_token(void) 
 {
@@ -52,7 +52,7 @@ bool uci_cmd_isready(void)
 
 bool uci_cmd_ucinewgame(void) 
 {
-    stop_search_thread(&engine); 
+    stop_search_ctx(&engine); 
     load_fen(&uci_game, START_FEN); 
     return true; 
 }
@@ -265,7 +265,7 @@ bool uci_cmd_go(void)
 
 bool uci_cmd_stop(void) 
 {
-    stop_search_thread(&engine); 
+    stop_search_ctx(&engine); 
     return true; 
 }
 
@@ -299,7 +299,7 @@ int main(void)
     fflush(stdout); 
 
     create_game_fen(&uci_game, START_FEN); 
-    create_search_thread(&engine); 
+    create_search_ctx(&engine); 
 
     char input[UCI_MAX_INPUT]; 
     while (true) 
@@ -311,6 +311,6 @@ int main(void)
     }
 
     destroy_game(&uci_game); 
-    destroy_search_thread(&engine); 
+    destroy_search_ctx(&engine); 
     return 0; 
 }

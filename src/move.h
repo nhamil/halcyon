@@ -7,6 +7,8 @@
 #include "piece.h" 
 #include "square.h" 
 
+#define NO_MOVE 0
+
 #define MOVE_CASTLE_NONE 0 
 #define MOVE_CASTLE_WK 1 
 #define MOVE_CASTLE_WQ 2 

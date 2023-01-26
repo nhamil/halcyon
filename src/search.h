@@ -11,7 +11,7 @@
 #define INF_TIME (-1) 
 
 typedef struct pv_line pv_line; 
-typedef struct search_thread search_thread; 
+typedef struct search_ctx search_ctx; 
 typedef struct search_params search_params; 
 
 struct pv_line 
@@ -20,7 +20,7 @@ struct pv_line
     move moves[128]; 
 };
 
-struct search_thread 
+struct search_ctx 
 {
     game board; 
     pthread_t thread; 
@@ -36,6 +36,7 @@ struct search_thread
     int depth; 
     int eval; 
     bool running; 
+    vector moves; 
 };
 
 struct search_params 
@@ -45,11 +46,11 @@ struct search_params
     int time_ms; 
 };
 
-void create_search_thread(search_thread *st); 
+void create_search_ctx(search_ctx *ctx); 
 
-void destroy_search_thread(search_thread *st); 
+void destroy_search_ctx(search_ctx *ctx); 
 
-void stop_search_thread(search_thread *st); 
+void stop_search_ctx(search_ctx *ctx); 
 
 static void init_search_params(search_params *sp, const game *board, int depth, int time_ms) 
 {
@@ -58,4 +59,4 @@ static void init_search_params(search_params *sp, const game *board, int depth, 
     sp->time_ms = time_ms; 
 }
 
-void search(search_thread *st, search_params *params); 
+void search(search_ctx *ctx, search_params *params); 
