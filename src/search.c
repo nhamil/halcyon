@@ -197,17 +197,17 @@ static inline int negamax(search_thread *thread, game *g, int alpha, int beta, i
         // - TODO gives check 
         // - depth < 3
         int sub_depth = -1; 
-        bool can_lmr = true; 
-        can_lmr &= (i - start) >= 4; 
-        can_lmr &= pv_idx == -1; 
-        can_lmr &= !is_capture(g, mv); 
-        can_lmr &= from_pc(mv) == pro_pc(mv); 
-        can_lmr &= depth >= 3; 
-        can_lmr &= get_no_col(from_pc(mv)) != PC_P; 
-        if (can_lmr) 
-        {
-            sub_depth--; 
-        }
+        // bool can_lmr = true; 
+        // can_lmr &= (i - start) >= 4; 
+        // can_lmr &= pv_idx == -1; 
+        // can_lmr &= !is_capture(g, mv); 
+        // can_lmr &= from_pc(mv) == pro_pc(mv); 
+        // can_lmr &= depth >= 3; 
+        // can_lmr &= get_no_col(from_pc(mv)) != PC_P; 
+        // if (can_lmr) 
+        // {
+        //     sub_depth--; 
+        // }
 
         push_move(g, mv); 
         int eval = -negamax(thread, g, -beta, -alpha, depth + sub_depth, null_move, next_pv_idx, moves, &line); 
