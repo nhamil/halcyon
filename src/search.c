@@ -222,7 +222,7 @@ static inline int negamax(
 
         // only consider next PV move if we are in the PV
         int next_pv_idx = -1; 
-        if (pv_idx >= 0 && (size_t) pv_idx < ctx->pv.n_moves) 
+        if (pv_idx >= 0 && (size_t) pv_idx < ctx->pv.n_moves && ctx->pv.moves[pv_idx] == mv) 
         {
             next_pv_idx = pv_idx + 1; 
         }
