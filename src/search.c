@@ -257,47 +257,74 @@ static inline int negamax(
     return alpha; 
 }
 
+static inline void update_search(search_ctx *ctx, clock_t search_start, clock_t start, clock_t end, int depth, int eval, const pv_line *line) 
+{
+    const game *g = &ctx->board; 
+
+    float duration = end - start; 
+    if (duration <= 0) duration = 1; 
+    duration /= CLOCKS_PER_SEC; 
+    float nps = g->nodes / duration; 
+
+    float start_duration = (end - search_start); 
+    if (start_duration <= 0) start_duration = 1; 
+    start_duration /= CLOCKS_PER_SEC / 1000; 
+
+    ctx->pv = *line; 
+    ctx->nodes = g->nodes; 
+    ctx->nps = (uint64_t) nps; 
+    ctx->depth = depth; 
+    ctx->eval = eval; 
+
+    printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, ctx->pv.n_moves, eval, start_duration, g->nodes, nps); 
+    for (size_t i = 0; i < ctx->pv.n_moves; i++) 
+    {
+        print_move_end(ctx->pv.moves[i], " "); 
+    }
+    printf("\n"); 
+    fflush(stdout); 
+}
+
 void run_search(search_ctx *ctx) 
 {
-    clock_t search_start = clock(); 
+    pv_line line; 
+    clock_t start, end, search_start = clock(); 
+    int eval, last_eval; 
 
-    game *g = &ctx->board; 
     clear_pv(&ctx->pv); 
 
     int tgt_depth = ctx->tgt_depth; 
     if (tgt_depth < 0) tgt_depth = INT_MAX; 
 
-    pv_line line; 
-    for (int depth = 1; depth <= tgt_depth; depth++) 
+    // always do full search with depth of 1
+    start = clock(); 
+    eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, 1, true, 0, 6, &line); 
+    end = clock(); 
+    update_search(ctx, search_start, start, end, 1, eval, &line); 
+    
+    for (int depth = 2; depth <= tgt_depth; depth++) 
     {
         clear_vec(&ctx->moves); 
 
-        clock_t start = clock(); 
-        int eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, &line); 
-        clock_t end = clock(); 
+        last_eval = eval; 
+        int alpha = last_eval - 50; 
+        int beta = last_eval + 50; 
         
-        float duration = (end - start); 
-        if (duration <= 0) duration = 1; 
-        duration /= CLOCKS_PER_SEC; 
-        float nps = g->nodes / duration; 
-
-        float start_duration = (end - search_start); 
-        if (start_duration <= 0) start_duration = 1; 
-        start_duration /= CLOCKS_PER_SEC / 1000; 
-
-        ctx->pv = line; 
-        ctx->nodes = g->nodes; 
-        ctx->nps = (uint64_t) nps; 
-        ctx->depth = depth; 
-        ctx->eval = eval; 
-
-        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, line.n_moves, eval, start_duration, g->nodes, nps); 
-        for (size_t i = 0; i < ctx->pv.n_moves; i++) 
+        start = clock(); 
+        eval = negamax(ctx, alpha, beta, depth, true, 0, 6, &line); 
+        if (eval <= alpha) 
         {
-            print_move_end(ctx->pv.moves[i], " "); 
+            // printf("info string Aspiration window failed: eval %d <= alpha %d\n", eval, alpha); 
+            eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, &line); 
         }
-        printf("\n"); 
-        fflush(stdout); 
+        else if (eval >= beta) 
+        {
+            // printf("info string Aspiration window failed: eval %d >= beta %d\n", eval, beta); 
+            eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, &line); 
+        }
+        end = clock(); 
+        
+        update_search(ctx, search_start, start, end, depth, eval, &line); 
     }
 
     ctx->running = false; 
