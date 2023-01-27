@@ -59,6 +59,7 @@ find_package(Threads REQUIRED)
 set(sources 
     src/game.c 
     src/search.c 
+    src/zobrist.c
 )
 
 add_executable(engine src/main.c ${sources})

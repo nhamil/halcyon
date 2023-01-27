@@ -23,9 +23,11 @@
 
 void reset_game(game *g) 
 {
+    init_zb(); 
     clear_vec(&g->hist); 
     memset(&g->pieces, 0, sizeof(g->pieces)); 
     memset(&g->colors, 0, sizeof(g->colors)); 
+    g->hash = 0; 
     g->check = NO_BITS; 
     g->castle = CASTLE_NONE; 
     g->ep = NO_SQ; 
@@ -269,6 +271,28 @@ void load_fen(game *g, const char *fen)
         g->colors[COL_W] |= g->pieces[make_pc(p, COL_W)]; 
         g->colors[COL_B] |= g->pieces[make_pc(p, COL_B)]; 
     }
+
+    // initial zobrist hashing 
+
+    for (square sq = A1; sq <= H8; sq++) 
+    {
+        for (piece pc = 0; pc < PC_CNT; pc++) 
+        {
+            if (get_bit(g->pieces[pc], sq)) 
+            {
+                g->hash ^= sq_pc_zb(sq, pc); 
+            }
+        }
+    }
+
+    g->hash ^= castle_zb(g->castle); 
+    g->hash ^= ep_zb(g->ep); 
+    g->hash ^= (g->turn == COL_B) * col_zb(); 
+
+    // white to play, check if black in check 
+    g->check = g->pieces[make_pc(PC_K, opp_col(g->turn))]; 
+
+    g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
 }
 
 bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, bboard add) 
@@ -331,6 +355,7 @@ bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, 
 void push_move(game *g, move m) 
 {
     g->nodes++; 
+    g->hash ^= col_zb(); 
 
     // save current state 
     push_vec(&g->hist, g); 
@@ -357,12 +382,15 @@ void push_move(game *g, move m)
     }
 
     // take moving piece off the board 
+    g->hash ^= sq_pc_zb(from, pc); 
     g->pieces[pc] = clear_bits(g->pieces[pc], from); 
 
     // WP if rm_tgt is empty, but this is okay because if pc is WP it will re-enable this square right after 
+    g->hash ^= get_bit(g->pieces[tgt], rm_tgt) * sq_pc_zb(rm_tgt, tgt); 
     g->pieces[tgt] = clear_bits(g->pieces[tgt], rm_tgt); 
 
     // place piece onto new square 
+    g->hash ^= sq_pc_zb(to, pro); 
     g->pieces[pro] = set_bit(g->pieces[pro], to); 
 
     color cur_col = g->turn, oth_col = opp_col(cur_col); 
@@ -378,6 +406,7 @@ void push_move(game *g, move m)
     g->pieces[PC_WR] = (g->pieces[PC_WR] & CASTLE_KEEP_WR[castle]) | CASTLE_ADD_WR[castle]; 
     g->pieces[PC_BR] = (g->pieces[PC_BR] & CASTLE_KEEP_BR[castle]) | CASTLE_ADD_BR[castle]; 
 
+    castle_flags prev_cf = g->castle; 
     castle_flags rem_cf = CASTLE_NONE; 
     // no castling if the king moves
     rem_cf |= CASTLE_W  * (pc == PC_WK); 
@@ -390,6 +419,11 @@ void push_move(game *g, move m)
 
     // remove castling rights if necessary 
     g->castle &= ~rem_cf; 
+    g->hash ^= castle_zb(g->castle ^ prev_cf); 
+    g->hash ^= ((castle & CASTLE_WK) > 0) * (sq_pc_zb(H1, PC_WR) ^ sq_pc_zb(F1, PC_WR)); 
+    g->hash ^= ((castle & CASTLE_WQ) > 0) * (sq_pc_zb(A1, PC_WR) ^ sq_pc_zb(D1, PC_WR)); 
+    g->hash ^= ((castle & CASTLE_BK) > 0) * (sq_pc_zb(H8, PC_BR) ^ sq_pc_zb(F8, PC_BR)); 
+    g->hash ^= ((castle & CASTLE_BQ) > 0) * (sq_pc_zb(A8, PC_BR) ^ sq_pc_zb(D8, PC_BR)); 
 
     // re-add rooks from aggregate (in case of castling) 
     g->colors[COL_W] ^= g->pieces[PC_WR]; 
@@ -401,7 +435,10 @@ void push_move(game *g, move m)
     g->colors[cur_col] = set_bit(g->colors[cur_col], to); 
 
     // update rest of state 
+    g->hash ^= ep_zb(g->ep); 
     g->ep = new_ep; 
+    g->hash ^= ep_zb(g->ep); 
+
     g->ply++; 
     g->turn = opp_col(g->turn); 
 
@@ -919,6 +956,8 @@ void print_game(const game *g)
     }
     printf("  +-----------------+\n"); 
     printf("    A B C D E F G H  \n"); 
+    printf("Hash: "); 
+    print_zb(g->hash); 
     printf("Castling: %s\n", str_castle(g->castle)); 
     printf("En passant: %s\n", g->ep == NO_SQ ? "(none)" : str_sq(g->ep)); 
     printf("In check: %s\n", g->in_check ? "yes" : "no"); 

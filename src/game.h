@@ -12,6 +12,7 @@
 #include "piece.h"
 #include "square.h"
 #include "vector.h"
+#include "zobrist.h"
 
 typedef struct game game; 
 
@@ -24,6 +25,7 @@ struct game
     bboard pieces[PC_CNT]; 
     bboard colors[2]; 
     bboard check; 
+    zobrist hash; 
     castle_flags castle; 
     square ep; 
     bool in_check; 
