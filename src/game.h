@@ -118,6 +118,11 @@ static inline bool is_capture(const game *g, move mv)
     return takes_ep(mv) | get_bit(g->colors[opp_col(g->turn)], to_sq(mv)); 
 }
 
+static inline bool is_quiet(const game *g, move mv) 
+{
+    return !is_capture(g, mv); 
+}
+
 static inline bool any_side_k_p(const game *g) 
 {
     const bool w_kp = g->colors[COL_W] == (g->pieces[PC_WK] | g->pieces[PC_WP]); 

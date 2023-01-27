@@ -4,33 +4,49 @@
 
 typedef struct search_data search_data; 
 
-static inline int move_val(const game *g, move mv, move pv) 
+static inline int move_val(const search_ctx *ctx, move mv, int depth, move pv) 
 {
     static const int VALUES[] = 
     {
-        100, 320, 330, 500, 900, 10000
+        100, 310, 320, 500, 900, 10000
     };
+
+    const game *g = &ctx->board; 
 
     // always check PV first
     if (mv == pv) 
     {
-        return 100000; 
+        return 200000; 
     }
 
     piece pc_type = get_no_col(from_pc(mv)); 
+    bool capture = is_capture(g, mv); 
+    bool quiet = is_quiet(g, mv); 
 
-    if (!is_capture(g, mv)) 
+    if (capture) 
     {
-        // non-capturing moves should be evaluated last 
-        return -100000 + PC_SQ[pc_type][to_sq(mv)] - PC_SQ[pc_type][from_sq(mv)]; 
+        return 10 * VALUES[get_no_col(pc_at_or_wp(g, to_sq(mv)))] - VALUES[pc_type]; 
     }
 
-    return 10 * VALUES[get_no_col(pc_at_or_wp(g, to_sq(mv)))] - VALUES[pc_type]; 
+    if (quiet) 
+    {
+        for (int i = 0; i < MAX_KILLER; i++) 
+        {
+            if (mv == ctx->killer[depth][i]) 
+            {
+                // low-to-high value capture comes before killer move 
+                // high-to-low value capture comes after killer move 
+                return -i - 1; 
+            }
+        }
+    }
+    
+    // remaining non-capturing moves should be evaluated last 
+    return -100000 + PC_SQ[pc_type][to_sq(mv)] - PC_SQ[pc_type][from_sq(mv)]; 
 }
 
-static inline move sort_first_move(search_ctx *ctx, size_t start, int pv_idx) 
+static inline move sort_first_move(search_ctx *ctx, size_t start, int depth, int pv_idx) 
 {
-    game *g = &ctx->board; 
     vector *moves = &ctx->moves; 
 
     // for PV prioritization 
@@ -42,10 +58,10 @@ static inline move sort_first_move(search_ctx *ctx, size_t start, int pv_idx)
 
     // swap current index with highest priority move 
     size_t best_i = start; 
-    int best_val = move_val(g, AT_VEC(moves, move, start), pv); 
+    int best_val = move_val(ctx, AT_VEC(moves, move, start), depth, pv); 
     for (size_t i = start + 1; i < moves->size; i++) 
     {
-        int val = move_val(g, AT_VEC(moves, move, i), pv); 
+        int val = move_val(ctx, AT_VEC(moves, move, i), depth, pv); 
         if (val > best_val) 
         {
             best_i = i; 
@@ -108,7 +124,7 @@ static inline int qsearch(search_ctx *ctx, int alpha, int beta)
     // keep playing moves until we get a quiet position
     for (size_t i = start; i < moves->size; i++) 
     {
-        move mv = sort_first_move(ctx, i, -1); 
+        move mv = sort_first_move(ctx, i, 0, -1); 
 
         // only consider captures (including en passant)
         if (is_capture(g, mv)) 
@@ -202,7 +218,7 @@ static inline int negamax(
     // handle legal moves (sorted by highest priority)
     for (size_t i = start; i < moves->size; i++) 
     {
-        move mv = sort_first_move(ctx, i, pv_idx);  
+        move mv = sort_first_move(ctx, i, depth, pv_idx);  
 
         // only consider next PV move if we are in the PV
         int next_pv_idx = -1; 
@@ -217,6 +233,15 @@ static inline int negamax(
 
         if (eval >= beta) 
         {
+            if (is_quiet(g, mv) && mv != ctx->killer[depth][0]) 
+            {
+                for (int j = MAX_KILLER - 1; j > 0; j--) 
+                {
+                    ctx->killer[depth][j] = ctx->killer[depth][j - 1]; 
+                }
+                ctx->killer[depth][0] = mv; 
+            }
+            
             pop_vec_to_size(moves, start); 
             return beta; 
         }
@@ -333,6 +358,7 @@ void search(search_ctx *ctx, search_params *params)
     ctx->depth = 0; 
     ctx->eval = 0; 
     ctx->running = true; 
+    memset(ctx->killer, 0, sizeof(ctx->killer)); 
 
     ctx->tgt_depth = params->depth; 
     ctx->tgt_time = params->time_ms; 

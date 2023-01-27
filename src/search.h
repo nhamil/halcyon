@@ -10,6 +10,9 @@
 #define INF_DEPTH (-1) 
 #define INF_TIME (-1) 
 
+#define MAX_DEPTH 128 
+#define MAX_KILLER 2
+
 typedef struct pv_line pv_line; 
 typedef struct search_ctx search_ctx; 
 typedef struct search_params search_params; 
@@ -17,7 +20,7 @@ typedef struct search_params search_params;
 struct pv_line 
 {
     size_t n_moves; 
-    move moves[128]; 
+    move moves[MAX_DEPTH]; 
 };
 
 struct search_ctx 
@@ -37,6 +40,7 @@ struct search_ctx
     int eval; 
     bool running; 
     vector moves; 
+    move killer[MAX_DEPTH][MAX_KILLER]; 
 };
 
 struct search_params 
