@@ -168,6 +168,7 @@ static inline int negamax(
     int depth, 
     bool null_move, 
     int pv_idx, 
+    int check_time, 
     pv_line *pv
 ) {
     
@@ -179,7 +180,7 @@ static inline int negamax(
     size_t num_moves = moves->size - start; 
 
     // prints best move and exits thread if out of time
-    handle_out_of_time(ctx); 
+    if (check_time >= 1) handle_out_of_time(ctx); 
 
     // one of the following: 
     // - checkmate 
@@ -203,7 +204,7 @@ static inline int negamax(
         if (depth >= 1 + R && !g->in_check && !any_side_k_p(g)) 
         {
             push_null_move(g); 
-            int eval = -negamax(ctx, -beta, -beta + 1, depth - 1 - R, false, -1, pv); 
+            int eval = -negamax(ctx, -beta, -beta + 1, depth - 1 - R, false, -1, check_time - 1, pv); 
             pop_null_move(g); 
 
             if (eval >= beta) 
@@ -228,7 +229,7 @@ static inline int negamax(
         }
 
         push_move(g, mv); 
-        int eval = -negamax(ctx, -beta, -alpha, depth - 1, null_move, next_pv_idx, &line); 
+        int eval = -negamax(ctx, -beta, -alpha, depth - 1, null_move, next_pv_idx, check_time - 1, &line); 
         pop_move(g); 
 
         if (eval >= beta) 
@@ -272,7 +273,7 @@ void run_search(search_ctx *ctx)
         clear_vec(&ctx->moves); 
 
         clock_t start = clock(); 
-        int eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, &line); 
+        int eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, &line); 
         clock_t end = clock(); 
         
         float duration = (end - start); 
