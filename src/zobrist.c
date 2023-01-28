@@ -6,6 +6,11 @@
 
 bool is_zb_init = false; 
 
+zobrist SQ_PC_HASH[SQ_CNT][PC_CNT]; 
+zobrist CASTLE_HASH[CASTLE_ALL + 1]; 
+zobrist EP_HASH[8]; 
+zobrist COL_HASH; 
+
 void init_zb(void) 
 {
     if (is_zb_init) return; 

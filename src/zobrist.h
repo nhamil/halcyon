@@ -10,10 +10,10 @@
 
 typedef uint64_t zobrist; 
 
-zobrist SQ_PC_HASH[SQ_CNT][PC_CNT]; 
-zobrist CASTLE_HASH[CASTLE_ALL + 1]; 
-zobrist EP_HASH[8]; 
-zobrist COL_HASH; 
+extern zobrist SQ_PC_HASH[SQ_CNT][PC_CNT]; 
+extern zobrist CASTLE_HASH[CASTLE_ALL + 1]; 
+extern zobrist EP_HASH[8]; 
+extern zobrist COL_HASH; 
 
 void init_zb(void); 
 
