@@ -7,7 +7,8 @@
 #define CREATE_VEC(v, type) create_vec(v, sizeof(type))
 #define PUSH_VEC(v, type, value) do { type vec_tmp_value = (value); push_vec(v, &vec_tmp_value); } while (0)
 #define INSERT_VEC(v, type, index, value) do { type vec_tmp_value = (value); insert_vec(v, index, &vec_tmp_value); } while (0)
-#define AT_VEC(v, type, index) *(type *) at_vec(v, index) 
+#define AT_VEC(v, type, index) (*(type *) at_vec(v, index)) 
+#define AT_VEC_CONST(v, type, index) (*(const type *) at_vec_const(v, index))
 
 typedef struct vector vector; 
 
@@ -121,4 +122,18 @@ static inline void swap_vec(vector *v, size_t a, size_t b)
     get_vec(v, a, tmp); 
     get_vec(v, b, at_vec(v, a)); 
     set_vec(v, b, tmp); 
+}
+
+static inline bool contains_vec(const vector *v, const void *in, size_t *idx) 
+{
+    for (size_t i = 0; i < v->size; i++) 
+    {
+        if (memcmp(in, at_vec_const(v, i), v->elem_size) == 0) 
+        {
+            if (idx) *idx = i; 
+            return true; 
+        }
+    }
+
+    return false; 
 }

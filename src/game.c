@@ -1,5 +1,7 @@
 #include "game.h" 
 
+#include <ctype.h> 
+
 /*
  * Of all squares that can be legally moved to, select all that either: 
  * ..capture/block an attacker
@@ -1041,4 +1043,182 @@ uint64_t perft(game *g, int depth)
 
     destroy_vec(&moves); 
     return total; 
+}
+
+move alg_to_move(const game *g, const char *alg) 
+{
+    const char *c = alg; 
+
+    piece pc = -1; 
+    int sfile = -1, srank = -1, tfile = -1, trank = -1; 
+
+    vector moves; 
+    CREATE_VEC(&moves, move); 
+    gen_moves(g, &moves); 
+
+    if (isupper(*c)) // piece 
+    {
+        switch (*c) 
+        {
+            case 'N': // knight
+                pc = PC_N; 
+                break; 
+            case 'B': // bishop 
+                pc = PC_B; 
+                break; 
+            case 'R': // rook 
+                pc = PC_R; 
+                break; 
+            case 'Q': // queen 
+                pc = PC_Q; 
+                break; 
+            case 'K': // king 
+                pc = PC_K; 
+                break; 
+            case 'O': // castle 
+                if (strncmp(alg, "O-O-O", 5) == 0) // queenside
+                {
+                    if (g->turn == COL_W) // white
+                    {
+                        move mv = make_move_castle(E1, C1, PC_WK, MOVE_CASTLE_WQ); 
+                        if (contains_vec(&moves, &mv, NULL)) 
+                        {
+                            destroy_vec(&moves); 
+                            return mv; 
+                        }
+                    }
+                    else // black 
+                    {
+                        move mv = make_move_castle(E8, C8, PC_BK, MOVE_CASTLE_BQ); 
+                        if (contains_vec(&moves, &mv, NULL)) 
+                        {
+                            destroy_vec(&moves); 
+                            return mv; 
+                        }
+                    }
+                }
+                else if (strncmp(alg, "O-O", 3) == 0) // kingside 
+                {
+                    if (g->turn == COL_W) // white
+                    {
+                        move mv = make_move_castle(E1, G1, PC_WK, MOVE_CASTLE_WK); 
+                        if (contains_vec(&moves, &mv, NULL)) 
+                        {
+                            destroy_vec(&moves); 
+                            return mv; 
+                        }
+                    }
+                    else // black 
+                    {
+                        move mv = make_move_castle(E8, G8, PC_BK, MOVE_CASTLE_BK); 
+                        if (contains_vec(&moves, &mv, NULL)) 
+                        {
+                            destroy_vec(&moves); 
+                            return mv; 
+                        }
+                    }
+                }
+                printf("Unknown algebraic notation: '%s'\n", alg); 
+                destroy_vec(&moves); 
+                return NO_MOVE; 
+            default: 
+                printf("Unknown algebraic notation: '%s'\n", alg); 
+                destroy_vec(&moves); 
+                return NO_MOVE; 
+        }
+
+        c++; 
+    }
+    else // pawn 
+    {
+        pc = PC_P; 
+    }
+
+    pc = make_pc(pc, g->turn); 
+
+    while (isalnum(*c)) 
+    {
+        if (*c == 'x') 
+        {
+            // capture, ignore
+        }
+        else if (isdigit(*c)) 
+        {
+            if (srank == -1) 
+            {
+                srank = *c - '1'; 
+            }
+            else 
+            {
+                trank = *c - '1'; 
+            }
+        }
+        else if (isalnum(*c)) 
+        {
+            if (sfile == -1) 
+            {
+                sfile = *c - 'a'; 
+            }
+            else 
+            {
+                tfile = *c - 'a'; 
+            }
+        }
+
+        c++; 
+    }
+
+    if (tfile == -1) 
+    {
+        tfile = sfile; 
+        sfile = -1; 
+    }
+
+    if (trank == -1) 
+    {
+        trank = srank; 
+        srank = -1; 
+    }
+
+    square target = make_sq(tfile, trank); 
+
+    piece promote = pc; 
+    for (size_t i = 0; i < strlen(alg) - 1; i++) 
+    {
+        if (strncmp("=Q", alg+i, 2) == 0) 
+        {
+            promote = make_pc(PC_Q, g->turn); 
+        }
+        else if (strncmp("=R", alg+i, 2) == 0) 
+        {
+            promote = make_pc(PC_R, g->turn); 
+        }
+        else if (strncmp("=B", alg+i, 2) == 0) 
+        {
+            promote = make_pc(PC_B, g->turn); 
+        }
+        else if (strncmp("=N", alg+i, 2) == 0) 
+        {
+            promote = make_pc(PC_N, g->turn); 
+        }
+    }
+
+    // check if non-castling move exists
+    for (size_t i = 0; i < moves.size; i++) 
+    {
+        move mv = AT_VEC(&moves, move, i); 
+
+        if (from_pc(mv) == pc && to_sq(mv) == target) 
+        {
+            if (srank != -1 && get_rank(from_sq(mv)) != srank) continue; 
+            if (sfile != -1 && get_file(from_sq(mv)) != sfile) continue; 
+            if (promote != pro_pc(mv)) continue; 
+
+            destroy_vec(&moves); 
+            return mv; 
+        }
+    }
+
+    destroy_vec(&moves); 
+    return NO_MOVE; 
 }

@@ -57,6 +57,7 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 set(sources 
+    src/book.c 
     src/game.c 
     src/search.c 
     src/zobrist.c
@@ -67,4 +68,10 @@ target_link_libraries(engine Threads::Threads)
 set_target_properties(engine PROPERTIES OUTPUT_NAME "${EXE_NAME}")
 
 add_executable(perft src/perft.c ${sources})
-target_link_libraries(perft Threads::Threads) 
+target_link_libraries(perft Threads::Threads)
+
+add_executable(opengen src/opengen.c ${sources})
+target_link_libraries(opengen Threads::Threads) 
+
+add_executable(openlist src/openlist.c ${sources})
+target_link_libraries(openlist Threads::Threads) 

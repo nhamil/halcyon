@@ -70,6 +70,8 @@ uint64_t perft(game *g, int depth);
 
 bool is_special_draw(const game *g); 
 
+move alg_to_move(const game *g, const char *alg); 
+
 static inline int col_sign(const game *g) 
 {
     return 1 - 2 * g->turn; 
