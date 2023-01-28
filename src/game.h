@@ -62,11 +62,13 @@ void push_null_move(game *g);
 
 void gen_moves(const game *g, vector *out); 
 
-int evaluate(const game *g, int num_moves); 
+int evaluate(const game *g, int num_moves, bool draw); 
 
 void print_game(const game *g); 
 
 uint64_t perft(game *g, int depth); 
+
+bool is_special_draw(const game *g); 
 
 static inline int col_sign(const game *g) 
 {

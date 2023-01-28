@@ -26,6 +26,7 @@ struct pv_line
 struct search_ctx 
 {
     game board; 
+    int start_ply; 
     pthread_t thread; 
     int tgt_depth; 
     int tgt_time; 

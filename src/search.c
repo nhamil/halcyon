@@ -102,15 +102,19 @@ static inline bool handle_out_of_time(search_ctx *ctx)
     return false; 
 }
 
-static inline int qsearch(search_ctx *ctx, int alpha, int beta) 
+static inline int qsearch(search_ctx *ctx, int alpha, int beta, int depth_idx) 
 {
     game *g = &ctx->board; 
     vector *moves = &ctx->moves; 
     size_t start = moves->size; 
+
+    bool draw = is_special_draw(g); 
+    if (draw) return 0; 
+
     gen_moves(g, moves); 
 
     // static eval of current position 
-    int stand_pat = col_sign(g) * evaluate(g, moves->size - start); 
+    int stand_pat = col_sign(g) * evaluate(g, moves->size - start, draw); 
     if (stand_pat >= beta) 
     {
         pop_vec_to_size(moves, start); 
@@ -121,26 +125,29 @@ static inline int qsearch(search_ctx *ctx, int alpha, int beta)
         alpha = stand_pat; 
     }
 
-    // keep playing moves until we get a quiet position
-    for (size_t i = start; i < moves->size; i++) 
+    if (!draw) 
     {
-        move mv = sort_first_move(ctx, i, 0, -1); 
-
-        // only consider captures (including en passant)
-        if (is_capture(g, mv)) 
+        // keep playing moves until we get a quiet position
+        for (size_t i = start; i < moves->size; i++) 
         {
-            push_move(g, mv); 
-            int score = -qsearch(ctx, -beta, -alpha); 
-            pop_move(g); 
+            move mv = sort_first_move(ctx, i, 0, -1); 
 
-            if (score >= beta) 
+            // only consider captures (including en passant)
+            if (is_capture(g, mv)) 
             {
-                pop_vec_to_size(moves, start); 
-                return beta; 
-            }
-            if (score > alpha) 
-            {
-                alpha = score; 
+                push_move(g, mv); 
+                int score = -qsearch(ctx, -beta, -alpha, depth_idx + 1); 
+                pop_move(g); 
+
+                if (score >= beta) 
+                {
+                    pop_vec_to_size(moves, start); 
+                    return beta; 
+                }
+                if (score > alpha) 
+                {
+                    alpha = score; 
+                }
             }
         }
     }
@@ -169,6 +176,7 @@ static inline int negamax(
     bool null_move, 
     int pv_idx, 
     int check_time, 
+    int depth_idx, 
     pv_line *pv
 ) {
     
@@ -176,21 +184,33 @@ static inline int negamax(
     game *g = &ctx->board; 
     vector *moves = &ctx->moves; 
     size_t start = moves->size; 
-    gen_moves(g, moves); 
-    size_t num_moves = moves->size - start; 
-
+    
     // prints best move and exits thread if out of time
     if (check_time >= 1) handle_out_of_time(ctx); 
+
+    // if (!null_move) g->hash ^= col_zb(); 
+    bool draw = depth_idx != 0 && is_special_draw(g); 
+    // if (!null_move) g->hash ^= col_zb(); 
+
+    if (draw) 
+    {
+        clear_pv(pv); 
+        pop_vec_to_size(moves, start); 
+        return 0;
+    }
+
+    gen_moves(g, moves); 
+    size_t num_moves = moves->size - start; 
 
     // one of the following: 
     // - checkmate 
     // - stalemate 
     // - deepest ply to search
-    if (num_moves == 0 || depth <= 0) 
+    if (num_moves == 0 || depth <= 0 || draw) 
     {
         clear_pv(pv); 
         pop_vec_to_size(moves, start); 
-        return qsearch(ctx, alpha, beta); 
+        return qsearch(ctx, alpha, beta, depth_idx); 
     }
 
     // null move pruning
@@ -204,7 +224,7 @@ static inline int negamax(
         if (depth >= 1 + R && !g->in_check && !any_side_k_p(g)) 
         {
             push_null_move(g); 
-            int eval = -negamax(ctx, -beta, -beta + 1, depth - 1 - R, false, -1, check_time - 1, pv); 
+            int eval = -negamax(ctx, -beta, -beta + 1, depth - 1 - R, false, -1, check_time - 1, depth_idx + 1, pv); 
             pop_null_move(g); 
 
             if (eval >= beta) 
@@ -229,7 +249,7 @@ static inline int negamax(
         }
 
         push_move(g, mv); 
-        int eval = -negamax(ctx, -beta, -alpha, depth - 1, null_move, next_pv_idx, check_time - 1, &line); 
+        int eval = -negamax(ctx, -beta, -alpha, depth - 1, null_move, next_pv_idx, check_time - 1, depth_idx + 1, &line); 
         pop_move(g); 
 
         if (eval >= beta) 
@@ -295,10 +315,11 @@ void run_search(search_ctx *ctx)
 
     int tgt_depth = ctx->tgt_depth; 
     if (tgt_depth < 0) tgt_depth = INT_MAX; 
+    if (tgt_depth > MAX_DEPTH) tgt_depth = MAX_DEPTH; 
 
     // always do full search with depth of 1
     start = clock(); 
-    eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, 1, true, 0, 6, &line); 
+    eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, 1, true, 0, 6, 0, &line); 
     end = clock(); 
     update_search(ctx, search_start, start, end, 1, eval, &line); 
     
@@ -311,16 +332,16 @@ void run_search(search_ctx *ctx)
         int beta = last_eval + 50; 
         
         start = clock(); 
-        eval = negamax(ctx, alpha, beta, depth, true, 0, 6, &line); 
+        eval = negamax(ctx, alpha, beta, depth, true, 0, 6, 0, &line); 
         if (eval <= alpha) 
         {
             // printf("info string Aspiration window failed: eval %d <= alpha %d\n", eval, alpha); 
-            eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, &line); 
+            eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, 0, &line); 
         }
         else if (eval >= beta) 
         {
             // printf("info string Aspiration window failed: eval %d >= beta %d\n", eval, beta); 
-            eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, &line); 
+            eval = negamax(ctx, -EVAL_MAX, EVAL_MAX, depth, true, 0, 6, 0, &line); 
         }
         end = clock(); 
         

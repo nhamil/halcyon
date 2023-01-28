@@ -48,6 +48,7 @@ void create_game_copy(game *g, const game *src)
     create_vec_copy(&g->hist, &src->hist); 
     memcpy(&g->pieces, &src->pieces, sizeof(g->pieces)); 
     memcpy(&g->colors, &src->colors, sizeof(g->colors)); 
+    g->hash = src->hash; 
     g->check = src->check; 
     g->castle = src->castle; 
     g->ep = src->ep; 
@@ -355,10 +356,11 @@ bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, 
 void push_move(game *g, move m) 
 {
     g->nodes++; 
-    g->hash ^= col_zb(); 
-
+    
     // save current state 
     push_vec(&g->hist, g); 
+
+    g->hash ^= col_zb(); 
 
     square from = from_sq(m); 
     square to = to_sq(m); 
@@ -420,10 +422,10 @@ void push_move(game *g, move m)
     // remove castling rights if necessary 
     g->castle &= ~rem_cf; 
     g->hash ^= castle_zb(g->castle ^ prev_cf); 
-    g->hash ^= ((castle & CASTLE_WK) > 0) * (sq_pc_zb(H1, PC_WR) ^ sq_pc_zb(F1, PC_WR)); 
-    g->hash ^= ((castle & CASTLE_WQ) > 0) * (sq_pc_zb(A1, PC_WR) ^ sq_pc_zb(D1, PC_WR)); 
-    g->hash ^= ((castle & CASTLE_BK) > 0) * (sq_pc_zb(H8, PC_BR) ^ sq_pc_zb(F8, PC_BR)); 
-    g->hash ^= ((castle & CASTLE_BQ) > 0) * (sq_pc_zb(A8, PC_BR) ^ sq_pc_zb(D8, PC_BR)); 
+    g->hash ^= (castle == MOVE_CASTLE_WK) * (sq_pc_zb(H1, PC_WR) ^ sq_pc_zb(F1, PC_WR)); 
+    g->hash ^= (castle == MOVE_CASTLE_WQ) * (sq_pc_zb(A1, PC_WR) ^ sq_pc_zb(D1, PC_WR)); 
+    g->hash ^= (castle == MOVE_CASTLE_BK) * (sq_pc_zb(H8, PC_BR) ^ sq_pc_zb(F8, PC_BR)); 
+    g->hash ^= (castle == MOVE_CASTLE_BQ) * (sq_pc_zb(A8, PC_BR) ^ sq_pc_zb(D8, PC_BR)); 
 
     // re-add rooks from aggregate (in case of castling) 
     g->colors[COL_W] ^= g->pieces[PC_WR]; 
@@ -457,16 +459,20 @@ void pop_move(game *g)
 void push_null_move(game *g) 
 {
     g->nodes++; 
+    g->hash ^= col_zb(); 
 
     push_vec(&g->hist, g); 
 
     color cur_col = g->turn; 
 
     g->check = g->pieces[make_pc(PC_K, cur_col)]; 
-    g->ep = NO_SQ; 
     g->ply++; 
     g->turn = opp_col(cur_col); 
 
+    g->hash ^= ep_zb(g->ep); 
+    g->ep = NO_SQ; 
+    g->hash ^= ep_zb(g->ep); 
+    
     // see if next player is in check 
     g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
 }
@@ -875,9 +881,28 @@ static inline int eval_bb(bboard pcs, const int eval[64])
     return sum; 
 }
 
-int evaluate(const game *g, int num_moves) 
+bool is_special_draw(const game *g) 
+{
+    // check for repitition 
+    for (size_t i = 1; i <= 8; i += 2)
+    {
+        if (i >= g->hist.size) break; 
+
+        zobrist hash = ((const game *) at_vec_const(&g->hist, g->hist.size - i - 1))->hash; 
+        if (g->hash == hash || (g->hash ^ col_zb()) == hash) 
+        {
+            return true; 
+        }
+    }
+
+    return false; 
+}
+
+int evaluate(const game *g, int num_moves, bool draw) 
 {
     int eval = 0; 
+
+    if (draw) return 0; 
 
     if (num_moves == 0) 
     {
@@ -892,7 +917,7 @@ int evaluate(const game *g, int num_moves)
             return 0; 
         }
     }
-
+    
     // material 
     eval += 100 * (popcnt(g->pieces[PC_WP]) - popcnt(g->pieces[PC_BP])); 
     eval += 310 * (popcnt(g->pieces[PC_WN]) - popcnt(g->pieces[PC_BN])); 
@@ -962,7 +987,7 @@ void print_game(const game *g)
     printf("En passant: %s\n", g->ep == NO_SQ ? "(none)" : str_sq(g->ep)); 
     printf("In check: %s\n", g->in_check ? "yes" : "no"); 
     printf("# moves: %zu\n", num_moves); 
-    printf("Static eval: %.2f\n", evaluate(g, num_moves) * 0.01); 
+    printf("Static eval: %.2f\n", evaluate(g, num_moves, is_special_draw(g)) * 0.01); 
     printf("%s to move\n", g->turn ? "Black" : "White"); 
 
     destroy_vec(&moves); 
