@@ -8,6 +8,8 @@
 #include "piece.h"
 #include "square.h"
 
+#define ZB_SEED 0xF72B927A3EED2837ULL
+
 typedef uint64_t zobrist; 
 
 extern zobrist SQ_PC_HASH[SQ_CNT][PC_CNT]; 

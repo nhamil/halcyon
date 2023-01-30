@@ -3,6 +3,8 @@
 #include <stdio.h> 
 #include <stdlib.h> 
 
+#include "zobrist.h"
+
 void create_book(book *b) 
 {
     CREATE_VEC(&b->entries, book_pos); 
@@ -20,7 +22,7 @@ void destroy_book(book *b)
 static inline uint64_t read_u64(FILE *file) 
 {
     uint64_t out = 0; 
-    for (int i = 0; i < 16; i++) 
+    for (int i = 0; i < 8; i++) 
     {
         out |= ((uint64_t) (getc(file) & 255)) << (i*8); 
     }
@@ -29,7 +31,7 @@ static inline uint64_t read_u64(FILE *file)
 
 static inline void write_u64(FILE *file, uint64_t value) 
 {
-    for (int i = 0; i < 16; i++) 
+    for (int i = 0; i < 8; i++) 
     {
         putc(value & 255, file); 
         value >>= 8; 
@@ -40,6 +42,13 @@ void create_book_file(book *b, const char *filename)
 {
     create_book(b); 
     FILE *file = fopen(filename, "rb"); 
+
+    uint64_t seed = read_u64(file); 
+    if (seed != ZB_SEED) 
+    {
+        printf("Book uses wrong seed: %s (%016"PRIx64"\n", filename, seed); 
+        goto cleanup; 
+    }
 
     size_t total = read_u64(file); 
     printf("Loading %"PRIu64" entries\n", total); 
@@ -63,6 +72,7 @@ void create_book_file(book *b, const char *filename)
         b->n_games += pos[i].n_games; 
     }
 
+cleanup: 
     fclose(file); 
 }
 
@@ -78,6 +88,8 @@ void save_book(const book *b, const char *filename, uint64_t min)
             total++; 
         }
     }
+
+    write_u64(file, ZB_SEED); 
 
     printf("Saving %"PRIu64" entries\n", total); 
     write_u64(file, total); 

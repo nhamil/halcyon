@@ -218,11 +218,20 @@ cleanup:
 
 int main(int argc, char **argv) 
 {
+    if (argc < 4) 
+    {
+        printf("Usage: opengen <out_file> <min_games> <pgn_file>...\n"); 
+        return 1; 
+    }
+
+    const char *out_file = argv[1]; 
+    const int N = atoi(argv[2]); 
+
     size_t pgns = 0; 
 
     book_tree *bt = new_tree(0); 
 
-    for (int i = 1; i < argc; i++) 
+    for (int i = 3; i < argc; i++) 
     {
         pgns += add_pgns(bt, argv[i]); 
     }
@@ -234,8 +243,6 @@ int main(int argc, char **argv)
     }
     else 
     {
-        const int N = 100; 
-
         printf("Building book\n"); 
         book b; 
         create_book(&b); 
@@ -243,8 +250,8 @@ int main(int argc, char **argv)
         printf("Done!\n"); 
         // print_book(&b, N); 
 
-        printf("Saving to file\n"); 
-        save_book(&b, "book.hc", N); 
+        printf("Saving positions with %d+ games to %s\n", N, out_file); 
+        save_book(&b, out_file, N); 
         printf("Done!\n"); 
 
         // book b2; 

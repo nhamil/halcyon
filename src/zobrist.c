@@ -16,7 +16,7 @@ void init_zb(void)
     if (is_zb_init) return; 
 
     rand_state r; 
-    init_rand(&r, 0xF72B927A3EED2837ULL); 
+    init_rand(&r, ZB_SEED); 
 
     for (size_t i = 0; i < SQ_CNT; i++) 
     {
