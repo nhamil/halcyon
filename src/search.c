@@ -288,7 +288,7 @@ static inline void update_search(search_ctx *ctx, clock_t search_start, clock_t 
 
     float start_duration = (end - search_start); 
     if (start_duration <= 0) start_duration = 1; 
-    start_duration /= CLOCKS_PER_SEC / 1000; 
+    start_duration /= CLOCKS_PER_SEC * 0.001; 
 
     ctx->pv = *line; 
     ctx->nodes = g->nodes; 
