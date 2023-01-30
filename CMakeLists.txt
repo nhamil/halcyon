@@ -67,11 +67,11 @@ add_executable(engine src/main.c ${sources})
 target_link_libraries(engine Threads::Threads) 
 set_target_properties(engine PROPERTIES OUTPUT_NAME "${EXE_NAME}")
 
-add_executable(perft src/perft.c ${sources})
+add_executable(perft EXCLUDE_FROM_ALL src/perft.c ${sources})
 target_link_libraries(perft Threads::Threads)
 
-add_executable(opengen src/opengen.c ${sources})
+add_executable(opengen EXCLUDE_FROM_ALL src/opengen.c ${sources})
 target_link_libraries(opengen Threads::Threads) 
 
-add_executable(openlist src/openlist.c ${sources})
+add_executable(openlist EXCLUDE_FROM_ALL src/openlist.c ${sources})
 target_link_libraries(openlist Threads::Threads) 

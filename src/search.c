@@ -296,7 +296,7 @@ static inline void update_search(search_ctx *ctx, clock_t search_start, clock_t 
     ctx->depth = depth; 
     ctx->eval = eval; 
 
-    printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %"PRIu64" nps %.0f pv ", depth, ctx->pv.n_moves, eval, start_duration, g->nodes, nps); 
+    printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f pv ", depth, ctx->pv.n_moves, eval, start_duration, g->nodes, nps); 
     for (size_t i = 0; i < ctx->pv.n_moves; i++) 
     {
         print_move_end(ctx->pv.moves[i], " "); 

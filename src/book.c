@@ -46,12 +46,12 @@ void create_book_file(book *b, const char *filename)
     uint64_t seed = read_u64(file); 
     if (seed != ZB_SEED) 
     {
-        printf("Book uses wrong seed: %s (%016"PRIx64"\n", filename, seed); 
+        printf("Book uses wrong seed: %s (%016" PRIx64 "\n", filename, seed); 
         goto cleanup; 
     }
 
     size_t total = read_u64(file); 
-    printf("Loading %"PRIu64" entries\n", total); 
+    printf("Loading %" PRIu64 " entries\n", total); 
 
     reserve_vec(&b->entries, total); 
     b->entries.size = total; 
@@ -91,7 +91,7 @@ void save_book(const book *b, const char *filename, uint64_t min)
 
     write_u64(file, ZB_SEED); 
 
-    printf("Saving %"PRIu64" entries\n", total); 
+    printf("Saving %" PRIu64 " entries\n", total); 
     write_u64(file, total); 
     for (size_t i = 0; i < b->entries.size; i++) 
     {

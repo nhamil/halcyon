@@ -1028,7 +1028,7 @@ static inline uint64_t perft_(game *g, vector *moves, int depth, bool verbose)
 
     if (verbose) 
     {
-        printf("Depth: %d, Total: %"PRIu64"", depth, total); 
+        printf("Depth: %d, Total: %" PRIu64 "", depth, total); 
     }
 
     return total; 

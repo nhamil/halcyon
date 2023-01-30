@@ -41,10 +41,10 @@ static inline zobrist col_zb(void)
 
 static void print_zb(zobrist hash) 
 {
-    printf("%016"PRIx64"\n", hash); 
+    printf("%016" PRIx64 "\n", hash); 
 }
 
 static void print_zb_end(zobrist hash, const char *end) 
 {
-    printf("%016"PRIx64"%s", hash, end); 
+    printf("%016" PRIx64 "%s", hash, end); 
 }
