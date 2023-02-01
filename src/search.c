@@ -18,7 +18,8 @@ static const int PC_VALUES[] =
 
 static inline bool out_of_time(const search_ctx *ctx) 
 {
-    return ctx->should_exit || (ctx->pv.n_moves && ctx->tgt_time >= 0 && clock() > ctx->end_at); 
+    // need at least depth 1
+    return ctx->pv.n_moves && (ctx->should_exit || (ctx->tgt_time >= 0 && clock() > ctx->end_at)); 
 }
 
 static inline bool handle_out_of_time(search_ctx *ctx) 
@@ -311,7 +312,7 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
     size_t num_moves = moves->size - start; 
 
     // end of search or end of game 
-    if (depth <= 0 || num_moves == 0 || draw) 
+    if (depth <= 0 || num_moves == 0 || (draw && ctx->ply > 0)) 
     {
         // no move found for node so this is a leaf node
         clear_pv(ctx, 0); 
