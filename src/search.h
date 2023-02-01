@@ -6,12 +6,13 @@
 #include <pthread.h> 
 
 #include "game.h" 
+#include "piece.h"
+#include "square.h"
 
 #define INF_DEPTH (-1) 
 #define INF_TIME (-1) 
 
 #define MAX_DEPTH 128 
-#define MAX_KILLER 2
 
 typedef struct pv_line pv_line; 
 typedef struct search_ctx search_ctx; 
@@ -40,8 +41,19 @@ struct search_ctx
     int depth; 
     int eval; 
     bool running; 
+
     vector moves; 
-    move killer[MAX_DEPTH][MAX_KILLER]; 
+    pv_line lines[MAX_DEPTH]; 
+    size_t node_cnt; 
+    size_t leaf_cnt; 
+    size_t qnode_cnt; 
+    size_t qleaf_cnt; 
+    int check_time; 
+    int ply; 
+    move killer[MAX_DEPTH][2]; 
+    int history[2][PC_CNT][SQ_CNT]; 
+    bool null_move; 
+    bool in_pv; 
 };
 
 struct search_params 

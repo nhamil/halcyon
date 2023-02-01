@@ -73,6 +73,31 @@ bool uci_cmd_position(void)
         load_fen(g, START_FEN); 
         token = uci_next_token(); 
     }
+    else if (uci_equals(token, "test1")) 
+    {
+        load_fen(g, "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq -"); 
+        token = uci_next_token(); 
+    }
+    else if (uci_equals(token, "test2")) 
+    {
+        load_fen(g, "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - -"); 
+        token = uci_next_token(); 
+    }
+    else if (uci_equals(token, "test3")) 
+    {
+        load_fen(g, "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1"); 
+        token = uci_next_token(); 
+    }
+    else if (uci_equals(token, "test4")) 
+    {
+        load_fen(g, "r2q1rk1/pP1p2pp/Q4n2/bbp1p3/Np6/1B3NBn/pPPP1PPP/R3K2R b KQ - 0 1"); 
+        token = uci_next_token(); 
+    }
+    else if (uci_equals(token, "test5")) 
+    {
+        load_fen(g, "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"); 
+        token = uci_next_token(); 
+    }
     else if (uci_equals(token, "fen")) 
     {
         // need to recreate FEN from token list 
@@ -220,13 +245,10 @@ bool uci_cmd_go(void)
 
     if (sidetime > 0) 
     {
-        int inv_scale = (int) (10 - 0.05 * uci_game.ply); 
-        if (inv_scale < 2) inv_scale = 2; 
-
-        int total_time = sidetime - 1000; 
+        int total_time = sidetime - 2000; 
         if (total_time < 10) total_time = 10; 
 
-        int tgt_time = (int) (total_time / inv_scale); 
+        int tgt_time = (int) (total_time / 40); 
         if (tgt_time > 0) 
         {
             time_ms = tgt_time; 

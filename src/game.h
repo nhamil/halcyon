@@ -16,7 +16,7 @@
 
 typedef struct game game; 
 
-#define EVAL_MAX (INT_MAX - 10)
+#define EVAL_MAX (INT_MAX - 10000)
 
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
