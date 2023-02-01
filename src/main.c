@@ -211,6 +211,7 @@ bool uci_cmd_go(void)
     int depth = INF_DEPTH, time_ms = INF_TIME; 
     int movetime = INF_TIME; 
     int wtime = INF_TIME, btime = INF_TIME, sidetime = INF_TIME; 
+    int winc = 0, binc = 0, sideinc = 0; 
 
     while ((token = uci_next_token())) 
     {
@@ -232,6 +233,16 @@ bool uci_cmd_go(void)
             btime = atoi(token); 
             if (uci_game.turn == COL_B) sidetime = btime; 
         }
+        if (uci_equals(token, "winc") && (token = uci_next_token())) 
+        {
+            winc = atoi(token); 
+            if (uci_game.turn == COL_W) sideinc = winc; 
+        }
+        if (uci_equals(token, "binc") && (token = uci_next_token())) 
+        {
+            binc = atoi(token); 
+            if (uci_game.turn == COL_B) sideinc = binc; 
+        }
     }
 
     if (depth > 0) 
@@ -246,9 +257,9 @@ bool uci_cmd_go(void)
     if (sidetime > 0) 
     {
         int total_time = sidetime - 2000; 
-        if (total_time < 10) total_time = 10; 
+        if (total_time < 40) total_time = 40; 
 
-        int tgt_time = (int) (total_time / 40); 
+        int tgt_time = (int) (total_time / 40 + sideinc * 3 / 4); 
         if (tgt_time > 0) 
         {
             time_ms = tgt_time; 
