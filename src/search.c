@@ -333,6 +333,8 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
         {
             ctx->ply++; 
             ctx->null_move = false; 
+            bool pv = ctx->in_pv; 
+            ctx->in_pv = false; 
 
             push_null_move(g); 
             // check if full search would have beta cutoff 
@@ -349,6 +351,7 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
                 return beta; 
             }
 
+            ctx->in_pv = pv; 
             ctx->null_move = true; 
             ctx->ply--; 
         }
