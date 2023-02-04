@@ -931,23 +931,23 @@ int evaluate(const game *g, int num_moves, bool draw)
     // bishop pair 
     eval += 15 * ((popcnt(g->pieces[PC_WB]) >= 2) - (popcnt(g->pieces[PC_BB]) >= 2)); 
 
-    eval += eval_bb(g->pieces[PC_WP], PC_SQ[PC_P]); 
-    eval -= eval_bb(rrow(g->pieces[PC_BP]), PC_SQ[PC_P]); 
+    eval += eval_bb(rrow(g->pieces[PC_WP]), PC_SQ[PC_P]); 
+    eval -= eval_bb(    (g->pieces[PC_BP]), PC_SQ[PC_P]); 
 
-    eval += eval_bb(g->pieces[PC_WN], PC_SQ[PC_N]); 
-    eval -= eval_bb(rrow(g->pieces[PC_BN]), PC_SQ[PC_N]); 
+    eval += eval_bb(rrow(g->pieces[PC_WN]), PC_SQ[PC_N]); 
+    eval -= eval_bb(    (g->pieces[PC_BN]), PC_SQ[PC_N]); 
 
-    eval += eval_bb(g->pieces[PC_WB], PC_SQ[PC_B]); 
-    eval -= eval_bb(rrow(g->pieces[PC_BB]), PC_SQ[PC_B]); 
+    eval += eval_bb(rrow(g->pieces[PC_WB]), PC_SQ[PC_B]); 
+    eval -= eval_bb(    (g->pieces[PC_BB]), PC_SQ[PC_B]); 
 
-    eval += eval_bb(g->pieces[PC_WR], PC_SQ[PC_R]); 
-    eval -= eval_bb(rrow(g->pieces[PC_BR]), PC_SQ[PC_R]); 
+    eval += eval_bb(rrow(g->pieces[PC_WR]), PC_SQ[PC_R]); 
+    eval -= eval_bb(    (g->pieces[PC_BR]), PC_SQ[PC_R]); 
 
-    eval += eval_bb(g->pieces[PC_WQ], PC_SQ[PC_Q]); 
-    eval -= eval_bb(rrow(g->pieces[PC_BQ]), PC_SQ[PC_Q]); 
+    eval += eval_bb(rrow(g->pieces[PC_WQ]), PC_SQ[PC_Q]); 
+    eval -= eval_bb(    (g->pieces[PC_BQ]), PC_SQ[PC_Q]); 
 
-    eval += eval_bb(g->pieces[PC_WK], PC_SQ[PC_K]); 
-    eval -= eval_bb(rrow(g->pieces[PC_BK]), PC_SQ[PC_K]); 
+    eval += eval_bb(rrow(g->pieces[PC_WK]), PC_SQ[PC_K]); 
+    eval -= eval_bb(    (g->pieces[PC_BK]), PC_SQ[PC_K]); 
 
     return eval; 
 }

@@ -151,11 +151,11 @@ static inline int move_val(search_ctx *ctx, move mv)
     }
 
     // default 
-    if (g->turn == COL_W) 
+    if (g->turn == COL_B) 
     {
         return -100000 + PC_SQ[pc_type][to_sq(mv)] - PC_SQ[pc_type][from_sq(mv)]; 
     }
-    else 
+    else // COL_W
     {
         return -100000 + PC_SQ[pc_type][rrank(to_sq(mv))] - PC_SQ[pc_type][rrank(from_sq(mv))]; 
     }
