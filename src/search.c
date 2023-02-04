@@ -151,7 +151,14 @@ static inline int move_val(search_ctx *ctx, move mv)
     }
 
     // default 
-    return -100000 + PC_SQ[pc_type][to_sq(mv)] - PC_SQ[pc_type][from_sq(mv)]; 
+    if (g->turn == COL_W) 
+    {
+        return -100000 + PC_SQ[pc_type][to_sq(mv)] - PC_SQ[pc_type][from_sq(mv)]; 
+    }
+    else 
+    {
+        return -100000 + PC_SQ[pc_type][rrank(to_sq(mv))] - PC_SQ[pc_type][rrank(from_sq(mv))]; 
+    }
 }
 
 static inline move next_move(search_ctx *ctx, size_t start) 
