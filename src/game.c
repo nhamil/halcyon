@@ -1,6 +1,11 @@
 #include "game.h" 
+#include "castle.h"
+#include "piece.h"
+#include "square.h"
 
 #include <ctype.h> 
+#include <stdio.h>
+#include <string.h>
 
 /*
  * Of all squares that can be legally moved to, select all that either: 
@@ -34,6 +39,7 @@ void reset_game(game *g)
     g->castle = CASTLE_NONE; 
     g->ep = NO_SQ; 
     g->in_check = false; 
+    g->halfmove = 0; 
     g->ply = 0; 
     g->turn = COL_W; 
     g->nodes = 0; 
@@ -55,6 +61,7 @@ void create_game_copy(game *g, const game *src)
     g->castle = src->castle; 
     g->ep = src->ep; 
     g->in_check = src->in_check; 
+    g->halfmove = src->halfmove; 
     g->ply = src->ply; 
     g->turn = src->turn; 
     g->nodes = src->nodes; 
@@ -69,6 +76,87 @@ void create_game_fen(game *g, const char *fen)
 {
     create_game(g); 
     load_fen(g, fen); 
+}
+
+void to_fen(const game *g, char *out) 
+{
+    // board position 
+    for (int rank = 7; rank >= 0; rank--) 
+    {
+        int empty = 0; 
+        for (int file = 0; file < 8; file++) 
+        {
+            square sq = make_sq(file, rank); 
+            if (is_pc_at(g, sq)) 
+            {
+                // add empty squares before this piece
+                if (empty > 0) 
+                {
+                    *out++ = '0' + empty; 
+                    empty = 0; 
+                }
+
+                // all pieces are 1 character, so dereferencing 
+                // should be okay 
+                *out++ = *str_pc(pc_at_or_wp(g, sq)); 
+            }
+            else 
+            {
+                empty++; 
+            }
+        }
+
+        // remaining empty squares for the current rank 
+        if (empty > 0) 
+        {
+            *out++ = '0' + empty; 
+        }
+
+        if (rank > 0) 
+        {
+            *out++ = '/'; 
+        }
+    }
+
+    *out++ = ' '; 
+
+    // color to play 
+    char turn[2] = { 'w', 'b' }; 
+    *out++ = turn[g->turn]; 
+    *out++ = ' '; 
+
+    // castling 
+    const char *tmp = str_castle(g->castle); 
+    if (!g->castle) tmp = "-"; 
+    strcpy(out, tmp); 
+    out += strlen(tmp); 
+    *out++ = ' '; 
+
+    // en passant 
+    tmp = str_sq(g->ep); 
+    if (g->ep == NO_SQ) 
+    {
+        *out++ = '-'; 
+    }
+    else 
+    {
+        strcpy(out, tmp); 
+        out += strlen(tmp); 
+    }
+    *out++ = ' '; 
+
+    // halfmove clock
+    sprintf(out, "%d", g->halfmove); 
+    out += strlen(out); 
+    *out++ = ' '; 
+
+    // fullmove counter 
+    sprintf(out, "%d", g->ply / 2 + 1); 
+    out += strlen(out); 
+    *out++ = ' '; 
+
+    // end string 
+    *out = 0; 
 }
 
 void load_fen(game *g, const char *fen) 
@@ -152,9 +240,11 @@ void load_fen(game *g, const char *fen)
                 {
                     case 'w': 
                         g->ply = 0; 
+                        g->turn = COL_W; 
                         break; 
                     case 'b': 
                         g->ply = 1; 
+                        g->turn = COL_B; 
                         break; 
                     default: 
                         printf("Unknown FEN character (active color): %c\n", *fen); 
@@ -232,7 +322,7 @@ void load_fen(game *g, const char *fen)
                     case '7': 
                     case '8': 
                     case '9': 
-                        // g->move50 = g->move50 * 10 + (*fen - '0'); 
+                        g->halfmove = g->halfmove * 10 + (*fen - '0'); 
                         break; 
                     default: 
                         printf("Unknown FEN character (halfmove): %c\n", *fen); 
@@ -266,8 +356,6 @@ void load_fen(game *g, const char *fen)
         }
     }
     if (mode >= 5) g->ply += turn * 2 - 2; 
-
-    g->turn = g->ply & 1; 
 
     for (piece p = PC_P; p <= PC_K; p++) 
     {
@@ -390,7 +478,8 @@ void push_move(game *g, move m)
     g->pieces[pc] = clear_bits(g->pieces[pc], from); 
 
     // WP if rm_tgt is empty, but this is okay because if pc is WP it will re-enable this square right after 
-    g->hash ^= get_bit(g->pieces[tgt], rm_tgt) * sq_pc_zb(rm_tgt, tgt); 
+    int capture = get_bit(g->pieces[tgt], rm_tgt); 
+    g->hash ^= capture * sq_pc_zb(rm_tgt, tgt); 
     g->pieces[tgt] = clear_bits(g->pieces[tgt], rm_tgt); 
 
     // place piece onto new square 
@@ -445,6 +534,15 @@ void push_move(game *g, move m)
 
     g->ply++; 
     g->turn = opp_col(g->turn); 
+
+    if (capture | (get_no_col(pc) == PC_P)) 
+    {
+        g->halfmove = 0; 
+    }
+    else 
+    {
+        g->halfmove++; 
+    }
 
     // useful to know if the new player is in check 
     g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
@@ -985,6 +1083,8 @@ void print_game(const game *g)
     printf("    A B C D E F G H  \n"); 
     printf("Hash: "); 
     print_zb(g->hash); 
+    printf("Ply: %d\n", g->ply); 
+    printf("Halfmove: %d\n", g->halfmove); 
     printf("Castling: %s\n", str_castle(g->castle)); 
     printf("En passant: %s\n", g->ep == NO_SQ ? "(none)" : str_sq(g->ep)); 
     printf("In check: %s\n", g->in_check ? "yes" : "no"); 

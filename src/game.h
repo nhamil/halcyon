@@ -20,6 +20,8 @@ typedef struct game game;
 
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
+#define FEN_LEN 128 
+
 struct game 
 {
     bboard pieces[PC_CNT]; 
@@ -29,6 +31,7 @@ struct game
     castle_flags castle; 
     square ep; 
     bool in_check; 
+    int halfmove; 
 
     vector hist; 
     int ply; 
@@ -48,6 +51,8 @@ void destroy_game(game *g);
 void reset_game(game *g); 
 
 void load_fen(game *g, const char *fen); 
+
+void to_fen(const game *g, char *out); 
 
 bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, bboard add); 
 
