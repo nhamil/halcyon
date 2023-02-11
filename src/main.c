@@ -226,12 +226,20 @@ bool uci_cmd_go(void)
         if (uci_equals(token, "wtime") && (token = uci_next_token())) 
         {
             wtime = atoi(token); 
-            if (uci_game.turn == COL_W) sidetime = wtime; 
+            if (uci_game.turn == COL_W) 
+            {
+                sidetime = wtime; 
+                if (sidetime < 0) sidetime = 0; 
+            }
         }
         if (uci_equals(token, "btime") && (token = uci_next_token())) 
         {
             btime = atoi(token); 
-            if (uci_game.turn == COL_B) sidetime = btime; 
+            if (uci_game.turn == COL_B) 
+            {
+                sidetime = btime; 
+                if (sidetime < 0) sidetime = 0; 
+            }
         }
         if (uci_equals(token, "winc") && (token = uci_next_token())) 
         {
@@ -254,18 +262,17 @@ bool uci_cmd_go(void)
         printf("info string Searching with no depth\n"); 
     }
 
-    if (sidetime > 0) 
+    if (sidetime > INF_TIME) 
     {
         int total_time = sidetime - 2000; 
         if (total_time < 40) total_time = 40; 
 
         int tgt_time = (int) (total_time / 40 + sideinc * 3 / 4); 
-        if (tgt_time > 0) 
-        {
-            time_ms = tgt_time; 
-            printf("info string Using %dms out of %dms to think\n", time_ms, sidetime); 
-            fflush(stdout); 
-        }
+        if (tgt_time <= 0) tgt_time = 1; 
+         
+        time_ms = tgt_time; 
+        printf("info string Using %dms out of %dms to think\n", time_ms, sidetime); 
+        fflush(stdout); 
     }
 
     if (time_ms > 20000) 
