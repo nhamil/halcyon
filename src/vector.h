@@ -37,6 +37,15 @@ static inline void create_vec_copy(vector *v, const vector *src)
     memcpy(v->data, src->data, v->size * v->elem_size); 
 }
 
+static inline void copy_vec(vector *v, const vector *src) 
+{
+    v->size = src->size; 
+    v->capacity = src->capacity; 
+    v->elem_size = src->elem_size; 
+    v->data = realloc(v->data, v->capacity * v->elem_size); 
+    memcpy(v->data, src->data, v->size * v->elem_size); 
+}
+
 static inline void destroy_vec(vector *v) 
 {
     free(v->data); 

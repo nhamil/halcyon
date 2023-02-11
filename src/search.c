@@ -619,3 +619,26 @@ void search(search_ctx *ctx, search_params *params)
 
     pthread_create(&ctx->thread, NULL, start_pthread_search, ctx); 
 }
+
+int basic_qsearch(const game *g) 
+{
+    search_ctx ctx; 
+    create_search_ctx(&ctx); 
+    ctx.pv.n_moves = 0; 
+    ctx.nodes = 0; 
+    ctx.nps = 0; 
+    ctx.depth = 0; 
+    ctx.eval = 0; 
+    ctx.running = true; 
+
+    ctx.tgt_depth = INF_DEPTH; 
+    ctx.tgt_time = INF_TIME; 
+    ctx.should_exit = false; 
+
+    destroy_game(&ctx.board); 
+    create_game_copy(&ctx.board, g); 
+    int score = qsearch(&ctx, -EVAL_MAX, EVAL_MAX, 32); 
+    destroy_search_ctx(&ctx); 
+
+    return score; 
+}

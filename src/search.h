@@ -77,3 +77,5 @@ static void init_search_params(search_params *sp, const game *board, int depth, 
 }
 
 void search(search_ctx *ctx, search_params *params); 
+
+int basic_qsearch(const game *g); 

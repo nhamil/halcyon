@@ -28,6 +28,134 @@
     ) \
 )
 
+int PC_SQ[2][6][64] = 
+{
+    {
+        { // pawn
+            0,   0,   0,   0,   0,   0,   0,   0, 
+            50,  50,  50,  50,  50,  50,  50,  50, 
+            10,  10,  20,  30,  30,  20,  10,  10, 
+            5,   5,  10,  25,  25,  10,   5,   5, 
+            0,   0,   0,  20,  20,   0,   0,   0, 
+            5,  -5, -10,   0,   0, -10,  -5,   5, 
+            5,  10,  10, -20, -20,  10,  10,   5, 
+            0,   0,   0,   0,   0,   0,   0,   0
+        }, 
+        { // knight 
+            -50, -40, -30, -30, -30, -30, -40, -50, 
+            -40, -20,   0,   0,   0,   0, -20, -40, 
+            -30,   0,  10,  15,  15,  10,   0, -30, 
+            -30,   5,  15,  20,  20,  15,   5, -30, 
+            -30,   0,  15,  20,  20,  15,   0, -30, 
+            -30,   5,  10,  15,  15,  10,   5, -30, 
+            -40, -20,   0,   5,   5,   0, -20, -40, 
+            -50, -40, -30, -30, -30, -30, -40, -50 
+        }, 
+        { // bishop 
+            -20, -10, -10, -10, -10, -10, -10, -20, 
+            -10,   0,   0,   0,   0,   0,   0, -10, 
+            -10,   0,   5,  10,  10,   5,   0, -10, 
+            -10,   5,   5,  10,  10,   5,   5, -10, 
+            -10,   0,  10,  10,  10,  10,   0, -10, 
+            -10,  10,  10,  10,  10,  10,  10, -10, 
+            -10,   5,   0,   0,   0,   0,   5, -10, 
+            -20, -10, -10, -10, -10, -10, -10, -20 
+        }, 
+        { // rook
+             0,   0,   0,   0,   0,   0,   0,   0,
+             5,  10,  10,  10,  10,  10,  10,   5, 
+            -5,   0,   0,   0,   0,   0,   0,  -5, 
+            -5,   0,   0,   0,   0,   0,   0,  -5, 
+            -5,   0,   0,   0,   0,   0,   0,  -5, 
+            -5,   0,   0,   0,   0,   0,   0,  -5, 
+            -5,   0,   0,   0,   0,   0,   0,  -5, 
+             0,   0,   0,   5,   5,   0,   0,   0 
+        }, 
+        { // queen
+            -20, -10, -10,  -5,  -5, -10, -10, -20, 
+            -10,   0,   0,   0,   0,   0,   0, -10, 
+            -10,   0,   5,   5,   5,   5,   0, -10, 
+              0,   0,   5,   5,   5,   5,   0,   0, 
+              0,   0,   5,   5,   5,   5,   0,   0, 
+            -10,   0,   5,   5,   5,   5,   0, -10, 
+            -10,   0,   5,   0,   0,   5,   0, -10, 
+            -20, -10, -10,  -5,  -5, -10, -10, -20, 
+        }, 
+        { // king 
+            -30, -40, -40, -50, -50, -40, -40, -30, 
+            -30, -40, -40, -50, -50, -40, -40, -30, 
+            -30, -40, -40, -50, -50, -40, -40, -30, 
+            -30, -40, -40, -50, -50, -40, -40, -30, 
+            -20, -30, -30, -40, -40, -30, -30, -20, 
+            -10, -20, -20, -20, -20, -20, -20, -10, 
+            20,  20,   0,   0,   0,   0,  20,  20, 
+            20,  30,  10,   0,   0,  10,  30,  20 
+        }
+    }, 
+    {
+        { // pawn
+            0,   0,   0,   0,   0,   0,   0,   0, 
+          100, 100, 100, 100, 100, 100, 100, 100, 
+           40,  40,  40,  40,  40,  40,  40,  40,
+           30,  30,  30,  30,  30,  30,  30,  30,  
+           20,  20,  20,  20,  20,  20,  20,  20,  
+           10,  10,  10,  10,  10,  10,  10,  10, 
+            5,   0,   0, -20, -20,   0,   0,   5, 
+            0,   0,   0,   0,   0,   0,   0,   0
+        }, 
+        { // knight 
+            -50, -40, -30, -30, -30, -30, -40, -50, 
+            -40, -20,   0,   0,   0,   0, -20, -40, 
+            -30,   0,  10,  15,  15,  10,   0, -30, 
+            -30,   5,  15,  20,  20,  15,   5, -30, 
+            -30,   0,  15,  20,  20,  15,   0, -30, 
+            -30,   5,  10,  15,  15,  10,   5, -30, 
+            -40, -20,   0,   5,   5,   0, -20, -40, 
+            -50, -40, -30, -30, -30, -30, -40, -50 
+        }, 
+        { // bishop 
+            -20, -10, -10, -10, -10, -10, -10, -20, 
+            -10,   0,   0,   0,   0,   0,   0, -10, 
+            -10,   0,   5,  10,  10,   5,   0, -10, 
+            -10,   5,   5,  10,  10,   5,   5, -10, 
+            -10,   0,  10,  10,  10,  10,   0, -10, 
+            -10,  10,  10,  10,  10,  10,  10, -10, 
+            -10,   5,   0,   0,   0,   0,   5, -10, 
+            -20, -10, -10, -10, -10, -10, -10, -20 
+        }, 
+        { // rook
+            0,   0,   0,   0,   0,   0,   0,   0,
+            5,  10,  10,  10,  10,  10,  10,   5, 
+           -5,   0,   0,   0,   0,   0,   0,  -5, 
+           -5,   0,   0,   0,   0,   0,   0,  -5, 
+           -5,   0,   0,   0,   0,   0,   0,  -5, 
+           -5,   0,   0,   0,   0,   0,   0,  -5, 
+           -5,   0,   0,   0,   0,   0,   0,  -5, 
+            0,   0,   0,   5,   5,   0,   0,   0 
+        }, 
+        { // queen
+            -20, -10, -10,  -5,  -5, -10, -10, -20, 
+            -10,   0,   0,   0,   0,   0,   0, -10, 
+            -10,   0,   5,   5,   5,   5,   0, -10, 
+              0,   0,   5,   5,   5,   5,   0,   0, 
+              0,   0,   5,   5,   5,   5,   0,   0, 
+            -10,   0,   5,   5,   5,   5,   0, -10, 
+            -10,   0,   5,   0,   0,   5,   0, -10, 
+            -20, -10, -10,  -5,  -5, -10, -10, -20, 
+        }, 
+        { // king 
+            -50, -40, -30, -30, -30, -30, -40, -50, 
+            -40, -20,   0,   0,   0,   0, -20, -40, 
+            -30,   0,  10,  15,  15,  10,   0, -30, 
+            -30,   5,  15,  20,  20,  15,   5, -30, 
+            -30,   0,  15,  20,  20,  15,   0, -30, 
+            -30,   5,  10,  15,  15,  10,   5, -30, 
+            -40, -20,   0,   5,   5,   0, -20, -40, 
+            -50, -40, -30, -30, -30, -30, -40, -50 
+        }
+    }, 
+};
+
 void reset_game(game *g) 
 {
     init_zb(); 
@@ -54,6 +182,22 @@ void create_game(game *g)
 void create_game_copy(game *g, const game *src) 
 {
     create_vec_copy(&g->hist, &src->hist); 
+    memcpy(&g->pieces, &src->pieces, sizeof(g->pieces)); 
+    memcpy(&g->colors, &src->colors, sizeof(g->colors)); 
+    g->hash = src->hash; 
+    g->check = src->check; 
+    g->castle = src->castle; 
+    g->ep = src->ep; 
+    g->in_check = src->in_check; 
+    g->halfmove = src->halfmove; 
+    g->ply = src->ply; 
+    g->turn = src->turn; 
+    g->nodes = src->nodes; 
+}
+
+void copy_game(game *g, const game *src) 
+{
+    copy_vec(&g->hist, &src->hist); 
     memcpy(&g->pieces, &src->pieces, sizeof(g->pieces)); 
     memcpy(&g->colors, &src->colors, sizeof(g->colors)); 
     g->hash = src->hash; 
@@ -969,16 +1113,24 @@ void gen_moves(const game *g, vector *out)
     }
 }
 
-static inline int eval_bb(bboard pcs, const int eval[64]) 
+static inline void eval_w_pc_sq(const game *g, piece pc, int *mg, int *eg) 
 {
-    int sum = 0; 
-
+    bboard pcs = rrow(g->pieces[pc]); 
     FOR_EACH_BIT(pcs, 
     {
-        sum += eval[sq]; 
+        *mg += PC_SQ[0][pc][sq]; 
+        *eg += PC_SQ[1][pc][sq]; 
     });
+}
 
-    return sum; 
+static inline void eval_b_pc_sq(const game *g, piece pc, int *mg, int *eg) 
+{
+    bboard pcs = g->pieces[make_pc(pc, COL_B)]; 
+    FOR_EACH_BIT(pcs, 
+    {
+        *mg -= PC_SQ[0][pc][sq]; 
+        *eg -= PC_SQ[1][pc][sq]; 
+    });
 }
 
 bool is_special_draw(const game *g) 
@@ -998,13 +1150,11 @@ bool is_special_draw(const game *g)
     return false; 
 }
 
-int evaluate(const game *g, int num_moves, bool draw) 
+int evaluate(const game *g, int n_moves, bool draw) 
 {
-    int eval = 0; 
-
     if (draw) return 0; 
 
-    if (num_moves == 0) 
+    if (n_moves == 0) 
     {
         if (g->in_check) 
         {
@@ -1017,37 +1167,60 @@ int evaluate(const game *g, int num_moves, bool draw)
             return 0; 
         }
     }
-    
-    // material 
-    eval += 100 * (popcnt(g->pieces[PC_WP]) - popcnt(g->pieces[PC_BP])); 
-    eval += 310 * (popcnt(g->pieces[PC_WN]) - popcnt(g->pieces[PC_BN])); 
-    eval += 320 * (popcnt(g->pieces[PC_WB]) - popcnt(g->pieces[PC_BB])); 
-    eval += 500 * (popcnt(g->pieces[PC_WR]) - popcnt(g->pieces[PC_BR])); 
-    eval += 900 * (popcnt(g->pieces[PC_WQ]) - popcnt(g->pieces[PC_BQ])); 
-    eval += 10000 * (popcnt(g->pieces[PC_WK]) - popcnt(g->pieces[PC_BK])); 
+
+    int wp = popcnt(g->pieces[PC_WP]); 
+    int bp = popcnt(g->pieces[PC_BP]); 
+    int wn = popcnt(g->pieces[PC_WN]); 
+    int bn = popcnt(g->pieces[PC_BN]); 
+    int wb = popcnt(g->pieces[PC_WB]); 
+    int bb = popcnt(g->pieces[PC_BB]); 
+    int wr = popcnt(g->pieces[PC_WR]); 
+    int br = popcnt(g->pieces[PC_BR]); 
+    int wq = popcnt(g->pieces[PC_WQ]); 
+    int bq = popcnt(g->pieces[PC_BQ]); 
+    int wk = popcnt(g->pieces[PC_WK]); 
+    int bk = popcnt(g->pieces[PC_BK]); 
+
+    int eval = 0; 
+    int mg = 0; 
+    int eg = 0; 
+
+    eval += 100 * (wp - bp); 
+    eval += 310 * (wn - bn); 
+    eval += 320 * (wb - bb); 
+    eval += 500 * (wr - br); 
+    eval += 975 * (wq - bq); 
+    eval += 10000 * (wk - bk); 
 
     // bishop pair 
-    eval += 15 * ((popcnt(g->pieces[PC_WB]) >= 2) - (popcnt(g->pieces[PC_BB]) >= 2)); 
+    eval += 15 * ((wb >= 2) - (bb >= 2)); 
 
-    eval += eval_bb(rrow(g->pieces[PC_WP]), PC_SQ[PC_P]); 
-    eval -= eval_bb(    (g->pieces[PC_BP]), PC_SQ[PC_P]); 
+    eval_w_pc_sq(g, PC_P, &mg, &eg); 
+    eval_b_pc_sq(g, PC_P, &mg, &eg); 
+    eval_w_pc_sq(g, PC_N, &mg, &eg); 
+    eval_b_pc_sq(g, PC_N, &mg, &eg); 
+    eval_w_pc_sq(g, PC_B, &mg, &eg); 
+    eval_b_pc_sq(g, PC_B, &mg, &eg); 
+    eval_w_pc_sq(g, PC_R, &mg, &eg); 
+    eval_b_pc_sq(g, PC_R, &mg, &eg); 
+    eval_w_pc_sq(g, PC_Q, &mg, &eg); 
+    eval_b_pc_sq(g, PC_Q, &mg, &eg); 
+    eval_w_pc_sq(g, PC_K, &mg, &eg); 
+    eval_b_pc_sq(g, PC_K, &mg, &eg); 
 
-    eval += eval_bb(rrow(g->pieces[PC_WN]), PC_SQ[PC_N]); 
-    eval -= eval_bb(    (g->pieces[PC_BN]), PC_SQ[PC_N]); 
+    // int p = 0 * (wp - bp);  
+    int n = 1 * (wn + bn); 
+    int b = 1 * (wb + bb); 
+    int r = 2 * (wr + br); 
+    // quick way to ignore extra queens 
+    int q = 4 * ((wq > 0) + (bq > 0)); 
 
-    eval += eval_bb(rrow(g->pieces[PC_WB]), PC_SQ[PC_B]); 
-    eval -= eval_bb(    (g->pieces[PC_BB]), PC_SQ[PC_B]); 
-
-    eval += eval_bb(rrow(g->pieces[PC_WR]), PC_SQ[PC_R]); 
-    eval -= eval_bb(    (g->pieces[PC_BR]), PC_SQ[PC_R]); 
-
-    eval += eval_bb(rrow(g->pieces[PC_WQ]), PC_SQ[PC_Q]); 
-    eval -= eval_bb(    (g->pieces[PC_BQ]), PC_SQ[PC_Q]); 
-
-    eval += eval_bb(rrow(g->pieces[PC_WK]), PC_SQ[PC_K]); 
-    eval -= eval_bb(    (g->pieces[PC_BK]), PC_SQ[PC_K]); 
-
-    return eval; 
+    // between 0 and (4+4+8+16)=32
+    int phase = 32 - (n + b + r + q); 
+    phase = (phase >= 0) * phase; 
+    // printf("phase %d mg %d eg %d eval %d\n", phase, mg, eg, (mg * (32 - phase) + eg * phase) / 32); 
+    
+    return eval + (mg * (32 - phase) + eg * phase) / 32; 
 }
 
 void print_game(const game *g) 
