@@ -1,685 +1,136 @@
 #include "game.h" 
+
+#include <stdlib.h> 
+#include <string.h> 
+
+#include "bitboard.h"
 #include "castle.h"
+#include "mailbox.h"
+#include "move.h"
+#include "movegen.h"
 #include "piece.h"
 #include "square.h"
+#include "zobrist.h"
 
-#include <ctype.h> 
-#include <stdio.h>
-#include <string.h>
-
-/*
- * Of all squares that can be legally moved to, select all that either: 
- * ..capture/block an attacker
- * ..or: 
- * ..anywhere, if: 
- * ....there is no pin on the direction from this square to the king 
- * ....or: 
- * ....this square is not in between an attacker and the king (past the attacker) 
- * ....and therefore is not pinned to this square
- */
-#define TARGET_SQUARES ( \
-    ok_squares & ( \
-        dirs[pin_idx[sq]] | (ALL_BITS * \
-            ( \
-                ((~pinned >> pin_idx[sq]) & 1) | \
-                ((dirs[pin_idx[sq]] & (1ULL << sq)) == 0) \
-            ) \
-        ) \
-    ) \
-)
-
-int PC_SQ[2][6][64] = 
+game *new_game(void) 
 {
-    {
-        { // pawn
-            0,   0,   0,   0,   0,   0,   0,   0, 
-            50,  50,  50,  50,  50,  50,  50,  50, 
-            10,  10,  20,  30,  30,  20,  10,  10, 
-            5,   5,  10,  25,  25,  10,   5,   5, 
-            0,   0,   0,  20,  20,   0,   0,   0, 
-            5,  -5, -10,   0,   0, -10,  -5,   5, 
-            5,  10,  10, -20, -20,  10,  10,   5, 
-            0,   0,   0,   0,   0,   0,   0,   0
-        }, 
-        { // knight 
-            -50, -40, -30, -30, -30, -30, -40, -50, 
-            -40, -20,   0,   0,   0,   0, -20, -40, 
-            -30,   0,  10,  15,  15,  10,   0, -30, 
-            -30,   5,  15,  20,  20,  15,   5, -30, 
-            -30,   0,  15,  20,  20,  15,   0, -30, 
-            -30,   5,  10,  15,  15,  10,   5, -30, 
-            -40, -20,   0,   5,   5,   0, -20, -40, 
-            -50, -40, -30, -30, -30, -30, -40, -50 
-        }, 
-        { // bishop 
-            -20, -10, -10, -10, -10, -10, -10, -20, 
-            -10,   0,   0,   0,   0,   0,   0, -10, 
-            -10,   0,   5,  10,  10,   5,   0, -10, 
-            -10,   5,   5,  10,  10,   5,   5, -10, 
-            -10,   0,  10,  10,  10,  10,   0, -10, 
-            -10,  10,  10,  10,  10,  10,  10, -10, 
-            -10,   5,   0,   0,   0,   0,   5, -10, 
-            -20, -10, -10, -10, -10, -10, -10, -20 
-        }, 
-        { // rook
-             0,   0,   0,   0,   0,   0,   0,   0,
-             5,  10,  10,  10,  10,  10,  10,   5, 
-            -5,   0,   0,   0,   0,   0,   0,  -5, 
-            -5,   0,   0,   0,   0,   0,   0,  -5, 
-            -5,   0,   0,   0,   0,   0,   0,  -5, 
-            -5,   0,   0,   0,   0,   0,   0,  -5, 
-            -5,   0,   0,   0,   0,   0,   0,  -5, 
-             0,   0,   0,   5,   5,   0,   0,   0 
-        }, 
-        { // queen
-            -20, -10, -10,  -5,  -5, -10, -10, -20, 
-            -10,   0,   0,   0,   0,   0,   0, -10, 
-            -10,   0,   5,   5,   5,   5,   0, -10, 
-              0,   0,   5,   5,   5,   5,   0,   0, 
-              0,   0,   5,   5,   5,   5,   0,   0, 
-            -10,   0,   5,   5,   5,   5,   0, -10, 
-            -10,   0,   5,   0,   0,   5,   0, -10, 
-            -20, -10, -10,  -5,  -5, -10, -10, -20, 
-        }, 
-        { // king 
-            -30, -40, -40, -50, -50, -40, -40, -30, 
-            -30, -40, -40, -50, -50, -40, -40, -30, 
-            -30, -40, -40, -50, -50, -40, -40, -30, 
-            -30, -40, -40, -50, -50, -40, -40, -30, 
-            -20, -30, -30, -40, -40, -30, -30, -20, 
-            -10, -20, -20, -20, -20, -20, -20, -10, 
-            20,  20,   0,   0,   0,   0,  20,  20, 
-            20,  30,  10,   0,   0,  10,  30,  20 
-        }
-    }, 
-    {
-        { // pawn
-            0,   0,   0,   0,   0,   0,   0,   0, 
-          100, 100, 100, 100, 100, 100, 100, 100, 
-           40,  40,  40,  40,  40,  40,  40,  40,
-           30,  30,  30,  30,  30,  30,  30,  30,  
-           20,  20,  20,  20,  20,  20,  20,  20,  
-           10,  10,  10,  10,  10,  10,  10,  10, 
-            5,   0,   0, -20, -20,   0,   0,   5, 
-            0,   0,   0,   0,   0,   0,   0,   0
-        }, 
-        { // knight 
-            -50, -40, -30, -30, -30, -30, -40, -50, 
-            -40, -20,   0,   0,   0,   0, -20, -40, 
-            -30,   0,  10,  15,  15,  10,   0, -30, 
-            -30,   5,  15,  20,  20,  15,   5, -30, 
-            -30,   0,  15,  20,  20,  15,   0, -30, 
-            -30,   5,  10,  15,  15,  10,   5, -30, 
-            -40, -20,   0,   5,   5,   0, -20, -40, 
-            -50, -40, -30, -30, -30, -30, -40, -50 
-        }, 
-        { // bishop 
-            -20, -10, -10, -10, -10, -10, -10, -20, 
-            -10,   0,   0,   0,   0,   0,   0, -10, 
-            -10,   0,   5,  10,  10,   5,   0, -10, 
-            -10,   5,   5,  10,  10,   5,   5, -10, 
-            -10,   0,  10,  10,  10,  10,   0, -10, 
-            -10,  10,  10,  10,  10,  10,  10, -10, 
-            -10,   5,   0,   0,   0,   0,   5, -10, 
-            -20, -10, -10, -10, -10, -10, -10, -20 
-        }, 
-        { // rook
-            0,   0,   0,   0,   0,   0,   0,   0,
-            5,  10,  10,  10,  10,  10,  10,   5, 
-           -5,   0,   0,   0,   0,   0,   0,  -5, 
-           -5,   0,   0,   0,   0,   0,   0,  -5, 
-           -5,   0,   0,   0,   0,   0,   0,  -5, 
-           -5,   0,   0,   0,   0,   0,   0,  -5, 
-           -5,   0,   0,   0,   0,   0,   0,  -5, 
-            0,   0,   0,   5,   5,   0,   0,   0 
-        }, 
-        { // queen
-            -20, -10, -10,  -5,  -5, -10, -10, -20, 
-            -10,   0,   0,   0,   0,   0,   0, -10, 
-            -10,   0,   5,   5,   5,   5,   0, -10, 
-              0,   0,   5,   5,   5,   5,   0,   0, 
-              0,   0,   5,   5,   5,   5,   0,   0, 
-            -10,   0,   5,   5,   5,   5,   0, -10, 
-            -10,   0,   5,   0,   0,   5,   0, -10, 
-            -20, -10, -10,  -5,  -5, -10, -10, -20, 
-        }, 
-        { // king 
-            -50, -40, -30, -30, -30, -30, -40, -50, 
-            -40, -20,   0,   0,   0,   0, -20, -40, 
-            -30,   0,  10,  15,  15,  10,   0, -30, 
-            -30,   5,  15,  20,  20,  15,   5, -30, 
-            -30,   0,  15,  20,  20,  15,   0, -30, 
-            -30,   5,  10,  15,  15,  10,   5, -30, 
-            -40, -20,   0,   5,   5,   0, -20, -40, 
-            -50, -40, -30, -30, -30, -30, -40, -50 
-        }
-    }, 
-};
+    game *g = malloc(sizeof(game)); 
+    reset_game(g); 
+    return g; 
+}
+
+void free_game(game *g) 
+{
+    free(g); 
+}
 
 void reset_game(game *g) 
 {
     init_zb(); 
-    clear_vec(&g->hist); 
-    memset(&g->pieces, 0, sizeof(g->pieces)); 
-    memset(&g->colors, 0, sizeof(g->colors)); 
+    init_mbox(&g->mailbox); 
+    memset(g->pieces, 0, sizeof(g->pieces)); 
+    memset(g->colors, 0, sizeof(g->colors)); 
+    g->all = 0; 
+    g->movement = 0; 
     g->hash = 0; 
-    g->check = NO_BITS; 
-    g->castle = CASTLE_NONE; 
+    g->castle = 0; 
     g->ep = NO_SQ; 
-    g->in_check = false; 
-    g->halfmove = 0; 
     g->ply = 0; 
+    g->halfmove = 0; 
     g->turn = COL_W; 
+    g->in_check = false; 
     g->nodes = 0; 
+    g->depth = 0; 
 }
 
-void create_game(game *g) 
+void copy_game(game *g, const game *from) 
 {
-    create_vec(&g->hist, offsetof(game, hist)); 
-    reset_game(g); 
+    init_zb(); 
+    g->mailbox = from->mailbox; 
+    memcpy(g->pieces, from->pieces, sizeof(g->pieces)); 
+    memcpy(g->colors, from->colors, sizeof(g->colors)); 
+    g->all = from->all; 
+    g->movement = from->movement; 
+    g->hash = from->hash; 
+    g->castle = from->castle; 
+    g->ep = from->ep; 
+    g->ply = from->ply; 
+    g->halfmove = from->halfmove; 
+    g->turn = from->turn; 
+    g->in_check = from->in_check; 
+    g->nodes = 0; 
+    g->depth = from->depth; 
+    for (int i = 0; i < g->depth; i++) 
+    {
+        g->hist[i] = from->hist[i]; 
+    }
 }
 
-void create_game_copy(game *g, const game *src) 
+void print_game(const game *g) 
 {
-    create_vec_copy(&g->hist, &src->hist); 
-    memcpy(&g->pieces, &src->pieces, sizeof(g->pieces)); 
-    memcpy(&g->colors, &src->colors, sizeof(g->colors)); 
-    g->hash = src->hash; 
-    g->check = src->check; 
-    g->castle = src->castle; 
-    g->ep = src->ep; 
-    g->in_check = src->in_check; 
-    g->halfmove = src->halfmove; 
-    g->ply = src->ply; 
-    g->turn = src->turn; 
-    g->nodes = src->nodes; 
-}
+    char fen[FEN_LEN]; 
+    to_fen(g, fen); 
 
-void copy_game(game *g, const game *src) 
-{
-    copy_vec(&g->hist, &src->hist); 
-    memcpy(&g->pieces, &src->pieces, sizeof(g->pieces)); 
-    memcpy(&g->colors, &src->colors, sizeof(g->colors)); 
-    g->hash = src->hash; 
-    g->check = src->check; 
-    g->castle = src->castle; 
-    g->ep = src->ep; 
-    g->in_check = src->in_check; 
-    g->halfmove = src->halfmove; 
-    g->ply = src->ply; 
-    g->turn = src->turn; 
-    g->nodes = src->nodes; 
-}
-
-void destroy_game(game *g) 
-{
-    destroy_vec(&g->hist); 
-}
-
-void create_game_fen(game *g, const char *fen) 
-{
-    create_game(g); 
-    load_fen(g, fen); 
-}
-
-void to_fen(const game *g, char *out) 
-{
-    // board position 
+    printf("+---+---+---+---+---+---+---+---+\n"); 
     for (int rank = 7; rank >= 0; rank--) 
     {
-        int empty = 0; 
+        printf("| "); 
         for (int file = 0; file < 8; file++) 
         {
             square sq = make_sq(file, rank); 
-            if (is_pc_at(g, sq)) 
-            {
-                // add empty squares before this piece
-                if (empty > 0) 
-                {
-                    *out++ = '0' + empty; 
-                    empty = 0; 
-                }
-
-                // all pieces are 1 character, so dereferencing 
-                // should be okay 
-                *out++ = *str_pc(pc_at_or_wp(g, sq)); 
-            }
-            else 
-            {
-                empty++; 
-            }
+            printf("%s | ", str_pc(pc_at(g, sq))); 
         }
-
-        // remaining empty squares for the current rank 
-        if (empty > 0) 
-        {
-            *out++ = '0' + empty; 
-        }
-
-        if (rank > 0) 
-        {
-            *out++ = '/'; 
-        }
+        printf("%d\n", rank + 1); 
+        printf("+---+---+---+---+---+---+---+---+\n"); 
     }
+    printf("  A   B   C   D   E   F   G   H  \n"); 
 
-    *out++ = ' '; 
+    printf("%s\nHash: ", fen); 
+    print_zb_end(g->hash, "\n");
 
-    // color to play 
-    char turn[2] = { 'w', 'b' }; 
-    *out++ = turn[g->turn]; 
-    *out++ = ' '; 
+    printf("Ply: %d, ", g->ply); 
+    printf("Halfmove: %d, ", g->halfmove); 
+    printf("Castling: %s\n", str_castle(g->castle)); 
 
-    // castling 
-    const char *tmp = str_castle(g->castle); 
-    if (!g->castle) tmp = "-"; 
-    strcpy(out, tmp); 
-    out += strlen(tmp); 
-    *out++ = ' '; 
+    printf("En passant: %s, ", str_sq(g->ep)); 
+    printf("In check: %s\n", g->in_check ? "yes" : "no"); 
 
-    // en passant 
-    tmp = str_sq(g->ep); 
-    if (g->ep == NO_SQ) 
-    {
-        *out++ = '-'; 
-    }
-    else 
-    {
-        strcpy(out, tmp); 
-        out += strlen(tmp); 
-    }
-    *out++ = ' '; 
+    printf("Special draw: %s, ", is_special_draw(g) ? "yes" : "no");
 
-    // halfmove clock
-    sprintf(out, "%d", g->halfmove); 
-    out += strlen(out); 
-    *out++ = ' '; 
-
-    // fullmove counter 
-    sprintf(out, "%d", g->ply / 2 + 1); 
-    out += strlen(out); 
-    *out++ = ' '; 
-
-    // end string 
-    *out = 0; 
+    printf("%s to move\n", g->turn ? "Black" : "White"); 
 }
 
-void load_fen(game *g, const char *fen) 
-{
-    reset_game(g); 
-
-    // decrement once so simple incrementing while loop 
-    // starts at the first character
-    fen--; 
-
-    int mode = 0, turn = 0; 
-    square sq = A1; 
-    while (*++fen) 
-    {
-        if (*fen == ' ') 
-        {
-            mode++; 
-            sq = A1; 
-            continue; 
-        }
-        switch (mode) 
-        {
-            case 0: // board setup 
-                switch (*fen) 
-                {
-                    case 'P': 
-                        g->pieces[PC_WP] = set_bit(g->pieces[PC_WP], rrank(sq++)); 
-                        break; 
-                    case 'p': 
-                        g->pieces[PC_BP] = set_bit(g->pieces[PC_BP], rrank(sq++)); 
-                        break; 
-                    case 'N': 
-                        g->pieces[PC_WN] = set_bit(g->pieces[PC_WN], rrank(sq++)); 
-                        break; 
-                    case 'n': 
-                        g->pieces[PC_BN] = set_bit(g->pieces[PC_BN], rrank(sq++)); 
-                        break; 
-                    case 'B': 
-                        g->pieces[PC_WB] = set_bit(g->pieces[PC_WB], rrank(sq++)); 
-                        break; 
-                    case 'b': 
-                        g->pieces[PC_BB] = set_bit(g->pieces[PC_BB], rrank(sq++)); 
-                        break; 
-                    case 'R': 
-                        g->pieces[PC_WR] = set_bit(g->pieces[PC_WR], rrank(sq++)); 
-                        break; 
-                    case 'r': 
-                        g->pieces[PC_BR] = set_bit(g->pieces[PC_BR], rrank(sq++)); 
-                        break; 
-                    case 'Q': 
-                        g->pieces[PC_WQ] = set_bit(g->pieces[PC_WQ], rrank(sq++)); 
-                        break; 
-                    case 'q': 
-                        g->pieces[PC_BQ] = set_bit(g->pieces[PC_BQ], rrank(sq++)); 
-                        break; 
-                    case 'K': 
-                        g->pieces[PC_WK] = set_bit(g->pieces[PC_WK], rrank(sq++)); 
-                        break; 
-                    case 'k': 
-                        g->pieces[PC_BK] = set_bit(g->pieces[PC_BK], rrank(sq++)); 
-                        break; 
-                    case '8': 
-                    case '7': 
-                    case '6': 
-                    case '5': 
-                    case '4': 
-                    case '3': 
-                    case '2': 
-                    case '1': 
-                        sq += *fen - '0'; 
-                        break; 
-                    case '/': 
-                        break; 
-                    default: 
-                        printf("Unknown FEN character (board setup): %c\n", *fen); 
-                        break; 
-                }
-                break; 
-            case 1: // color to play 
-                switch (*fen) 
-                {
-                    case 'w': 
-                        g->ply = 0; 
-                        g->turn = COL_W; 
-                        break; 
-                    case 'b': 
-                        g->ply = 1; 
-                        g->turn = COL_B; 
-                        break; 
-                    default: 
-                        printf("Unknown FEN character (active color): %c\n", *fen); 
-                        break; 
-                }
-                break; 
-            case 2: // castling rights
-                switch (*fen) 
-                {
-                    case 'K': 
-                        g->castle |= CASTLE_WK; 
-                        break; 
-                    case 'k': 
-                        g->castle |= CASTLE_BK; 
-                        break; 
-                    case 'Q': 
-                        g->castle |= CASTLE_WQ; 
-                        break; 
-                    case 'q': 
-                        g->castle |= CASTLE_BQ; 
-                        break; 
-                    case '-': 
-                        break; 
-                    default: 
-                        printf("Unknown FEN character (castling availability): %c\n", *fen); 
-                        break; 
-                }
-                break; 
-            case 3: // en passant 
-                switch (*fen) 
-                {
-                    case 'a': 
-                    case 'b': 
-                    case 'c': 
-                    case 'd': 
-                    case 'e': 
-                    case 'f': 
-                    case 'g': 
-                    case 'h': 
-                        sq = make_sq(*fen - 'a', get_rank(sq)); 
-                        g->ep = sq; 
-                        break; 
-                    case '1': 
-                    case '2': 
-                    case '3': 
-                    case '4': 
-                    case '5': 
-                    case '6': 
-                    case '7': 
-                    case '8': 
-                        sq = make_sq(get_file(sq), *fen - '1'); 
-                        g->ep = sq; 
-                        break; 
-                    case '-': 
-                        sq = NO_SQ; 
-                        g->ep = sq; 
-                        break; 
-                    default: 
-                        printf("Unknown FEN character (en passant): %c\n", *fen); 
-                        sq = NO_SQ; 
-                        g->ep = sq; 
-                        break; 
-                }
-                break; 
-            case 4: // halfmove
-                switch (*fen) 
-                {
-                    case '0': 
-                    case '1': 
-                    case '2': 
-                    case '3': 
-                    case '4': 
-                    case '5': 
-                    case '6': 
-                    case '7': 
-                    case '8': 
-                    case '9': 
-                        g->halfmove = g->halfmove * 10 + (*fen - '0'); 
-                        break; 
-                    default: 
-                        printf("Unknown FEN character (halfmove): %c\n", *fen); 
-                        sq = NO_SQ; 
-                        g->ep = sq; 
-                        break; 
-                }
-                break; 
-            case 5: // turn
-                switch (*fen) 
-                {
-                    case '0': 
-                    case '1': 
-                    case '2': 
-                    case '3': 
-                    case '4': 
-                    case '5': 
-                    case '6': 
-                    case '7': 
-                    case '8': 
-                    case '9': 
-                        turn = turn * 10 + (*fen - '0'); 
-                        break; 
-                    default: 
-                        printf("Unknown FEN character (turn): %c\n", *fen); 
-                        sq = NO_SQ; 
-                        g->ep = sq; 
-                        break; 
-                }
-                break; 
-        }
-    }
-    if (mode >= 5) g->ply += turn * 2 - 2; 
-
-    for (piece p = PC_P; p <= PC_K; p++) 
-    {
-        g->colors[COL_W] |= g->pieces[make_pc(p, COL_W)]; 
-        g->colors[COL_B] |= g->pieces[make_pc(p, COL_B)]; 
-    }
-
-    // initial zobrist hashing 
-
-    for (square sq = A1; sq <= H8; sq++) 
-    {
-        for (piece pc = 0; pc < PC_CNT; pc++) 
-        {
-            if (get_bit(g->pieces[pc], sq)) 
-            {
-                g->hash ^= sq_pc_zb(sq, pc); 
-            }
-        }
-    }
-
-    g->hash ^= castle_zb(g->castle); 
-    g->hash ^= ep_zb(g->ep); 
-    g->hash ^= (g->turn == COL_B) * col_zb(); 
-
-    // white to play, check if black in check 
-    g->check = g->pieces[make_pc(PC_K, opp_col(g->turn))]; 
-
-    g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
-}
-
-bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, bboard add) 
-{
-    color col = for_color; 
-    color opp = opp_col(col); 
-
-    // check if any of these squares are attacked 
-    bboard target = check_king; 
-
-    // blockers include both colors' pieces other than the target squares 
-    bboard occupants = (((g->colors[col] & ~target) | g->colors[opp]) & ~ignore) | add; 
-
-    bboard attacks = NO_BITS; 
-    bboard tmp; 
-
-    FOR_EACH_BIT(target, 
-    {
-        // pawn 
-        if (col == COL_W) 
-        {
-            // check for black pawns north of the king 
-            tmp  = shift_nw(target); 
-            tmp |= shift_ne(target); 
-            attacks |= tmp & ((g->pieces[PC_BP] & ~ignore)); 
-        }
-        else 
-        {
-            // check for white pawns south of the king 
-            tmp  = shift_sw(target); 
-            tmp |= shift_se(target); 
-            attacks |= tmp & ((g->pieces[PC_WP] & ~ignore)); 
-        }
-
-        // knight 
-        tmp = MOVES_N[sq]; 
-        attacks |= tmp & g->pieces[make_pc(PC_N, opp)]; 
-
-        // bishop (and queen)
-        tmp  = cast_ray(sq, SLIDE_DIAG[get_diag(sq)], occupants); 
-        tmp |= cast_ray(sq, SLIDE_ANTI[get_anti(sq)], occupants); 
-        attacks |= tmp & (g->pieces[make_pc(PC_B, opp)] | g->pieces[make_pc(PC_Q, opp)]); 
-
-        // rook (and queen)
-        tmp  = cast_ray(sq, SLIDE_FILE[get_file(sq)], occupants); 
-        tmp |= cast_ray(sq, SLIDE_RANK[get_rank(sq)], occupants); 
-        attacks |= tmp & (g->pieces[make_pc(PC_R, opp)] | g->pieces[make_pc(PC_Q, opp)]); 
-
-        // king 
-        tmp = MOVES_K[sq]; 
-        attacks |= tmp & g->pieces[make_pc(PC_K, opp)]; 
-
-        if (attacks) return true; 
-    });
-
-    return false; 
-}
-
-// does not check if the move is legal 
-void push_move(game *g, move m) 
+void push_move(game *g, move mv) 
 {
     g->nodes++; 
-    
-    // save current state 
-    push_vec(&g->hist, g); 
+
+    move_hist *hist = g->hist + g->depth++; 
+    hist->halfmove = g->halfmove; 
+    hist->ep = g->ep; 
+    hist->castle = g->castle; 
+    hist->in_check = g->in_check; 
+    hist->hash = g->hash; 
+
+    color col = g->turn; 
+    color opp = opp_col(col); 
 
     g->hash ^= col_zb(); 
-
-    square from = from_sq(m); 
-    square to = to_sq(m); 
-    square rm_tgt = to; // remove opponent's piece on this square (can be different from `to` if en passant)
-    square new_ep = ep_sq(m); 
-
-    piece pc = from_pc(m); 
-    piece pro = pro_pc(m); 
-    piece tgt; 
-
-    // note: tgt will be WP if rm_tgt is empty 
-    if (g->turn == COL_W) 
-    {
-        rm_tgt -= 8 * takes_ep(m); // target piece is south (behind the capturing pawn) if ep
-        tgt = b_pc_at(g, rm_tgt); 
-    }
-    else // B
-    {
-        rm_tgt += 8 * takes_ep(m); // target piece is north (behind the capturing pawn) if ep
-        tgt = w_pc_at(g, rm_tgt); 
-    }
-
-    // take moving piece off the board 
-    g->hash ^= sq_pc_zb(from, pc); 
-    g->pieces[pc] = clear_bits(g->pieces[pc], from); 
-
-    // WP if rm_tgt is empty, but this is okay because if pc is WP it will re-enable this square right after 
-    int capture = get_bit(g->pieces[tgt], rm_tgt); 
-    g->hash ^= capture * sq_pc_zb(rm_tgt, tgt); 
-    g->pieces[tgt] = clear_bits(g->pieces[tgt], rm_tgt); 
-
-    // place piece onto new square 
-    g->hash ^= sq_pc_zb(to, pro); 
-    g->pieces[pro] = set_bit(g->pieces[pro], to); 
-
-    color cur_col = g->turn, oth_col = opp_col(cur_col); 
-
-    // remove rooks from aggregate (in case of castling) 
-    g->colors[COL_W] ^= g->pieces[PC_WR]; 
-    g->colors[COL_B] ^= g->pieces[PC_BR]; 
-
-    int castle = castle_idx(m); 
-    g->check = g->pieces[make_pc(PC_K, cur_col)] | CASTLE_TARGETS[castle]; 
-
-    // move the rooks when castling 
-    g->pieces[PC_WR] = (g->pieces[PC_WR] & CASTLE_KEEP_WR[castle]) | CASTLE_ADD_WR[castle]; 
-    g->pieces[PC_BR] = (g->pieces[PC_BR] & CASTLE_KEEP_BR[castle]) | CASTLE_ADD_BR[castle]; 
-
-    castle_flags prev_cf = g->castle; 
-    castle_flags rem_cf = CASTLE_NONE; 
-    // no castling if the king moves
-    rem_cf |= CASTLE_W  * (pc == PC_WK); 
-    rem_cf |= CASTLE_B  * (pc == PC_BK); 
-    // no castling if the rook moves or is captured
-    rem_cf |= CASTLE_WK * ((from == H1) | (to == H1)); 
-    rem_cf |= CASTLE_WQ * ((from == A1) | (to == A1)); 
-    rem_cf |= CASTLE_BK * ((from == H8) | (to == H8)); 
-    rem_cf |= CASTLE_BQ * ((from == A8) | (to == A8)); 
-
-    // remove castling rights if necessary 
-    g->castle &= ~rem_cf; 
-    g->hash ^= castle_zb(g->castle ^ prev_cf); 
-    g->hash ^= (castle == MOVE_CASTLE_WK) * (sq_pc_zb(H1, PC_WR) ^ sq_pc_zb(F1, PC_WR)); 
-    g->hash ^= (castle == MOVE_CASTLE_WQ) * (sq_pc_zb(A1, PC_WR) ^ sq_pc_zb(D1, PC_WR)); 
-    g->hash ^= (castle == MOVE_CASTLE_BK) * (sq_pc_zb(H8, PC_BR) ^ sq_pc_zb(F8, PC_BR)); 
-    g->hash ^= (castle == MOVE_CASTLE_BQ) * (sq_pc_zb(A8, PC_BR) ^ sq_pc_zb(D8, PC_BR)); 
-
-    // re-add rooks from aggregate (in case of castling) 
-    g->colors[COL_W] ^= g->pieces[PC_WR]; 
-    g->colors[COL_B] ^= g->pieces[PC_BR]; 
-
-    // update aggregate piece tracking 
-    g->colors[cur_col] = clear_bits(g->colors[cur_col], from); 
-    g->colors[oth_col] = clear_bits(g->colors[oth_col], rm_tgt); 
-    g->colors[cur_col] = set_bit(g->colors[cur_col], to); 
-
-    // update rest of state 
-    g->hash ^= ep_zb(g->ep); 
-    g->ep = new_ep; 
     g->hash ^= ep_zb(g->ep); 
 
-    g->ply++; 
-    g->turn = opp_col(g->turn); 
+    piece pc = from_pc(mv); 
+    piece pro = pro_pc(mv); 
+    piece tgt = tgt_pc(mv); 
 
-    if (capture | (get_no_col(pc) == PC_P)) 
+    square src = from_sq(mv); 
+    square dst = to_sq(mv); 
+
+    bool ep = is_ep(mv); 
+    int cas_idx = castle_idx(mv); 
+
+    bboard src_pos = make_pos(src); 
+    bboard dst_pos = make_pos(dst); 
+
+    if (is_capture(mv) || get_no_col(pc) == PC_P) 
     {
         g->halfmove = 0; 
     }
@@ -688,587 +139,283 @@ void push_move(game *g, move m)
         g->halfmove++; 
     }
 
-    // useful to know if the new player is in check 
-    g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
+    if (ep) // en passant 
+    {
+        square rm = g->ep - 8 * col_sign(g->turn); 
+        bboard rm_pos = make_pos(rm); 
+
+        g->colors[col] ^= src_pos ^ dst_pos; 
+        g->colors[opp] ^= rm_pos; 
+
+        g->hash ^= sq_pc_zb(src, pc); 
+        g->hash ^= sq_pc_zb(dst, pc); 
+        g->hash ^= sq_pc_zb(rm, tgt); 
+
+        g->pieces[pc] ^= src_pos ^ dst_pos; 
+        g->pieces[tgt] ^= rm_pos; 
+        
+        clear_mbox(&g->mailbox, src); 
+        clear_mbox(&g->mailbox, rm); 
+        set_mbox(&g->mailbox, dst, pc); 
+
+        g->ep = NO_SQ; 
+    }
+    else if (cas_idx) // castling 
+    {
+        // printf("TODO push_move castle\n"); 
+
+        g->colors[col] ^= MOVE_CASTLE_BB_ALL[cas_idx]; 
+
+        g->hash ^= sq_pc_zb(MOVE_CASTLE_SQ_K[cas_idx][0], MOVE_CASTLE_PC_K[cas_idx]); 
+        g->hash ^= sq_pc_zb(MOVE_CASTLE_SQ_K[cas_idx][1], MOVE_CASTLE_PC_K[cas_idx]); 
+        g->hash ^= sq_pc_zb(MOVE_CASTLE_SQ_R[cas_idx][0], MOVE_CASTLE_PC_R[cas_idx]); 
+        g->hash ^= sq_pc_zb(MOVE_CASTLE_SQ_R[cas_idx][1], MOVE_CASTLE_PC_R[cas_idx]); 
+
+        g->pieces[pc] ^= MOVE_CASTLE_BB_K[cas_idx]; 
+        g->pieces[make_pc(PC_R, col)] ^= MOVE_CASTLE_BB_R[cas_idx]; 
+
+        clear_mbox(&g->mailbox, MOVE_CASTLE_SQ_K[cas_idx][0]); 
+        clear_mbox(&g->mailbox, MOVE_CASTLE_SQ_R[cas_idx][0]); 
+        set_mbox(&g->mailbox, MOVE_CASTLE_SQ_K[cas_idx][1], pc); 
+        set_mbox(&g->mailbox, MOVE_CASTLE_SQ_R[cas_idx][1], make_pc(PC_R, col)); 
+
+        g->ep = NO_SQ; 
+    }
+    else if (pc != pro) // promotion
+    {
+        // printf("TODO push_move promotion\n"); 
+
+        g->colors[col] ^= src_pos ^ dst_pos; 
+        g->colors[opp] ^= (tgt != NO_PC) * dst_pos; 
+
+        g->hash ^= sq_pc_zb(src, pc); 
+        g->hash ^= sq_pc_zb(dst, pro); 
+        g->hash ^= (tgt != NO_PC) * sq_pc_zb(dst, tgt); 
+
+        g->pieces[pc] ^= src_pos; 
+        g->pieces[pro] ^= dst_pos; 
+        g->pieces[tgt] ^= dst_pos; 
+        
+        clear_mbox(&g->mailbox, src); 
+        set_mbox(&g->mailbox, dst, pro); 
+
+        g->ep = NO_SQ; 
+    }
+    else // standard move 
+    {
+        g->colors[col] ^= src_pos ^ dst_pos; 
+        g->colors[opp] ^= (tgt != NO_PC) * dst_pos; 
+
+        g->hash ^= sq_pc_zb(src, pc); 
+        g->hash ^= sq_pc_zb(dst, pc); 
+        g->hash ^= (tgt != NO_PC) * sq_pc_zb(dst, tgt); 
+
+        g->pieces[pc] ^= src_pos ^ dst_pos; 
+        g->pieces[tgt] ^= dst_pos; 
+        
+        clear_mbox(&g->mailbox, src); 
+        set_mbox(&g->mailbox, dst, pc); 
+
+        if (get_no_col(pc) == PC_P && abs(src - dst) == 16) 
+        {
+            g->ep = col_sign(g->turn) * 8 + src; 
+        }
+        else 
+        {
+            g->ep = NO_SQ; 
+        }
+    }
+
+    g->castle &= ~(MOVE_CASTLE_RM[src] | MOVE_CASTLE_RM[dst]); 
+    g->all = g->colors[COL_W] | g->colors[COL_B]; 
+
+    g->hash ^= ep_zb(g->ep); 
+    g->hash ^= castle_zb(g->castle ^ hist->castle); 
+
+    // for next movement: 
+    //   can move to any square without own pieces 
+    g->movement = ~g->colors[opp]; 
+
+#ifdef CHECK_IN_CHECK
+    g->in_check = is_attacked(g, lsb(g->pieces[make_pc(PC_K, opp)]), opp); 
+#endif
+    
+    g->ply++; 
+    g->turn = opp; 
+
+#ifdef CHECK_IN_CHECK
+    if (is_check(mv) ^ g->in_check) 
+    {
+        printf("\n\n\nMove "); 
+        print_move_end(mv, ""); 
+        printf(" claims check=%d, but board is really check=%d\n", is_check(mv), g->in_check); 
+        print_game(g); 
+        exit(1); 
+    }
+#endif
+
+    g->in_check = is_check(mv); 
 }
 
-void pop_move(game *g) 
+void pop_move(game *g, move mv) 
 {
-    get_vec(&g->hist, g->hist.size - 1, g); 
-    pop_vec(&g->hist); 
+    color opp = g->turn; 
+    color col = opp_col(opp); 
+
     g->ply--; 
-    g->turn = opp_col(g->turn); 
+    g->turn = col; 
+
+    move_hist *hist = g->hist + --g->depth; 
+    g->halfmove = hist->halfmove; 
+    g->ep = hist->ep; 
+    g->castle = hist->castle; 
+    g->in_check = hist->in_check; 
+    g->hash = hist->hash; 
+
+    piece pc = from_pc(mv); 
+    piece pro = pro_pc(mv); 
+    piece tgt = tgt_pc(mv); 
+
+    square src = from_sq(mv); 
+    square dst = to_sq(mv); 
+
+    bool ep = is_ep(mv); 
+    int cas_idx = castle_idx(mv); 
+
+    bboard src_pos = make_pos(src); 
+    bboard dst_pos = make_pos(dst); 
+
+    if (ep) 
+    {
+        bboard rm_pos = make_pos(g->ep - 8 * col_sign(g->turn)); 
+
+        g->colors[col] ^= src_pos ^ dst_pos; 
+        g->colors[opp] ^= rm_pos; 
+
+        g->pieces[pc] ^= src_pos ^ dst_pos; 
+        g->pieces[tgt] ^= rm_pos; 
+        
+        set_mbox(&g->mailbox, src, pc); 
+        set_mbox(&g->mailbox, g->ep - 8 * col_sign(g->turn), tgt); 
+        clear_mbox(&g->mailbox, dst); 
+    }
+    else if (cas_idx) 
+    {
+        // printf("TODO pop_move castle\n"); 
+
+        g->colors[col] ^= MOVE_CASTLE_BB_ALL[cas_idx]; 
+
+        g->pieces[pc] ^= MOVE_CASTLE_BB_K[cas_idx]; 
+        g->pieces[make_pc(PC_R, col)] ^= MOVE_CASTLE_BB_R[cas_idx]; 
+
+        clear_mbox(&g->mailbox, MOVE_CASTLE_SQ_K[cas_idx][1]); 
+        clear_mbox(&g->mailbox, MOVE_CASTLE_SQ_R[cas_idx][1]); 
+        set_mbox(&g->mailbox, MOVE_CASTLE_SQ_K[cas_idx][0], pc); 
+        set_mbox(&g->mailbox, MOVE_CASTLE_SQ_R[cas_idx][0], make_pc(PC_R, col)); 
+
+        g->ep = NO_SQ; 
+    }
+    else if (pc != pro) 
+    {
+        g->colors[col] ^= src_pos ^ dst_pos; 
+        g->colors[opp] ^= (tgt != NO_PC) * dst_pos; 
+
+        g->pieces[pc] ^= src_pos; 
+        g->pieces[pro] ^= dst_pos; 
+        g->pieces[tgt] ^= dst_pos; 
+        
+        set_mbox(&g->mailbox, src, pc); 
+        set_mbox(&g->mailbox, dst, tgt); 
+    }
+    else 
+    {
+        g->colors[col] ^= src_pos ^ dst_pos; 
+        g->colors[opp] ^= (tgt != NO_PC) * dst_pos; 
+
+        g->pieces[pc] ^= src_pos ^ dst_pos; 
+        g->pieces[tgt] ^= dst_pos; 
+        
+        set_mbox(&g->mailbox, src, pc); 
+        set_mbox(&g->mailbox, dst, tgt); 
+    }
+
+    g->all = g->colors[COL_W] | g->colors[COL_B]; 
+    g->movement = ~g->colors[col]; 
 }
 
 void push_null_move(game *g) 
 {
     g->nodes++; 
+
+    move_hist *hist = g->hist + g->depth++; 
+    hist->halfmove = g->halfmove; 
+    hist->ep = g->ep; 
+    hist->castle = g->castle; 
+    hist->in_check = g->in_check; 
+
     g->hash ^= col_zb(); 
 
-    push_vec(&g->hist, g); 
+    color col = g->turn; 
+    color opp = opp_col(col); 
 
-    color cur_col = g->turn; 
-
-    g->check = g->pieces[make_pc(PC_K, cur_col)]; 
-    g->ply++; 
-    g->turn = opp_col(cur_col); 
-
-    g->hash ^= ep_zb(g->ep); 
     g->ep = NO_SQ; 
-    g->hash ^= ep_zb(g->ep); 
-    
-    // see if next player is in check 
-    g->in_check = in_check(g, g->turn, g->pieces[make_pc(PC_K, g->turn)], NO_BITS, NO_BITS); 
+
+    // for next movement: 
+    //   can move to any square without own pieces 
+    g->movement = ~g->colors[opp]; 
+
+    g->ply++; 
+    g->turn = opp; 
+
+    g->in_check = is_attacked(g, lsb(g->pieces[make_pc(PC_K, opp)]), opp); 
 }
 
 void pop_null_move(game *g) 
 {
-    pop_move(g); 
-}
+    color opp = g->turn; 
+    color col = opp_col(opp); 
 
-static inline void gen_push(bboard b, square from, piece pc, vector *out) 
-{
-    FOR_EACH_BIT(b, 
-    {
-        PUSH_VEC(out, move, make_move(from, sq, pc, pc)); 
-    });
-}
+    g->ply--; 
+    g->turn = col; 
 
-static inline void gen_push_safe(const game *g, bboard b, square from, piece pc, vector *out) 
-{
-    FOR_EACH_BIT(b, 
-    {
-        if (!in_check(g, g->turn, make_pos(sq), make_pos(from), NO_BITS)) 
-        {
-            PUSH_VEC(out, move, make_move(from, sq, pc, pc)); 
-        }
-    });
-}
+    g->hash ^= col_zb(); 
 
-static inline void gen_push_castle(square from, square to, piece pc, int castle_index, vector *out) 
-{
-    PUSH_VEC(out, move, make_move_castle(from, to, pc, castle_index)); 
-}
+    move_hist *hist = g->hist + --g->depth; 
+    g->halfmove = hist->halfmove; 
+    g->ep = hist->ep; 
+    g->castle = hist->castle; 
+    g->in_check = hist->in_check; 
 
-static inline void movegen_push_ep(bboard b, square from, piece pc, int d_sq, vector *out) 
-{
-    FOR_EACH_BIT(b, 
-    {
-        PUSH_VEC(out, move, make_move_allow_ep(from, sq, pc, sq + d_sq)); 
-    });
-}
-
-static inline void gen_push_pro(bboard b, square from, piece pc, color col, vector *out) 
-{
-    FOR_EACH_BIT(b, 
-    {
-        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_Q, col))); 
-        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_R, col))); 
-        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_B, col))); 
-        PUSH_VEC(out, move, make_move(from, sq, pc, make_pc(PC_N, col))); 
-    });
-}
-
-static inline void gen_push_take_ep(const game *g, bboard b, square from, piece pc, square ep, vector *out) 
-{
-    FOR_EACH_BIT(b, 
-    {
-        if (sq != ep) 
-        {
-            PUSH_VEC(out, move, make_move_ep(from, sq, pc, false)); 
-        }
-        else if (get_col(pc) == COL_W) 
-        {
-            if (!in_check(g, COL_W, g->pieces[PC_WK], make_pos(from) | make_pos(ep - 8), make_pos(ep))) 
-            {
-                PUSH_VEC(out, move, make_move_ep(from, sq, pc, true)); 
-            }
-        }
-        else // COL_B  
-        {
-            if (!in_check(g, COL_B, g->pieces[PC_BK], make_pos(from) | make_pos(ep + 8), make_pos(ep))) 
-            {
-                PUSH_VEC(out, move, make_move_ep(from, sq, pc, true)); 
-            }
-        }
-    });
-}
-
-static inline void gen_p(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
-{
-    bboard empty = ~(g->colors[COL_W] | g->colors[COL_B]); 
-    bboard ep = (g->ep != NO_SQ) * make_pos(g->ep); 
-    bboard cur_pos, attack, target_squares; 
-
-    if (col == COL_W) 
-    {
-        FOR_EACH_BIT(g->pieces[PC_WP], 
-        {
-            cur_pos = make_pos(sq); 
-
-            // move forward if square is empty 
-            attack = shift_n(cur_pos) & empty; 
-
-            // attack left if there is a piece or en passant
-            attack |= shift_nw(cur_pos) & (g->colors[COL_B] | ep); 
-
-            // attack right if there is a piece or en passant
-            attack |= shift_ne(cur_pos) & (g->colors[COL_B] | ep); 
-
-            target_squares = TARGET_SQUARES; 
-            attack &= target_squares; 
-
-            // move 2 squares if on starting square 
-            movegen_push_ep((get_rank(sq) == 1) * (shift_nn(cur_pos) & empty & shift_n(empty) & target_squares), sq, PC_WP, -8, out); 
-
-            // add non-promoting moves to list 
-            gen_push_take_ep(g, attack & NO_RANK_8, sq, PC_WP, g->ep, out); 
-
-            // add promoting moves to list 
-            gen_push_pro(attack & RANK_8, sq, PC_WP, COL_W, out); 
-        });
-    }
-    else 
-    {
-        FOR_EACH_BIT(g->pieces[PC_BP], 
-        {
-            cur_pos = make_pos(sq); 
-
-            // move forward if square is empty 
-            attack = shift_s(cur_pos) & empty; 
-
-            // attack left if there is a piece or en passant
-            attack |= shift_sw(cur_pos) & (g->colors[COL_W] | ep); 
-
-            // attack right if there is a piece or en passant
-            attack |= shift_se(cur_pos) & (g->colors[COL_W] | ep); 
-
-            target_squares = TARGET_SQUARES; 
-            attack &= target_squares; 
-
-            // move 2 squares if on starting square 
-            movegen_push_ep((get_rank(sq) == 6) * (shift_ss(cur_pos) & empty & shift_s(empty) & target_squares), sq, PC_BP, 8, out); 
-
-            // add non-promoting moves to list 
-            gen_push_take_ep(g, attack & NO_RANK_1, sq, PC_BP, g->ep, out); 
-
-            // add promoting moves to list 
-            gen_push_pro(attack & RANK_1, sq, PC_BP, COL_B, out); 
-        });
-    }
-}
-
-static inline void gen_rem_illegal(const game *state, size_t start, vector *out) 
-{
-    game *g = (game *) state; 
-    size_t i = start; 
-
-    while (i < out->size) 
-    {
-        push_move(g, AT_VEC(out, move, i)); 
-
-        if (in_check(g, opp_col(g->turn), g->check, NO_BITS, NO_BITS)) 
-        {
-            set_vec(out, i, at_vec(out, out->size - 1)); 
-            pop_vec(out); 
-        }
-        else 
-        {
-            i++; 
-        }
-
-        pop_move(g); 
-    }
-}
-
-static inline void gen_k(const game *g, color col, vector *out) 
-{
-    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
-    bboard not_cur_col = ~g->colors[col]; 
-    bboard attack; 
-
-    piece pc = make_pc(PC_K, col); 
-    FOR_EACH_BIT(g->pieces[pc], 
-    {
-        attack = MOVES_K[sq] & not_cur_col; 
-        gen_push_safe(g, attack, sq, pc, out); 
-
-        int c_wk = 0 != (opp_col(col) * ((g->castle & CASTLE_WK) != 0) * ((occupants & EMPTY_WK) == 0)); 
-        int c_wq = 0 != (opp_col(col) * ((g->castle & CASTLE_WQ) != 0) * ((occupants & EMPTY_WQ) == 0)); 
-        int c_bk = 0 != (col * ((g->castle & CASTLE_BK) != 0) * ((occupants & EMPTY_BK) == 0)); 
-        int c_bq = 0 != (col * ((g->castle & CASTLE_BQ) != 0) * ((occupants & EMPTY_BQ) == 0)); 
-
-        if (c_wk && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_WK], NO_BITS, NO_BITS)) 
-        {
-            gen_push_castle(E1, G1, PC_WK, MOVE_CASTLE_WK, out); 
-        }
-
-        if (c_wq && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_WQ], NO_BITS, NO_BITS)) 
-        {
-            gen_push_castle(E1, C1, PC_WK, MOVE_CASTLE_WQ, out); 
-        }
-
-        if (c_bk && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_BK], NO_BITS, NO_BITS)) 
-        {
-            gen_push_castle(E8, G8, PC_BK, MOVE_CASTLE_BK, out); 
-        }
-
-        if (c_bq && !in_check(g, col, g->pieces[pc] | CASTLE_TARGETS[MOVE_CASTLE_BQ], NO_BITS, NO_BITS)) 
-        {
-            gen_push_castle(E8, C8, PC_BK, MOVE_CASTLE_BQ, out); 
-        }
-    });
-}
-
-static inline void gen_n(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
-{
-    // empty squares 
-    bboard not_cur_col = ~g->colors[col]; 
-    bboard attack; 
-
-    piece pc = make_pc(PC_N, col); 
-    FOR_EACH_BIT(g->pieces[pc], 
-    {
-        attack = MOVES_N[sq] & not_cur_col; 
-        attack &= TARGET_SQUARES;  
-        gen_push(attack, sq, pc, out); 
-    });
-}
-
-static inline void gen_b(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
-{
-    bboard not_cur_col = ~g->colors[col]; 
-    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
-    bboard attack; 
-
-    piece pc = make_pc(PC_B, col); 
-    FOR_EACH_BIT(g->pieces[pc], 
-    {
-        attack  = cast_ray(sq, SLIDE_DIAG[get_diag(sq)], occupants); 
-        attack |= cast_ray(sq, SLIDE_ANTI[get_anti(sq)], occupants); 
-        attack &= not_cur_col; 
-        attack &= TARGET_SQUARES; 
-        gen_push(attack, sq, pc, out); 
-    })
-}
-
-static inline void gen_r(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
-{
-    bboard not_cur_col = ~g->colors[col]; 
-    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
-    bboard attack; 
-
-    piece pc = make_pc(PC_R, col); 
-    FOR_EACH_BIT(g->pieces[pc], 
-    {
-        attack  = cast_ray(sq, SLIDE_FILE[get_file(sq)], occupants); 
-        attack |= cast_ray(sq, SLIDE_RANK[get_rank(sq)], occupants); 
-        attack &= not_cur_col; 
-        attack &= TARGET_SQUARES; 
-
-        gen_push(attack, sq, pc, out); 
-    })
-}
-
-static inline void gen_q(const game *g, color col, bboard ok_squares, const bboard *dirs, uint16_t pinned, const uint8_t *pin_idx, vector *out) 
-{
-    bboard not_cur_col = ~g->colors[col]; 
-    bboard occupants = g->colors[COL_W] | g->colors[COL_B]; 
-    bboard attack; 
-
-    piece pc = make_pc(PC_Q, col); 
-    FOR_EACH_BIT(g->pieces[pc], 
-    {
-        attack  = cast_ray(sq, SLIDE_FILE[get_file(sq)], occupants); 
-        attack |= cast_ray(sq, SLIDE_RANK[get_rank(sq)], occupants); 
-        attack |= cast_ray(sq, SLIDE_DIAG[get_diag(sq)], occupants); 
-        attack |= cast_ray(sq, SLIDE_ANTI[get_anti(sq)], occupants); 
-        attack &= not_cur_col; 
-        attack &= TARGET_SQUARES; 
-        gen_push(attack, sq, pc, out); 
-    })
-}
-
-void gen_moves(const game *g, vector *out) 
-{
-    color col = g->turn; 
-    color opp = opp_col(col); 
-
-    bboard target = g->pieces[make_pc(PC_K, col)]; 
-    bboard col_occ = g->colors[col]; 
-    bboard opp_occ = g->colors[opp]; 
-    bboard opp_rocc = rev(opp_occ); 
-
-    bboard opp_card = g->pieces[make_pc(PC_R, opp)] | g->pieces[make_pc(PC_Q, opp)]; 
-    bboard opp_diag = g->pieces[make_pc(PC_B, opp)] | g->pieces[make_pc(PC_Q, opp)]; 
-
-    square sq = lsb(target), rsq = 63 - sq; 
-
-    bboard dirs[CHECK_CNT]; 
-    uint8_t blocking[CHECK_DIR_CNT]; 
-
-    uint16_t attacked = 0; 
-    uint16_t pinned = 0; 
-
-    // diagonal movement to occupied square (ignoring current color pieces and including non-relevant enemy pieces)
-    dirs[CHECK_DIR_NW] = cast_pos_ray(sq, SLIDE_ANTI[get_anti(sq)], opp_occ); 
-    dirs[CHECK_DIR_SE] = rev(cast_pos_ray(rsq, SLIDE_ANTI[get_anti(rsq)], opp_rocc)); 
-    dirs[CHECK_DIR_NE] = cast_pos_ray(sq, SLIDE_DIAG[get_diag(sq)], opp_occ); 
-    dirs[CHECK_DIR_SW] = rev(cast_pos_ray(rsq, SLIDE_DIAG[get_diag(rsq)], opp_rocc)); 
-
-    // cardinal movement to occupied square (ignoring current color pieces and including non-relevant enemy pieces)
-    dirs[CHECK_DIR_N] = cast_pos_ray(sq, SLIDE_FILE[get_file(sq)], opp_occ); 
-    dirs[CHECK_DIR_S] = rev(cast_pos_ray(rsq, SLIDE_FILE[get_file(rsq)], opp_rocc)); 
-    dirs[CHECK_DIR_E] = cast_pos_ray(sq, SLIDE_RANK[get_rank(sq)], opp_occ); 
-    dirs[CHECK_DIR_W] = rev(cast_pos_ray(rsq, SLIDE_RANK[get_rank(rsq)], opp_rocc)); 
-
-    // knight 
-    dirs[CHECK_PC_N] = MOVES_N[sq] & g->pieces[make_pc(PC_N, opp)]; 
-
-    // pawn 
-    if (col == COL_W) 
-    {
-        dirs[CHECK_PC_P]  = shift_nw(target); 
-        dirs[CHECK_PC_P] |= shift_ne(target); 
-    }
-    else 
-    {
-        dirs[CHECK_PC_P]  = shift_sw(target); 
-        dirs[CHECK_PC_P] |= shift_se(target); 
-    }
-    dirs[CHECK_PC_P] &= g->pieces[make_pc(PC_P, opp)]; 
-
-    // determine number of blockers (assuming that the direction has an attacker) 
-    blocking[CHECK_DIR_N] = popcnt(dirs[CHECK_DIR_N] & col_occ); 
-    blocking[CHECK_DIR_S] = popcnt(dirs[CHECK_DIR_S] & col_occ); 
-    blocking[CHECK_DIR_E] = popcnt(dirs[CHECK_DIR_E] & col_occ); 
-    blocking[CHECK_DIR_W] = popcnt(dirs[CHECK_DIR_W] & col_occ); 
-    blocking[CHECK_DIR_NE] = popcnt(dirs[CHECK_DIR_NE] & col_occ); 
-    blocking[CHECK_DIR_NW] = popcnt(dirs[CHECK_DIR_NW] & col_occ); 
-    blocking[CHECK_DIR_SE] = popcnt(dirs[CHECK_DIR_SE] & col_occ); 
-    blocking[CHECK_DIR_SW] = popcnt(dirs[CHECK_DIR_SW] & col_occ); 
-
-    // first figure out which directions have an attacker (ignore current color pinned pieces)
-
-    // directions might hit a non-attacking opponent piece, or even no piece at all
-    attacked |= (((dirs[CHECK_DIR_N] & opp_card) != 0) & (blocking[CHECK_DIR_N] <= 1)) << CHECK_DIR_N; 
-    attacked |= (((dirs[CHECK_DIR_S] & opp_card) != 0) & (blocking[CHECK_DIR_S] <= 1)) << CHECK_DIR_S; 
-    attacked |= (((dirs[CHECK_DIR_E] & opp_card) != 0) & (blocking[CHECK_DIR_E] <= 1)) << CHECK_DIR_E; 
-    attacked |= (((dirs[CHECK_DIR_W] & opp_card) != 0) & (blocking[CHECK_DIR_W] <= 1)) << CHECK_DIR_W; 
-    attacked |= (((dirs[CHECK_DIR_NE] & opp_diag) != 0) & (blocking[CHECK_DIR_NE] <= 1)) << CHECK_DIR_NE; 
-    attacked |= (((dirs[CHECK_DIR_NW] & opp_diag) != 0) & (blocking[CHECK_DIR_NW] <= 1)) << CHECK_DIR_NW; 
-    attacked |= (((dirs[CHECK_DIR_SE] & opp_diag) != 0) & (blocking[CHECK_DIR_SE] <= 1)) << CHECK_DIR_SE; 
-    attacked |= (((dirs[CHECK_DIR_SW] & opp_diag) != 0) & (blocking[CHECK_DIR_SW] <= 1)) << CHECK_DIR_SW;
-    // there are already checked against correct opponent pieces and cannot be blocked 
-    attacked |= (dirs[CHECK_PC_N] != 0) << CHECK_PC_N; 
-    attacked |= (dirs[CHECK_PC_P] != 0) << CHECK_PC_P; 
-
-    // determine pins 
-
-    // these need to have an attacker, and exactly one friendly piece in the way 
-    pinned |= ((attacked >> CHECK_DIR_N) & (blocking[CHECK_DIR_N] == 1)) << CHECK_DIR_N; 
-    pinned |= ((attacked >> CHECK_DIR_S) & (blocking[CHECK_DIR_S] == 1)) << CHECK_DIR_S; 
-    pinned |= ((attacked >> CHECK_DIR_E) & (blocking[CHECK_DIR_E] == 1)) << CHECK_DIR_E; 
-    pinned |= ((attacked >> CHECK_DIR_W) & (blocking[CHECK_DIR_W] == 1)) << CHECK_DIR_W; 
-    pinned |= ((attacked >> CHECK_DIR_NE) & (blocking[CHECK_DIR_NE] == 1)) << CHECK_DIR_NE; 
-    pinned |= ((attacked >> CHECK_DIR_NW) & (blocking[CHECK_DIR_NW] == 1)) << CHECK_DIR_NW; 
-    pinned |= ((attacked >> CHECK_DIR_SE) & (blocking[CHECK_DIR_SE] == 1)) << CHECK_DIR_SE; 
-    pinned |= ((attacked >> CHECK_DIR_SW) & (blocking[CHECK_DIR_SW] == 1)) << CHECK_DIR_SW; 
-
-    attacked &= ~pinned; 
-
-    int n_checks = popcnt_16(attacked); 
-
-    if (n_checks == 0) 
-    {
-        // all moves 
-        gen_p(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
-        gen_n(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
-        gen_b(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
-        gen_r(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
-        gen_q(g, col, ALL_BITS, dirs, pinned, PIN_IDX[sq], out); 
-        gen_k(g, col, out); 
-    }
-    else if (n_checks == 1) 
-    {
-        // all moves, but must remove check 
-
-        // for sliding attacking piece: 
-        //   all squares that block or capture the piece
-        // knight or pawn: 
-        //   only allows capturing the piece (as it cannot be blocked)
-        bboard target_squares = dirs[lsb(attacked)]; 
-
-        gen_p(g, col, target_squares | ((g->ep != NO_SQ) * make_pos(g->ep)), dirs, pinned, PIN_IDX[sq], out); 
-        gen_n(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
-        gen_b(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
-        gen_r(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
-        gen_q(g, col, target_squares, dirs, pinned, PIN_IDX[sq], out); 
-        gen_k(g, col, out); 
-    }
-    else // double check: must move the king 
-    {
-        // move king 
-        gen_k(g, col, out); 
-    }
-}
-
-static inline void eval_w_pc_sq(const game *g, piece pc, int *mg, int *eg) 
-{
-    bboard pcs = rrow(g->pieces[pc]); 
-    FOR_EACH_BIT(pcs, 
-    {
-        *mg += PC_SQ[0][pc][sq]; 
-        *eg += PC_SQ[1][pc][sq]; 
-    });
-}
-
-static inline void eval_b_pc_sq(const game *g, piece pc, int *mg, int *eg) 
-{
-    bboard pcs = g->pieces[make_pc(pc, COL_B)]; 
-    FOR_EACH_BIT(pcs, 
-    {
-        *mg -= PC_SQ[0][pc][sq]; 
-        *eg -= PC_SQ[1][pc][sq]; 
-    });
+    g->all = g->colors[COL_W] | g->colors[COL_B]; 
+    g->movement = ~g->colors[col]; 
 }
 
 bool is_special_draw(const game *g) 
 {
-    // check for repitition 
-    for (size_t i = 1; i <= 8; i += 2)
-    {
-        if (i >= g->hist.size) break; 
+    // 50-move rule 
+    if (g->halfmove > 99) return true; 
 
-        zobrist hash = ((const game *) at_vec_const(&g->hist, g->hist.size - i - 1))->hash; 
-        if (g->hash == hash || (g->hash ^ col_zb()) == hash) 
+    for (int i = 0; i < DRAW_DEPTH; i++) 
+    {
+        // (g->depth-1) is previous ply (opponent made the move)
+        // so our first depth to check should be (g->depth-2)
+        int depth = (g->depth-2) - i*2; 
+
+        if (depth >= 0) 
         {
-            return true; 
+            if (g->hash == g->hist[depth].hash) return true; 
+            if ((g->hash ^ col_zb()) == g->hist[depth].hash) return true; 
+        }
+        else 
+        {
+            break; 
         }
     }
 
     return false; 
 }
 
-int evaluate(const game *g, int n_moves, bool draw) 
-{
-    if (draw) return 0; 
-
-    if (n_moves == 0) 
-    {
-        if (g->in_check) 
-        {
-            // lower value the farther out the mate is (prioritize faster mates)
-            return (100000 - g->ply) * (-1 + 2 * g->turn); 
-        }
-        else 
-        {
-            // stalemate
-            return 0; 
-        }
-    }
-
-    int wp = popcnt(g->pieces[PC_WP]); 
-    int bp = popcnt(g->pieces[PC_BP]); 
-    int wn = popcnt(g->pieces[PC_WN]); 
-    int bn = popcnt(g->pieces[PC_BN]); 
-    int wb = popcnt(g->pieces[PC_WB]); 
-    int bb = popcnt(g->pieces[PC_BB]); 
-    int wr = popcnt(g->pieces[PC_WR]); 
-    int br = popcnt(g->pieces[PC_BR]); 
-    int wq = popcnt(g->pieces[PC_WQ]); 
-    int bq = popcnt(g->pieces[PC_BQ]); 
-    int wk = popcnt(g->pieces[PC_WK]); 
-    int bk = popcnt(g->pieces[PC_BK]); 
-
-    int eval = 0; 
-    int mg = 0; 
-    int eg = 0; 
-
-    eval += 100 * (wp - bp); 
-    eval += 310 * (wn - bn); 
-    eval += 320 * (wb - bb); 
-    eval += 500 * (wr - br); 
-    eval += 975 * (wq - bq); 
-    eval += 10000 * (wk - bk); 
-
-    // bishop pair 
-    eval += 15 * ((wb >= 2) - (bb >= 2)); 
-
-    eval_w_pc_sq(g, PC_P, &mg, &eg); 
-    eval_b_pc_sq(g, PC_P, &mg, &eg); 
-    eval_w_pc_sq(g, PC_N, &mg, &eg); 
-    eval_b_pc_sq(g, PC_N, &mg, &eg); 
-    eval_w_pc_sq(g, PC_B, &mg, &eg); 
-    eval_b_pc_sq(g, PC_B, &mg, &eg); 
-    eval_w_pc_sq(g, PC_R, &mg, &eg); 
-    eval_b_pc_sq(g, PC_R, &mg, &eg); 
-    eval_w_pc_sq(g, PC_Q, &mg, &eg); 
-    eval_b_pc_sq(g, PC_Q, &mg, &eg); 
-    eval_w_pc_sq(g, PC_K, &mg, &eg); 
-    eval_b_pc_sq(g, PC_K, &mg, &eg); 
-
-    // int p = 0 * (wp - bp);  
-    int n = 1 * (wn + bn); 
-    int b = 1 * (wb + bb); 
-    int r = 2 * (wr + br); 
-    // quick way to ignore extra queens 
-    int q = 4 * ((wq > 0) + (bq > 0)); 
-
-    // between 0 and (4+4+8+16)=32
-    int phase = 32 - (n + b + r + q); 
-    phase = (phase >= 0) * phase; 
-    // printf("phase %d mg %d eg %d eval %d\n", phase, mg, eg, (mg * (32 - phase) + eg * phase) / 32); 
-    
-    return eval + (mg * (32 - phase) + eg * phase) / 32; 
-}
-
-void print_game(const game *g) 
-{
-    static const char *empty = "."; 
-
-    vector moves; 
-    CREATE_VEC(&moves, move); 
-    gen_moves(g, &moves);  
-    size_t num_moves = moves.size; 
-
-    printf("  +-----------------+\n"); 
-    for (int rank = 7; rank >= 0; rank--) 
-    {
-        printf("%d | ", rank + 1); 
-        for (int file = 0; file < 8; file++) 
-        {
-            square sq = make_sq(file, rank); 
-            const char *str = empty; 
-            for (piece p = 0; p < PC_CNT; p++) 
-            {
-                if (get_bit(g->pieces[p], sq)) 
-                {
-                    str = str_pc(p); 
-                }
-            }
-
-            printf("%s ", str); 
-        }
-        printf("|\n"); 
-    }
-    printf("  +-----------------+\n"); 
-    printf("    A B C D E F G H  \n"); 
-    printf("Hash: "); 
-    print_zb(g->hash); 
-    printf("Ply: %d\n", g->ply); 
-    printf("Halfmove: %d\n", g->halfmove); 
-    printf("Castling: %s\n", str_castle(g->castle)); 
-    printf("En passant: %s\n", g->ep == NO_SQ ? "(none)" : str_sq(g->ep)); 
-    printf("In check: %s\n", g->in_check ? "yes" : "no"); 
-    printf("# moves: %zu\n", num_moves); 
-    printf("Static eval: %.2f\n", evaluate(g, num_moves, is_special_draw(g)) * 0.01); 
-    printf("%s to move\n", g->turn ? "Black" : "White"); 
-
-    destroy_vec(&moves); 
-}
-
-static inline uint64_t perft_(game *g, vector *moves, int depth, bool verbose) 
+static inline uint64_t perft_(game *g, mvlist *moves, int depth, bool verbose) 
 {
     uint64_t total = 0, start = moves->size, size; 
 
@@ -1281,18 +428,19 @@ static inline uint64_t perft_(game *g, vector *moves, int depth, bool verbose)
 
         for (size_t i = start; i < size; i++) 
         {
-            push_move(g, AT_VEC(moves, move, i)); 
+            move mv = moves->moves[i]; 
+            push_move(g, mv); 
             total += perft_(g, moves, depth - 1, false); 
-            pop_move(g); 
+            pop_move(g, mv); 
         }
 
-        pop_vec_to_size(moves, start); 
+        moves->size = size; 
     }
     else if (depth == 1) 
     {
-        gen_moves(g, moves); 
-        total += moves->size - start; 
-        pop_vec_to_size(moves, start); 
+        mvinfo info; 
+        gen_mvinfo(g, &info); 
+        total += info.n_moves; 
     }
     else 
     {
@@ -1309,189 +457,10 @@ static inline uint64_t perft_(game *g, vector *moves, int depth, bool verbose)
 
 uint64_t perft(game *g, int depth) 
 {
-    vector moves; 
-    CREATE_VEC(&moves, move); 
+    mvlist *moves = new_mvlist(); 
 
-    uint64_t total = perft_(g, &moves, depth, true); 
+    uint64_t total = perft_(g, moves, depth, true); 
 
-    destroy_vec(&moves); 
+    free_mvlist(moves); 
     return total; 
-}
-
-move alg_to_move(const game *g, const char *alg) 
-{
-    const char *c = alg; 
-
-    piece pc = -1; 
-    int sfile = -1, srank = -1, tfile = -1, trank = -1; 
-
-    vector moves; 
-    CREATE_VEC(&moves, move); 
-    gen_moves(g, &moves); 
-
-    if (isupper(*c)) // piece 
-    {
-        switch (*c) 
-        {
-            case 'N': // knight
-                pc = PC_N; 
-                break; 
-            case 'B': // bishop 
-                pc = PC_B; 
-                break; 
-            case 'R': // rook 
-                pc = PC_R; 
-                break; 
-            case 'Q': // queen 
-                pc = PC_Q; 
-                break; 
-            case 'K': // king 
-                pc = PC_K; 
-                break; 
-            case 'O': // castle 
-                if (strncmp(alg, "O-O-O", 5) == 0) // queenside
-                {
-                    if (g->turn == COL_W) // white
-                    {
-                        move mv = make_move_castle(E1, C1, PC_WK, MOVE_CASTLE_WQ); 
-                        if (contains_vec(&moves, &mv, NULL)) 
-                        {
-                            destroy_vec(&moves); 
-                            return mv; 
-                        }
-                    }
-                    else // black 
-                    {
-                        move mv = make_move_castle(E8, C8, PC_BK, MOVE_CASTLE_BQ); 
-                        if (contains_vec(&moves, &mv, NULL)) 
-                        {
-                            destroy_vec(&moves); 
-                            return mv; 
-                        }
-                    }
-                }
-                else if (strncmp(alg, "O-O", 3) == 0) // kingside 
-                {
-                    if (g->turn == COL_W) // white
-                    {
-                        move mv = make_move_castle(E1, G1, PC_WK, MOVE_CASTLE_WK); 
-                        if (contains_vec(&moves, &mv, NULL)) 
-                        {
-                            destroy_vec(&moves); 
-                            return mv; 
-                        }
-                    }
-                    else // black 
-                    {
-                        move mv = make_move_castle(E8, G8, PC_BK, MOVE_CASTLE_BK); 
-                        if (contains_vec(&moves, &mv, NULL)) 
-                        {
-                            destroy_vec(&moves); 
-                            return mv; 
-                        }
-                    }
-                }
-                printf("Unknown algebraic notation: '%s'\n", alg); 
-                destroy_vec(&moves); 
-                return NO_MOVE; 
-            default: 
-                printf("Unknown algebraic notation: '%s'\n", alg); 
-                destroy_vec(&moves); 
-                return NO_MOVE; 
-        }
-
-        c++; 
-    }
-    else // pawn 
-    {
-        pc = PC_P; 
-    }
-
-    pc = make_pc(pc, g->turn); 
-
-    while (isalnum(*c)) 
-    {
-        if (*c == 'x') 
-        {
-            // capture, ignore
-        }
-        else if (isdigit(*c)) 
-        {
-            if (srank == -1) 
-            {
-                srank = *c - '1'; 
-            }
-            else 
-            {
-                trank = *c - '1'; 
-            }
-        }
-        else if (isalnum(*c)) 
-        {
-            if (sfile == -1) 
-            {
-                sfile = *c - 'a'; 
-            }
-            else 
-            {
-                tfile = *c - 'a'; 
-            }
-        }
-
-        c++; 
-    }
-
-    if (tfile == -1) 
-    {
-        tfile = sfile; 
-        sfile = -1; 
-    }
-
-    if (trank == -1) 
-    {
-        trank = srank; 
-        srank = -1; 
-    }
-
-    square target = make_sq(tfile, trank); 
-
-    piece promote = pc; 
-    for (size_t i = 0; i < strlen(alg) - 1; i++) 
-    {
-        if (strncmp("=Q", alg+i, 2) == 0) 
-        {
-            promote = make_pc(PC_Q, g->turn); 
-        }
-        else if (strncmp("=R", alg+i, 2) == 0) 
-        {
-            promote = make_pc(PC_R, g->turn); 
-        }
-        else if (strncmp("=B", alg+i, 2) == 0) 
-        {
-            promote = make_pc(PC_B, g->turn); 
-        }
-        else if (strncmp("=N", alg+i, 2) == 0) 
-        {
-            promote = make_pc(PC_N, g->turn); 
-        }
-    }
-
-    // check if non-castling move exists
-    for (size_t i = 0; i < moves.size; i++) 
-    {
-        move mv = AT_VEC(&moves, move, i); 
-
-        if (from_pc(mv) == pc && to_sq(mv) == target) 
-        {
-            if (srank != -1 && get_rank(from_sq(mv)) != srank) continue; 
-            if (sfile != -1 && get_file(from_sq(mv)) != sfile) continue; 
-            if (promote != pro_pc(mv)) continue; 
-
-            destroy_vec(&moves); 
-            return mv; 
-        }
-    }
-
-    destroy_vec(&moves); 
-    return NO_MOVE; 
 }

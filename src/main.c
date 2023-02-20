@@ -9,6 +9,7 @@
 #include "castle.h"
 #include "game.h" 
 #include "move.h"
+#include "movegen.h"
 #include "piece.h"
 #include "random.h" 
 #include "search.h" 
@@ -21,7 +22,7 @@
 
 #define UCI_MAX_INPUT 4096
 
-game uci_game; 
+game *uci_game; 
 search_ctx engine; 
 
 const char *uci_next_token(void) 
@@ -53,16 +54,15 @@ bool uci_cmd_isready(void)
 bool uci_cmd_ucinewgame(void) 
 {
     stop_search_ctx(&engine); 
-    load_fen(&uci_game, START_FEN); 
+    load_fen(uci_game, START_FEN); 
     return true; 
 }
 
 bool uci_cmd_position(void) 
 {
-    vector moves; 
-    CREATE_VEC(&moves, move); 
+    mvlist *moves = new_mvlist(); 
 
-    game *g = &uci_game; 
+    game *g = uci_game; 
 
     const char *token = uci_next_token(); 
 
@@ -119,8 +119,8 @@ bool uci_cmd_position(void)
     {
         while ((token = uci_next_token())) 
         {
-            clear_vec(&moves); 
-            gen_moves(g, &moves); 
+            clear_mvlist(moves); 
+            gen_moves(g, moves); 
 
             piece promote = PC_P; 
 
@@ -160,7 +160,7 @@ bool uci_cmd_position(void)
             // if promote is still pawn, then it wasn't promoted -> get the real original piece
             if (promote == PC_P) 
             {
-                promote = get_no_col(pc_at_or_wp(g, from)); 
+                promote = get_no_col(pc_at(g, from)); 
             }
 
             promote = make_pc(promote, g->turn); 
@@ -169,14 +169,14 @@ bool uci_cmd_position(void)
 
             // make sure the complete move is legal 
             bool found = false; 
-            for (size_t i = 0; i < moves.size; i++) 
+            for (size_t i = 0; i < moves->size; i++) 
             {
-                move m = AT_VEC(&moves, move, i); 
-                // print_move(m); 
+                move m = moves->moves[i]; 
                 if (from_sq(m) == from && to_sq(m) == to && pro_pc(m) == promote) 
                 {
                     found = true; 
                     push_move(g, m); 
+                    no_depth(g); 
                 }
             }
 
@@ -195,13 +195,13 @@ done:
         load_fen(g, START_FEN); 
     }
 
-    destroy_vec(&moves); 
+    free_mvlist(moves); 
     return success; 
 }
 
 bool uci_cmd_print(void) 
 {
-    print_game(&uci_game); 
+    print_game(uci_game); 
     return true; 
 }
 
@@ -212,6 +212,7 @@ bool uci_cmd_go(void)
     int movetime = INF_TIME; 
     int wtime = INF_TIME, btime = INF_TIME, sidetime = INF_TIME; 
     int winc = 0, binc = 0, sideinc = 0; 
+    int perft_num = -1; 
 
     while ((token = uci_next_token())) 
     {
@@ -226,7 +227,7 @@ bool uci_cmd_go(void)
         if (uci_equals(token, "wtime") && (token = uci_next_token())) 
         {
             wtime = atoi(token); 
-            if (uci_game.turn == COL_W) 
+            if (uci_game->turn == COL_W) 
             {
                 sidetime = wtime; 
                 if (sidetime < 0) sidetime = 0; 
@@ -235,7 +236,7 @@ bool uci_cmd_go(void)
         if (uci_equals(token, "btime") && (token = uci_next_token())) 
         {
             btime = atoi(token); 
-            if (uci_game.turn == COL_B) 
+            if (uci_game->turn == COL_B) 
             {
                 sidetime = btime; 
                 if (sidetime < 0) sidetime = 0; 
@@ -244,13 +245,50 @@ bool uci_cmd_go(void)
         if (uci_equals(token, "winc") && (token = uci_next_token())) 
         {
             winc = atoi(token); 
-            if (uci_game.turn == COL_W) sideinc = winc; 
+            if (uci_game->turn == COL_W) sideinc = winc; 
         }
         if (uci_equals(token, "binc") && (token = uci_next_token())) 
         {
             binc = atoi(token); 
-            if (uci_game.turn == COL_B) sideinc = binc; 
+            if (uci_game->turn == COL_B) sideinc = binc; 
         }
+        if (uci_equals(token, "perft") && (token = uci_next_token())) 
+        {
+            perft_num = atoi(token); 
+        }
+    }
+
+    if (perft_num > 0) 
+    {
+        uint64_t total = 0; 
+
+        game *pgame = new_game(); 
+        copy_game(pgame, uci_game); 
+        mvlist *moves = new_mvlist(); 
+
+        clock_t start = clock(); 
+
+        gen_moves(uci_game, moves); 
+        for (size_t i = 0; i < moves->size; i++) 
+        {
+            move mv = moves->moves[i]; 
+            print_move_end(mv, " - "); 
+            push_move(uci_game, mv); 
+            total += perft(uci_game, perft_num - 1); 
+            pop_move(uci_game, mv); 
+            printf("\n"); 
+        }
+
+        clock_t end = clock(); 
+        printf("Total: %lu", total); 
+
+        free_mvlist(moves); 
+        free_game(pgame); 
+
+        double dur = (double) (end - start) / CLOCKS_PER_SEC; 
+        double nps = total / dur; 
+        printf(", Time: %0.2fs, Speed: %0.3fMnps\n", dur, nps / 1000000.0); 
+        return true; 
     }
 
     if (depth > 0) 
@@ -297,7 +335,7 @@ bool uci_cmd_go(void)
     fflush(stdout); 
 
     search_params params; 
-    init_search_params(&params, &uci_game, depth, time_ms); 
+    init_search_params(&params, uci_game, depth, time_ms); 
 
     search(&engine, &params); 
     return true; 
@@ -325,7 +363,7 @@ bool uci_parse(const char *orig_cmd)
         if (uci_equals(token, "uci")) return uci_cmd_uci(); 
         if (uci_equals(token, "isready")) return uci_cmd_isready(); 
         if (uci_equals(token, "position")) return uci_cmd_position(); 
-        if (uci_equals(token, "d")) return uci_cmd_print(); 
+        if (uci_equals(token, "print")) return uci_cmd_print(); 
         if (uci_equals(token, "go")) return uci_cmd_go(); 
         if (uci_equals(token, "stop")) return uci_cmd_stop(); 
     }
@@ -338,7 +376,8 @@ int main(void)
     printf("%s by Nicholas Hamilton\n", ENGINE_NAME); 
     fflush(stdout); 
 
-    create_game_fen(&uci_game, START_FEN); 
+    uci_game = new_game(); 
+    load_fen(uci_game, START_FEN); 
     create_search_ctx(&engine); 
 
     char input[UCI_MAX_INPUT]; 
@@ -350,7 +389,7 @@ int main(void)
         if (!uci_parse(input)) printf("Unknown command: '%s'\n", input); 
     }
 
-    destroy_game(&uci_game); 
+    free_game(uci_game); 
     destroy_search_ctx(&engine); 
     return 0; 
 }

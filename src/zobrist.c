@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 
+#include "move.h" 
 #include "random.h" 
 
 bool is_zb_init = false; 

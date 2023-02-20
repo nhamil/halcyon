@@ -1,3 +1,4 @@
+#include <math.h> 
 #include <stdio.h> 
 #include <time.h> 
 
@@ -20,31 +21,58 @@ struct perft_data
     const uint64_t expected[10]; 
 };
 
+#define MIN_SPEED_TIME 0.1
+
+struct perft_speed 
+{
+    double fast; 
+    double slow; 
+    double total; 
+    int n; 
+} speed = 
+{
+    .fast = -INFINITY, 
+    .slow = INFINITY, 
+    .total = 0, 
+    .n = 0
+}; 
+
 bool run_perft(const char *name, const char *fen, const uint64_t *expected) 
 {
     total++; 
 
     bool ret = true; 
 
-    game g; 
-    create_game_fen(&g, fen); 
+    game *g = new_game(); 
+    load_fen(g, fen); 
 
     printf("%s\n%s\n", name, fen); 
-    print_game(&g); 
+    print_game(g); 
 
     int i = -1; 
     while (expected[++i] > 0) 
     {
+        uint64_t e = expected[i]; 
+
         clock_t c = clock(); 
-        uint64_t total = perft(&g, i);
+        uint64_t total = perft(g, i);
         clock_t c2 = clock(); 
 
         double time = (double) (c2 - c) / CLOCKS_PER_SEC; 
-        printf(", Time: %.2lfms, Speed: %.2lfMnps - %s\n", time * 1000, total / time / 1000 / 1000, expected[i] == total ? "PASS" : "FAIL"); 
+        double nps = total / time; 
+        printf(", Time: %.2lfms, Speed: %.2lfMnps - %s\n", time * 1000, nps / 1000000, e == total ? "PASS" : "FAIL"); 
 
-        if (expected[i] != total) 
+        if (time >= MIN_SPEED_TIME) 
         {
-            printf("FAILURE: Expected %lu, difference of %ld\n", expected[i], (int64_t) expected[i] - (int64_t) total); 
+            speed.n++; 
+            speed.total += nps; 
+            if (nps > speed.fast) speed.fast = nps; 
+            if (nps < speed.slow) speed.slow = nps; 
+        }
+
+        if (e != total) 
+        {
+            printf("FAILURE: Expected %lu, difference of %ld\n", e, (int64_t) e - (int64_t) total); 
             ret = 0; 
             // goto cleanup; 
         }
@@ -55,7 +83,7 @@ bool run_perft(const char *name, const char *fen, const uint64_t *expected)
     printf("DONE\n\n"); 
 
 cleanup: 
-    destroy_game(&g); 
+    free_game(g); 
     return ret; 
 }
 
@@ -210,6 +238,10 @@ int main(void)
     }
 
     printf("%d / %d passed\n", res, total); 
+    printf("\nSpeed (>%.1fs)\n", MIN_SPEED_TIME); 
+    printf("Min: %.2fMnps\n", speed.slow / 1000000); 
+    printf("Max: %.2fMnps\n", speed.fast / 1000000); 
+    printf("Mean: %.2fMnps\n", speed.total / speed.n / 1000000); 
 
     return -(res != total); // 0 if succeed
 }

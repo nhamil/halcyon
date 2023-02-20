@@ -45,7 +45,7 @@ else()
 endif() 
 
 set(CMAKE_C_STANDARD 11) 
-set(CMAKE_C_FLAGS "--std=c11 -Wall -Wextra -pedantic ${BIT_FLAG} -Wno-unused-function -Wno-unused-result -Wno-unused-label")
+set(CMAKE_C_FLAGS "--std=c99 -Wall -Wextra -pedantic ${BIT_FLAG} -Wno-unused-function -Wno-unused-result -Wno-unused-label")
 set(CMAKE_C_FLAGS_DEBUG "-g")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops")
 
@@ -57,9 +57,14 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 set(sources 
-    src/book.c 
+    # src/book.c 
+    src/eval.c 
+    src/fen.c 
     src/game.c 
+    src/magic.c 
+    src/movegen.c 
     src/search.c 
+    src/tables.c 
     src/zobrist.c
 )
 
@@ -69,9 +74,3 @@ set_target_properties(engine PROPERTIES OUTPUT_NAME "${EXE_NAME}")
 
 add_executable(perft EXCLUDE_FROM_ALL src/perft.c ${sources})
 target_link_libraries(perft Threads::Threads)
-
-add_executable(opengen EXCLUDE_FROM_ALL src/opengen.c ${sources})
-target_link_libraries(opengen Threads::Threads) 
-
-add_executable(openlist EXCLUDE_FROM_ALL src/openlist.c ${sources})
-target_link_libraries(openlist Threads::Threads) 

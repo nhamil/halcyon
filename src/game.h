@@ -4,10 +4,13 @@
 #include <limits.h> 
 #include <stdbool.h>
 #include <stddef.h> 
+#include <stdint.h>
 #include <string.h> 
 
 #include "bitboard.h"
 #include "castle.h" 
+#include "magic.h" 
+#include "mailbox.h"
 #include "move.h" 
 #include "piece.h"
 #include "square.h"
@@ -15,6 +18,11 @@
 #include "zobrist.h"
 
 typedef struct game game; 
+typedef struct move_hist move_hist; 
+
+#define DRAW_DEPTH 4
+
+#define MAX_DEPTH 256 
 
 #define EVAL_MAX (INT_MAX - 10000)
 
@@ -22,125 +30,135 @@ typedef struct game game;
 
 #define FEN_LEN 128 
 
+struct move_hist 
+{
+    int halfmove; 
+    square ep; 
+    castle_flags castle; 
+    bool in_check;
+    zobrist hash; 
+};
+
 struct game 
 {
-    bboard pieces[PC_CNT]; 
-    bboard colors[2]; 
-    bboard check; 
+    move_hist hist[MAX_DEPTH + DRAW_DEPTH*2]; 
+
+    mbox mailbox; 
+
+    bboard pieces[PC_CNT + 1]; // extra bitboard for NO_PC
+    bboard colors[COL_CNT]; 
+    bboard all; 
+    bboard movement; 
+
     zobrist hash; 
     castle_flags castle; 
     square ep; 
-    bool in_check; 
-    int halfmove; 
 
-    vector hist; 
     int ply; 
+    int halfmove; 
     color turn; 
+    bool in_check; 
+    int depth; 
 
     uint64_t nodes; 
 };
 
-void create_game(game *g); 
+game *new_game(void); 
 
-void create_game_fen(game *g, const char *fen); 
-
-void create_game_copy(game *g, const game *from_game); 
-
-void destroy_game(game *g); 
+void free_game(game *g); 
 
 void reset_game(game *g); 
 
-void copy_game(game *g, const game *from_game); 
+void copy_game(game *g, const game *from); 
 
 void load_fen(game *g, const char *fen); 
 
 void to_fen(const game *g, char *out); 
 
-bool in_check(const game *g, color for_color, bboard check_king, bboard ignore, bboard add); 
-
-void pop_move(game *g); 
-
-// does not check if the move is legal 
 void push_move(game *g, move m); 
 
-void pop_null_move(game *g); 
+void pop_move(game *g, move m); 
 
 void push_null_move(game *g); 
 
-void gen_moves(const game *g, vector *out); 
-
-int evaluate(const game *g, int num_moves, bool draw); 
+void pop_null_move(game *g); 
 
 void print_game(const game *g); 
 
 uint64_t perft(game *g, int depth); 
 
-bool is_special_draw(const game *g); 
+bool is_special_draw(const game *g);
 
-move alg_to_move(const game *g, const char *alg); 
+int evaluate(const game *g, int n_moves, bool draw); 
 
-static inline int col_sign(const game *g) 
+static inline piece pc_at(const game *g, square sq) 
 {
-    return 1 - 2 * g->turn; 
-}
-
-// assumes there is a white piece on the square, otherwise returns WP
-static inline piece w_pc_at(const game *g, square sq) 
-{
-    piece p = 0; 
-    p |= get_bit(g->pieces[PC_WP], sq) * PC_WP; 
-    p |= get_bit(g->pieces[PC_WN], sq) * PC_WN; 
-    p |= get_bit(g->pieces[PC_WB], sq) * PC_WB; 
-    p |= get_bit(g->pieces[PC_WR], sq) * PC_WR; 
-    p |= get_bit(g->pieces[PC_WQ], sq) * PC_WQ; 
-    p |= get_bit(g->pieces[PC_WK], sq) * PC_WK; 
-    return p; 
-}
-
-// assumes there is a black piece on the square, otherwise returns WP
-static inline piece b_pc_at(const game *g, square sq) 
-{
-    piece p = 0; 
-    p |= get_bit(g->pieces[PC_BP], sq) * PC_BP; 
-    p |= get_bit(g->pieces[PC_BN], sq) * PC_BN; 
-    p |= get_bit(g->pieces[PC_BB], sq) * PC_BB; 
-    p |= get_bit(g->pieces[PC_BR], sq) * PC_BR; 
-    p |= get_bit(g->pieces[PC_BQ], sq) * PC_BQ; 
-    p |= get_bit(g->pieces[PC_BK], sq) * PC_BK; 
-    return p; 
-}
-
-// assumes there is a piece on the square, otherwise returns WP 
-static inline piece pc_at_or_wp(const game *g, square sq) 
-{
-    return w_pc_at(g, sq) | b_pc_at(g, sq); 
-}
-
-static inline bool is_pc_at(const game *g, square sq) 
-{
-    return get_bit(g->colors[COL_W], sq) | get_bit(g->colors[COL_B], sq); 
-}
-
-static inline bool no_pc_at(const game *g, square sq) 
-{
-    return !is_pc_at(g, sq); 
-}
-
-static inline bool is_capture(const game *g, move mv) 
-{
-    return takes_ep(mv) | get_bit(g->colors[opp_col(g->turn)], to_sq(mv)); 
-}
-
-static inline bool is_quiet(const game *g, move mv) 
-{
-    return !is_capture(g, mv); 
+    return get_mbox(&g->mailbox, sq); 
 }
 
 static inline bool any_side_k_p(const game *g) 
 {
-    const bool w_kp = g->colors[COL_W] == (g->pieces[PC_WK] | g->pieces[PC_WP]); 
-    const bool b_kp = g->colors[COL_B] == (g->pieces[PC_BK] | g->pieces[PC_BP]); 
+    bool w_kp = g->colors[COL_W] == (g->pieces[PC_WK] | g->pieces[PC_WP]); 
+    bool b_kp = g->colors[COL_B] == (g->pieces[PC_BK] | g->pieces[PC_BP]); 
     return w_kp | b_kp;  
 }
 
-extern int PC_SQ[2][6][SQ_CNT]; 
+/**
+ * Removes move history to increase max depth. 
+ * Do not use pop_move on previous moves after calling this. 
+ */
+static inline void no_depth(game *g) 
+{
+    int copy_amt = DRAW_DEPTH * 2; 
+    if (g->depth < copy_amt) copy_amt = g->depth; 
+
+    if (copy_amt > 0) 
+    {
+        int copy_start = g->depth - copy_amt; 
+
+        for (int i = 0; i < copy_amt; i++) 
+        {
+            g->hist[i] = g->hist[copy_start + i]; 
+        }
+    }
+
+    g->depth = copy_amt; 
+}
+
+static inline bboard r_attacks(square sq, bboard occ) 
+{
+    return MAGIC_R_SLIDE[sq][((MAGIC_R_MASK[sq] & occ) * MAGIC_R[sq]) >> MAGIC_R_SHIFT[sq]];
+}
+
+static inline bboard b_attacks(square sq, bboard occ) 
+{
+    return MAGIC_B_SLIDE[sq][((MAGIC_B_MASK[sq] & occ) * MAGIC_B[sq]) >> MAGIC_B_SHIFT[sq]];
+}
+
+static inline bool is_attacked(const game *g, square sq, color chk_col) 
+{
+    color col = chk_col; 
+    color opp = opp_col(col); 
+
+    bboard occ = g->all; 
+
+    bboard opp_p = g->pieces[make_pc(PC_P, opp)]; 
+    bboard opp_n = g->pieces[make_pc(PC_N, opp)]; 
+    bboard opp_b = g->pieces[make_pc(PC_B, opp)]; 
+    bboard opp_r = g->pieces[make_pc(PC_R, opp)]; 
+    bboard opp_q = g->pieces[make_pc(PC_Q, opp)]; 
+    bboard opp_k = g->pieces[make_pc(PC_K, opp)]; 
+
+    bboard opp_rq = (opp_r | opp_q); 
+    bboard opp_bq = (opp_b | opp_q); 
+
+    bboard chk = (r_attacks(sq, occ) & opp_rq) 
+               | (b_attacks(sq, occ) & opp_bq) 
+               | (opp_k & MOVES_K[sq]) 
+               | (opp_n & MOVES_N[sq]) 
+               | (opp_p & ATTACKS_P[col][sq]);     
+
+    return chk != 0; 
+}
+
+extern int PC_SQ[2][PC_TYPE_CNT][SQ_CNT]; 

@@ -6,13 +6,12 @@
 #include <pthread.h> 
 
 #include "game.h" 
+#include "movegen.h"
 #include "piece.h"
 #include "square.h"
 
 #define INF_DEPTH (-1) 
 #define INF_TIME (-1) 
-
-#define MAX_DEPTH 128 
 
 typedef struct pv_line pv_line; 
 typedef struct search_ctx search_ctx; 
@@ -26,7 +25,7 @@ struct pv_line
 
 struct search_ctx 
 {
-    game board; 
+    game *board; 
     int start_ply; 
     pthread_t thread; 
     int tgt_depth; 
@@ -42,7 +41,7 @@ struct search_ctx
     int eval; 
     bool running; 
 
-    vector moves; 
+    mvlist *moves; 
     pv_line lines[MAX_DEPTH]; 
     size_t node_cnt; 
     size_t leaf_cnt; 

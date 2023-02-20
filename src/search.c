@@ -1,6 +1,7 @@
 #include "search.h" 
 #include "game.h"
 #include "move.h"
+#include "movegen.h"
 #include "piece.h"
 #include "vector.h"
 
@@ -13,7 +14,7 @@ typedef struct search_data search_data;
 
 static const int PC_VALUES[] = 
 {
-    100, 310, 320, 500, 900, 10000
+    100, 310, 320, 500, 900, 10000, 0
 };
 
 static inline bool out_of_time(const search_ctx *ctx) 
@@ -55,27 +56,24 @@ static inline bool handle_out_of_time(search_ctx *ctx)
 static inline int mvv_lva(search_ctx *ctx, move mv) 
 {
     piece pc_type = get_no_col(from_pc(mv)); 
-
-    if (takes_ep(mv)) 
-    {
-        return 10 * (PC_VALUES[PC_P] - PC_VALUES[pc_type]); 
-    }
-    else 
-    {
-        return 10 * (PC_VALUES[get_no_col(pc_at_or_wp(&ctx->board, to_sq(mv)))] - PC_VALUES[pc_type]); 
-    }   
+    return 10 * (PC_VALUES[get_no_col(pc_at(ctx->board, to_sq(mv)))] - PC_VALUES[pc_type]); 
 }
 
 static inline int qmove_val(search_ctx *ctx, move mv) 
 {
-    if (is_capture(&ctx->board, mv)) 
+    if (is_capture(mv)) 
     {
         return mvv_lva(ctx, mv); 
     }
 
-    if (has_pro(mv)) 
+    if (is_pro(mv)) 
     {
         return PC_VALUES[get_no_col(pro_pc(mv))]; 
+    }
+
+    if (is_check(mv)) 
+    {
+        return 100000; 
     }
 
     return -100000; 
@@ -83,14 +81,14 @@ static inline int qmove_val(search_ctx *ctx, move mv)
 
 static inline move next_qmove(search_ctx *ctx, size_t start) 
 {
-    vector *moves = &ctx->moves; 
+    mvlist *moves = ctx->moves; 
 
     // swap current index with highest priority move 
     size_t best_i = start; 
-    int best_val = mvv_lva(ctx, AT_VEC(moves, move, start)); 
+    int best_val = mvv_lva(ctx, moves->moves[start]); 
     for (size_t i = start + 1; i < moves->size; i++) 
     {
-        move mv = AT_VEC(moves, move, i); 
+        move mv = moves->moves[i]; 
         int val = qmove_val(ctx, mv); 
         
         if (val > best_val) 
@@ -101,76 +99,79 @@ static inline move next_qmove(search_ctx *ctx, size_t start)
     }
 
     // put best move in first place and return it 
-    swap_vec(moves, start, best_i); 
-    return AT_VEC(moves, move, start); 
+    swap_mvlist(moves, start, best_i); 
+    return moves->moves[start]; 
 }
 
 static inline int move_val(search_ctx *ctx, move mv) 
 {
-    game *g = &ctx->board; 
+    game *g = ctx->board; 
     piece pc_type = get_no_col(from_pc(mv)); 
+
+    int add = is_check(mv) * 1000000; 
 
     // previous pv has highest priority 
     // first move is ply 1, not ply 0
     // so check <= instead of <
     if (ctx->in_pv && ctx->ply <= (ssize_t) ctx->pv.n_moves) 
     {
-        if (mv == ctx->pv.moves[ctx->ply - 1]) return 200000; 
+        if (mv == ctx->pv.moves[ctx->ply - 1]) return 2000000 + add;  
     }
 
     // capture
-    if (is_capture(g, mv)) 
+    if (is_capture(mv)) 
     {
-        return 100000 + mvv_lva(ctx, mv); 
+        return 100000 + mvv_lva(ctx, mv) + add; 
     }
 
-    if (is_quiet(g, mv)) 
+    bool q = is_quiet(mv); 
+    if (q) 
     {
         // killer move 
         if (ctx->killer[ctx->ply][0] == mv) 
         {
-            return 100001; 
+            return 100001 + add; 
         }
         if (ctx->killer[ctx->ply][1] == mv) 
         {
-            return 100000; 
+            return 100000 + add; 
         }
 
         // history heuristic 
         int hist = ctx->history[g->turn][pc_type][to_sq(mv)]; 
         if (hist > 0) 
         {
-            return hist; 
+            return hist + add; 
         }
     }
     
     // promotion
-    if (has_pro(mv)) 
+    if (is_pro(mv)) 
     {
-        return PC_VALUES[get_no_col(pro_pc(mv))]; 
+        return PC_VALUES[get_no_col(pro_pc(mv))] + add; 
     }
 
     // default 
     if (g->turn == COL_B) 
     {
-        return -100000 + PC_SQ[pc_type][to_sq(mv)] - PC_SQ[pc_type][from_sq(mv)]; 
+        return -100000 + PC_SQ[pc_type][to_sq(mv)] - PC_SQ[pc_type][from_sq(mv)] + add; 
     }
     else // COL_W
     {
-        return -100000 + PC_SQ[pc_type][rrank(to_sq(mv))] - PC_SQ[pc_type][rrank(from_sq(mv))]; 
+        return -100000 + PC_SQ[pc_type][rrank(to_sq(mv))] - PC_SQ[pc_type][rrank(from_sq(mv))] + add; 
     }
 }
 
 static inline move next_move(search_ctx *ctx, size_t start) 
 {
-    vector *moves = &ctx->moves; 
+    mvlist *moves = ctx->moves; 
 
     // swap current index with highest priority move 
     size_t best_i = start; 
-    int best_val = mvv_lva(ctx, AT_VEC(moves, move, start)); 
+    int best_val = move_val(ctx, moves->moves[start]); 
     for (size_t i = start + 1; i < moves->size; i++) 
     {
-        move mv = AT_VEC(moves, move, i); 
+        move mv = moves->moves[i]; 
         int val = move_val(ctx, mv); 
         
         if (val > best_val) 
@@ -181,14 +182,14 @@ static inline move next_move(search_ctx *ctx, size_t start)
     }
 
     // put best move in first place and return it 
-    swap_vec(moves, start, best_i); 
-    return AT_VEC(moves, move, start); 
+    swap_mvlist(moves, start, best_i); 
+    return moves->moves[start]; 
 }
 
 static inline int qsearch(search_ctx *ctx, int alpha, int beta, int depth) 
 {
-    game *g = &ctx->board; 
-    vector *moves = &ctx->moves; 
+    game *g = ctx->board; 
+    mvlist *moves = ctx->moves; 
     size_t start = moves->size; 
 
     ctx->qnode_cnt++; 
@@ -200,12 +201,12 @@ static inline int qsearch(search_ctx *ctx, int alpha, int beta, int depth)
     gen_moves(g, moves); 
     size_t num_moves = moves->size - start; 
 
-    int stand_pat = col_sign(g) * evaluate(g, num_moves, draw); 
+    int stand_pat = col_sign(g->turn) * evaluate(g, num_moves, draw); 
 
     // check for beta cutoff
     if (stand_pat >= beta) 
     {
-        pop_vec_to_size(moves, start); 
+        pop_mvlist(moves, start); 
         return beta; 
     }
     
@@ -219,7 +220,7 @@ static inline int qsearch(search_ctx *ctx, int alpha, int beta, int depth)
     if (depth <= 0) 
     {
         ctx->qleaf_cnt++; 
-        pop_vec_to_size(moves, start); 
+        pop_mvlist(moves, start); 
         return alpha; 
     }
 
@@ -232,11 +233,8 @@ static inline int qsearch(search_ctx *ctx, int alpha, int beta, int depth)
         {
             move mv = next_qmove(ctx, i); 
 
-            bool should_search = is_capture(g, mv) || has_pro(mv); 
+            bool should_search = is_tactical(mv); 
             if (!should_search) continue; 
-
-            // print_move_end(mv, " "); 
-            // printf("%s x %s = %d\n", str_pc(from_pc(mv)), str_pc(pc_at_or_wp(g, to_sq(mv))), qmove_val(ctx, mv)); 
 
             // there is 1+ active moves, so not a leaf node 
             found_move = true; 
@@ -244,13 +242,13 @@ static inline int qsearch(search_ctx *ctx, int alpha, int beta, int depth)
             // search move 
             push_move(g, mv); 
             int score = -qsearch(ctx, -beta, -alpha, depth - 1); 
-            pop_move(g); 
+            pop_move(g, mv); 
 
             // beta cutoff 
             if (score >= beta) 
             {
                 ctx->ply--; 
-                pop_vec_to_size(moves, start); 
+                pop_mvlist(moves, start); 
                 return beta; 
             }
 
@@ -264,7 +262,7 @@ static inline int qsearch(search_ctx *ctx, int alpha, int beta, int depth)
     }
     if (!found_move) ctx->qleaf_cnt++; 
 
-    pop_vec_to_size(moves, start); 
+    pop_mvlist(moves, start); 
     return alpha; 
 }
 
@@ -306,8 +304,8 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
     // break out if search should end 
     handle_out_of_time(ctx); 
 
-    game *g = &ctx->board; 
-    vector *moves = &ctx->moves; 
+    game *g = ctx->board; 
+    mvlist *moves = ctx->moves; 
     size_t start = moves->size; 
 
     // 3-fold repetition etc 
@@ -325,7 +323,7 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
         clear_pv(ctx, 0); 
         ctx->leaf_cnt++; 
 
-        pop_vec_to_size(moves, start); 
+        pop_mvlist(moves, start); 
         return qsearch(ctx, alpha, beta, 16); 
     }
 
@@ -354,7 +352,7 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
                 ctx->ply--; 
 
                 clear_pv(ctx, 0); 
-                pop_vec_to_size(moves, start); 
+                pop_mvlist(moves, start); 
                 return beta; 
             }
 
@@ -376,8 +374,8 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
     {
         move mv = next_move(ctx, i); 
 
-        bool capture = is_capture(g, mv); 
-        bool pro = has_pro(mv); 
+        bool capture = is_capture(mv); 
+        bool pro = is_pro(mv); 
         bool check = g->in_check; 
 
         // search position after applying move 
@@ -396,6 +394,13 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
         lmr &= i - start >= 4;
         lmr &= depth > 3; 
         int lmr_amt = lmr * 2; 
+
+        // if (ctx->ply == 1) 
+        // {
+        //     printf("%*s move ", ctx->ply * 2, ""); 
+        //     print_move_end(mv, " "); 
+        //     printf("cap=%d pro=%d was_chk=%d give_chk=%d\n", capture, pro, check, gives_check); 
+        // }
 
         if (!check && !gives_check && found_pv) // principal variation search 
         {
@@ -422,12 +427,12 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
             score = -negamax(ctx, -beta, -alpha, depth - 1); 
         }
         
-        pop_move(g); 
+        pop_move(g, mv); 
 
         // beta cutoff 
         if (score >= beta) 
         {
-            if (is_quiet(g, mv)) 
+            if (is_quiet(mv)) 
             {
                 // killer move heuristic 
                 if (ctx->killer[ctx->ply][0] != mv) 
@@ -442,7 +447,7 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
 
             ctx->ply--; 
             ctx->in_pv = node_in_pv; 
-            pop_vec_to_size(moves, start); 
+            pop_mvlist(moves, start); 
             return beta; 
         }
 
@@ -460,13 +465,13 @@ static inline int negamax(search_ctx *ctx, int alpha, int beta, int depth)
     ctx->ply--; 
     ctx->in_pv = node_in_pv; 
 
-    pop_vec_to_size(moves, start); 
+    pop_mvlist(moves, start); 
     return alpha; 
 }
 
 static inline void update_search(search_ctx *ctx, clock_t search_start, clock_t start, clock_t end, int depth, int eval, const pv_line *line) 
 {
-    size_t nodes = ctx->board.nodes;// ctx->leaf_cnt; 
+    size_t nodes = ctx->board->nodes;// ctx->leaf_cnt; 
 
     float duration = end - start; 
     if (duration <= 0) duration = 1; 
@@ -483,7 +488,16 @@ static inline void update_search(search_ctx *ctx, clock_t search_start, clock_t 
     ctx->depth = depth; 
     ctx->eval = eval; 
 
-    printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f pv ", depth, ctx->pv.n_moves, eval, start_duration, nodes, nps); 
+    if (eval > 90000 || eval < -90000) 
+    {
+        int mate_ply = 100000 - abs(eval); 
+        int plies = mate_ply - ctx->board->ply + 1; 
+        printf("info depth %d seldepth %zu multipv 1 score mate %d time %.0f nodes %" PRIu64 " nps %.0f pv ", depth, ctx->pv.n_moves, (eval > 0 ? 1 : -1) * (plies/2), start_duration, nodes, nps); 
+    }
+    else 
+    {
+        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f pv ", depth, ctx->pv.n_moves, eval, start_duration, nodes, nps); 
+    }
     for (size_t i = 0; i < ctx->pv.n_moves; i++) 
     {
         print_move_end(ctx->pv.moves[i], " "); 
@@ -508,7 +522,7 @@ void run_search(search_ctx *ctx)
 
     for (int depth = 2; depth <= tgt_depth; depth++) 
     {
-        clear_vec(&ctx->moves); 
+        clear_mvlist(ctx->moves); 
         int last = eval; 
 
         int a[] = { last - 30, last - 130, last - 530, -EVAL_MAX }; 
@@ -559,8 +573,8 @@ void create_search_ctx(search_ctx *ctx)
     memset(ctx, 0, sizeof(search_ctx)); 
 
     // board should always be initialized
-    create_game(&ctx->board); 
-    CREATE_VEC(&ctx->moves, move); 
+    ctx->board = new_game(); 
+    ctx->moves = new_mvlist(); 
 
     pthread_mutex_init(&ctx->lock, NULL); 
 } 
@@ -568,8 +582,8 @@ void create_search_ctx(search_ctx *ctx)
 void destroy_search_ctx(search_ctx *ctx) 
 {
     stop_search_ctx(ctx); 
-    destroy_game(&ctx->board); 
-    destroy_vec(&ctx->moves); 
+    free_game(ctx->board); 
+    free_mvlist(ctx->moves); 
     pthread_mutex_destroy(&ctx->lock); 
 }
 
@@ -580,7 +594,7 @@ void stop_search_ctx(search_ctx *ctx)
         ctx->should_exit = true; 
         pthread_join(ctx->thread, NULL); 
 
-        clear_vec(&ctx->moves); 
+        clear_mvlist(ctx->moves); 
         ctx->running = false; 
     }
 
@@ -599,7 +613,7 @@ void search(search_ctx *ctx, search_params *params)
     ctx->eval = 0; 
     ctx->running = true; 
 
-    clear_vec(&ctx->moves); 
+    clear_mvlist(ctx->moves); 
     ctx->ply = 0; 
     for (int i = 0; i < MAX_DEPTH; i++) 
     {
@@ -614,31 +628,8 @@ void search(search_ctx *ctx, search_params *params)
         ctx->end_at = clock() + ctx->tgt_time * CLOCKS_PER_SEC / 1000; 
     }
 
-    destroy_game(&ctx->board); 
-    create_game_copy(&ctx->board, params->board); 
+    copy_game(ctx->board, params->board); 
+    no_depth(ctx->board); 
 
     pthread_create(&ctx->thread, NULL, start_pthread_search, ctx); 
-}
-
-int basic_qsearch(const game *g) 
-{
-    search_ctx ctx; 
-    create_search_ctx(&ctx); 
-    ctx.pv.n_moves = 0; 
-    ctx.nodes = 0; 
-    ctx.nps = 0; 
-    ctx.depth = 0; 
-    ctx.eval = 0; 
-    ctx.running = true; 
-
-    ctx.tgt_depth = INF_DEPTH; 
-    ctx.tgt_time = INF_TIME; 
-    ctx.should_exit = false; 
-
-    destroy_game(&ctx.board); 
-    create_game_copy(&ctx.board, g); 
-    int score = qsearch(&ctx, -EVAL_MAX, EVAL_MAX, 32); 
-    destroy_search_ctx(&ctx); 
-
-    return score; 
 }
