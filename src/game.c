@@ -415,11 +415,17 @@ bool is_special_draw(const game *g)
     return false; 
 }
 
-static inline uint64_t perft_(game *g, mvlist *moves, int depth, bool verbose) 
+static inline uint64_t perft_(game *g, mvlist *moves, int depth) 
 {
     uint64_t total = 0, start = moves->size, size; 
 
-    if (depth > 1) 
+    if (depth == 1) 
+    {
+        mvinfo info; 
+        gen_mvinfo(g, &info); 
+        total += info.n_moves; 
+    }
+    else if (depth > 1) 
     {
         gen_moves(g, moves); 
         size = moves->size; 
@@ -430,26 +436,15 @@ static inline uint64_t perft_(game *g, mvlist *moves, int depth, bool verbose)
         {
             move mv = moves->moves[i]; 
             push_move(g, mv); 
-            total += perft_(g, moves, depth - 1, false); 
+            total += perft_(g, moves, depth - 1); 
             pop_move(g, mv); 
         }
 
-        moves->size = size; 
-    }
-    else if (depth == 1) 
-    {
-        mvinfo info; 
-        gen_mvinfo(g, &info); 
-        total += info.n_moves; 
+        pop_mvlist(moves, size); 
     }
     else 
     {
         total = 1; 
-    }
-
-    if (verbose) 
-    {
-        printf("Depth: %d, Total: %" PRIu64 "", depth, total); 
     }
 
     return total; 
@@ -459,7 +454,8 @@ uint64_t perft(game *g, int depth)
 {
     mvlist *moves = new_mvlist(); 
 
-    uint64_t total = perft_(g, moves, depth, true); 
+    uint64_t total = perft_(g, moves, depth); 
+    printf("Depth: %d, Total: %" PRIu64 "", depth, total); 
 
     free_mvlist(moves); 
     return total; 
