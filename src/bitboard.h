@@ -70,7 +70,7 @@ extern const bboard SLIDE_TO[SQ_CNT][SQ_CNT];
 
 extern const uint8_t PIN_IDX[SQ_CNT][SQ_CNT]; 
 
-extern const int POPCNT_8[256];
+extern const uint8_t POPCNT16[1 << 16]; 
 extern const uint64_t REV8OFF[8][256]; 
 
 static inline bboard make_pos(square sq) 
@@ -178,20 +178,15 @@ static inline int msb(bboard b)
 
 static inline int popcnt(bboard b) 
 {
-    return POPCNT_8[b & 255] + 
-           POPCNT_8[(b >>  8) & 255] + 
-           POPCNT_8[(b >> 16) & 255] + 
-           POPCNT_8[(b >> 24) & 255] + 
-           POPCNT_8[(b >> 32) & 255] + 
-           POPCNT_8[(b >> 40) & 255] + 
-           POPCNT_8[(b >> 48) & 255] + 
-           POPCNT_8[(b >> 56) & 255];
+    return POPCNT16[((b >>  0) & 65535)]
+         + POPCNT16[((b >> 16) & 65535)]
+         + POPCNT16[((b >> 32) & 65535)]
+         + POPCNT16[((b >> 48) & 65535)];
 }
 
-static inline int popcnt_16(uint16_t b) 
+static inline int popcnt16(uint16_t b) 
 {
-    return POPCNT_8[b & 255] + 
-           POPCNT_8[(b >> 8) & 255];
+    return POPCNT16[b]; 
 }
 
 static inline bboard shift_nn(bboard b) 
