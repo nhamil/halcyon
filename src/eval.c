@@ -183,18 +183,18 @@ int evaluate(const game *g, int n_moves, bool draw)
         }
     }
 
-    int wp = popcnt(g->pieces[PC_WP]); 
-    int bp = popcnt(g->pieces[PC_BP]); 
-    int wn = popcnt(g->pieces[PC_WN]); 
-    int bn = popcnt(g->pieces[PC_BN]); 
-    int wb = popcnt(g->pieces[PC_WB]); 
-    int bb = popcnt(g->pieces[PC_BB]); 
-    int wr = popcnt(g->pieces[PC_WR]); 
-    int br = popcnt(g->pieces[PC_BR]); 
-    int wq = popcnt(g->pieces[PC_WQ]); 
-    int bq = popcnt(g->pieces[PC_BQ]); 
-    int wk = popcnt(g->pieces[PC_WK]); 
-    int bk = popcnt(g->pieces[PC_BK]); 
+    int wp = g->counts[PC_WP]; 
+    int bp = g->counts[PC_BP]; 
+    int wn = g->counts[PC_WN]; 
+    int bn = g->counts[PC_BN]; 
+    int wb = g->counts[PC_WB]; 
+    int bb = g->counts[PC_BB]; 
+    int wr = g->counts[PC_WR]; 
+    int br = g->counts[PC_BR]; 
+    int wq = g->counts[PC_WQ]; 
+    int bq = g->counts[PC_BQ]; 
+    int wk = g->counts[PC_WK]; 
+    int bk = g->counts[PC_BK]; 
 
     int eval = 0; 
     int mg = 0; 
@@ -230,10 +230,10 @@ int evaluate(const game *g, int n_moves, bool draw)
     // quick way to ignore extra queens 
     int q = 4 * ((wq > 0) + (bq > 0)); 
 
-    // between 0 and (4+4+8+16)=32
-    int phase = 32 - (n + b + r + q); 
+    // between 0 and (4+4+8+8)=24
+    int phase = 24 - (n + b + r + q); 
     phase = (phase >= 0) * phase; 
     // printf("phase %d mg %d eg %d eval %d\n", phase, mg, eg, (mg * (32 - phase) + eg * phase) / 32); 
     
-    return eval + (mg * (32 - phase) + eg * phase) / 32; 
+    return eval + (mg * (24 - phase) + eg * phase) / 24; 
 }

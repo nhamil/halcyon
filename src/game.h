@@ -49,6 +49,7 @@ struct game
     bboard colors[COL_CNT]; 
     bboard all; 
     bboard movement; 
+    int counts[PC_CNT + 1]; 
 
     zobrist hash; 
     castle_flags castle; 
@@ -90,6 +91,20 @@ uint64_t perft(game *g, int depth);
 bool is_special_draw(const game *g);
 
 int evaluate(const game *g, int n_moves, bool draw); 
+
+bool validate_game(const game *g); 
+
+#ifdef VALIDATION 
+    #define VALIDATE_GAME_MOVE(g, mv, action) \
+        if (!validate_game(g)) \
+        {\
+            printf("info string ERROR validation of %s move ", action); \
+            print_move_end(mv, " failed\n"); \
+            exit(1); \
+        }
+#else 
+    #define VALIDATE_GAME_MOVE(g, mv, action)
+#endif 
 
 static inline piece pc_at(const game *g, square sq) 
 {

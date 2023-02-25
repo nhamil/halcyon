@@ -30,6 +30,7 @@ void reset_game(game *g)
     init_mbox(&g->mailbox); 
     memset(g->pieces, 0, sizeof(g->pieces)); 
     memset(g->colors, 0, sizeof(g->colors)); 
+    memset(g->counts, 0, sizeof(g->counts)); 
     g->all = 0; 
     g->movement = 0; 
     g->hash = 0; 
@@ -49,6 +50,7 @@ void copy_game(game *g, const game *from)
     g->mailbox = from->mailbox; 
     memcpy(g->pieces, from->pieces, sizeof(g->pieces)); 
     memcpy(g->colors, from->colors, sizeof(g->colors)); 
+    memcpy(g->counts, from->counts, sizeof(g->counts)); 
     g->all = from->all; 
     g->movement = from->movement; 
     g->hash = from->hash; 
@@ -85,6 +87,16 @@ void print_game(const game *g)
     }
     printf("  A   B   C   D   E   F   G   H  \n"); 
 
+    for (color col = COL_W; col < COL_CNT; col++) 
+    {
+        for (piece pc = PC_P; pc < PC_TYPE_CNT; pc++) 
+        {
+            piece cpc = make_pc(pc, col); 
+            printf("%d%s ", g->counts[cpc], str_pc(cpc)); 
+        }
+    }
+    printf("\n"); 
+
     printf("%s\nHash: ", fen); 
     print_zb_end(g->hash, "\n");
 
@@ -109,6 +121,8 @@ void push_move(game *g, move mv)
     hist->ep = g->ep; 
     hist->castle = g->castle; 
     hist->in_check = g->in_check; 
+
+    
     hist->hash = g->hash; 
 
     color col = g->turn; 
@@ -127,8 +141,8 @@ void push_move(game *g, move mv)
     bool ep = is_ep(mv); 
     int cas_idx = castle_idx(mv); 
 
-    bboard src_pos = make_pos(src); 
-    bboard dst_pos = make_pos(dst); 
+    bboard src_pos = BB[src]; 
+    bboard dst_pos = BB[dst]; 
 
     if (is_capture(mv) || get_no_col(pc) == PC_P) 
     {
@@ -142,7 +156,7 @@ void push_move(game *g, move mv)
     if (ep) // en passant 
     {
         square rm = g->ep - 8 * col_sign(g->turn); 
-        bboard rm_pos = make_pos(rm); 
+        bboard rm_pos = BB[rm]; 
 
         g->colors[col] ^= src_pos ^ dst_pos; 
         g->colors[opp] ^= rm_pos; 
@@ -158,12 +172,11 @@ void push_move(game *g, move mv)
         clear_mbox(&g->mailbox, rm); 
         set_mbox(&g->mailbox, dst, pc); 
 
+        g->counts[tgt]--; 
         g->ep = NO_SQ; 
     }
     else if (cas_idx) // castling 
     {
-        // printf("TODO push_move castle\n"); 
-
         g->colors[col] ^= MOVE_CASTLE_BB_ALL[cas_idx]; 
 
         g->hash ^= sq_pc_zb(MOVE_CASTLE_SQ_K[cas_idx][0], MOVE_CASTLE_PC_K[cas_idx]); 
@@ -183,14 +196,12 @@ void push_move(game *g, move mv)
     }
     else if (pc != pro) // promotion
     {
-        // printf("TODO push_move promotion\n"); 
-
         g->colors[col] ^= src_pos ^ dst_pos; 
         g->colors[opp] ^= (tgt != NO_PC) * dst_pos; 
 
         g->hash ^= sq_pc_zb(src, pc); 
         g->hash ^= sq_pc_zb(dst, pro); 
-        g->hash ^= (tgt != NO_PC) * sq_pc_zb(dst, tgt); 
+        g->hash ^= sq_pc_zb(dst, tgt); 
 
         g->pieces[pc] ^= src_pos; 
         g->pieces[pro] ^= dst_pos; 
@@ -199,6 +210,9 @@ void push_move(game *g, move mv)
         clear_mbox(&g->mailbox, src); 
         set_mbox(&g->mailbox, dst, pro); 
 
+        g->counts[tgt]--; 
+        g->counts[pc]--; 
+        g->counts[pro]++; 
         g->ep = NO_SQ; 
     }
     else // standard move 
@@ -208,7 +222,7 @@ void push_move(game *g, move mv)
 
         g->hash ^= sq_pc_zb(src, pc); 
         g->hash ^= sq_pc_zb(dst, pc); 
-        g->hash ^= (tgt != NO_PC) * sq_pc_zb(dst, tgt); 
+        g->hash ^= sq_pc_zb(dst, tgt); 
 
         g->pieces[pc] ^= src_pos ^ dst_pos; 
         g->pieces[tgt] ^= dst_pos; 
@@ -216,6 +230,7 @@ void push_move(game *g, move mv)
         clear_mbox(&g->mailbox, src); 
         set_mbox(&g->mailbox, dst, pc); 
 
+        g->counts[tgt]--; 
         if (get_no_col(pc) == PC_P && abs(src - dst) == 16) 
         {
             g->ep = col_sign(g->turn) * 8 + src; 
@@ -235,26 +250,11 @@ void push_move(game *g, move mv)
     // for next movement: 
     //   can move to any square without own pieces 
     g->movement = ~g->colors[opp]; 
-
-#ifdef CHECK_IN_CHECK
-    g->in_check = is_attacked(g, lsb(g->pieces[make_pc(PC_K, opp)]), opp); 
-#endif
-    
     g->ply++; 
     g->turn = opp; 
-
-#ifdef CHECK_IN_CHECK
-    if (is_check(mv) ^ g->in_check) 
-    {
-        printf("\n\n\nMove "); 
-        print_move_end(mv, ""); 
-        printf(" claims check=%d, but board is really check=%d\n", is_check(mv), g->in_check); 
-        print_game(g); 
-        exit(1); 
-    }
-#endif
-
     g->in_check = is_check(mv); 
+
+    VALIDATE_GAME_MOVE(g, mv, "pushing"); 
 }
 
 void pop_move(game *g, move mv) 
@@ -282,12 +282,12 @@ void pop_move(game *g, move mv)
     bool ep = is_ep(mv); 
     int cas_idx = castle_idx(mv); 
 
-    bboard src_pos = make_pos(src); 
-    bboard dst_pos = make_pos(dst); 
+    bboard src_pos = BB[src]; 
+    bboard dst_pos = BB[dst]; 
 
     if (ep) 
     {
-        bboard rm_pos = make_pos(g->ep - 8 * col_sign(g->turn)); 
+        bboard rm_pos = BB[g->ep - 8 * col_sign(g->turn)]; 
 
         g->colors[col] ^= src_pos ^ dst_pos; 
         g->colors[opp] ^= rm_pos; 
@@ -298,11 +298,11 @@ void pop_move(game *g, move mv)
         set_mbox(&g->mailbox, src, pc); 
         set_mbox(&g->mailbox, g->ep - 8 * col_sign(g->turn), tgt); 
         clear_mbox(&g->mailbox, dst); 
+
+        g->counts[tgt]++; 
     }
     else if (cas_idx) 
     {
-        // printf("TODO pop_move castle\n"); 
-
         g->colors[col] ^= MOVE_CASTLE_BB_ALL[cas_idx]; 
 
         g->pieces[pc] ^= MOVE_CASTLE_BB_K[cas_idx]; 
@@ -312,8 +312,6 @@ void pop_move(game *g, move mv)
         clear_mbox(&g->mailbox, MOVE_CASTLE_SQ_R[cas_idx][1]); 
         set_mbox(&g->mailbox, MOVE_CASTLE_SQ_K[cas_idx][0], pc); 
         set_mbox(&g->mailbox, MOVE_CASTLE_SQ_R[cas_idx][0], make_pc(PC_R, col)); 
-
-        g->ep = NO_SQ; 
     }
     else if (pc != pro) 
     {
@@ -326,6 +324,10 @@ void pop_move(game *g, move mv)
         
         set_mbox(&g->mailbox, src, pc); 
         set_mbox(&g->mailbox, dst, tgt); 
+
+        g->counts[tgt]++; 
+        g->counts[pc]++; 
+        g->counts[pro]--; 
     }
     else 
     {
@@ -337,10 +339,14 @@ void pop_move(game *g, move mv)
         
         set_mbox(&g->mailbox, src, pc); 
         set_mbox(&g->mailbox, dst, tgt); 
+
+        g->counts[tgt]++; 
     }
 
     g->all = g->colors[COL_W] | g->colors[COL_B]; 
     g->movement = ~g->colors[col]; 
+
+    VALIDATE_GAME_MOVE(g, mv, "popping"); 
 }
 
 void push_null_move(game *g) 
@@ -352,13 +358,16 @@ void push_null_move(game *g)
     hist->ep = g->ep; 
     hist->castle = g->castle; 
     hist->in_check = g->in_check; 
+    hist->hash = g->hash; 
 
     g->hash ^= col_zb(); 
+    g->hash ^= ep_zb(g->ep); 
 
     color col = g->turn; 
     color opp = opp_col(col); 
 
     g->ep = NO_SQ; 
+    g->hash ^= ep_zb(g->ep); 
 
     // for next movement: 
     //   can move to any square without own pieces 
@@ -368,6 +377,8 @@ void push_null_move(game *g)
     g->turn = opp; 
 
     g->in_check = is_attacked(g, lsb(g->pieces[make_pc(PC_K, opp)]), opp); 
+
+    VALIDATE_GAME_MOVE(g, 0, "pushing null"); 
 }
 
 void pop_null_move(game *g) 
@@ -378,16 +389,17 @@ void pop_null_move(game *g)
     g->ply--; 
     g->turn = col; 
 
-    g->hash ^= col_zb(); 
-
     move_hist *hist = g->hist + --g->depth; 
     g->halfmove = hist->halfmove; 
     g->ep = hist->ep; 
     g->castle = hist->castle; 
     g->in_check = hist->in_check; 
+    g->hash = hist->hash; 
 
     g->all = g->colors[COL_W] | g->colors[COL_B]; 
     g->movement = ~g->colors[col]; 
+
+    VALIDATE_GAME_MOVE(g, 0, "popping null"); 
 }
 
 bool is_special_draw(const game *g) 
@@ -413,6 +425,167 @@ bool is_special_draw(const game *g)
     }
 
     return false; 
+}
+
+bool validate_game(const game *g) 
+{
+    bool valid = true; 
+
+    // piece counts 
+    for (piece pc = 0; pc < PC_CNT; pc++) 
+    {
+        if (g->counts[pc] != popcnt(g->pieces[pc])) 
+        {
+            printf("info string ERROR %s count is %d but should be %d\n", str_pc(pc), g->counts[pc], popcnt(g->pieces[pc])); 
+            valid = false; 
+        }
+    }
+
+    // exactly 1 king 
+    {
+        for (color col = COL_W; col < COL_CNT; col++) 
+        {
+            if (g->counts[make_pc(PC_K, col)] != 1) 
+            {
+                printf("info string ERROR %s does not have exactly 1 king: %d\n", col ? "white" : "black", g->counts[make_pc(PC_K, col)]); 
+                valid = false; 
+            }
+        }
+    }
+
+    // bitboards 
+    {
+        bboard all = 0, col[2] = { 0, 0 }; 
+        for (piece pc = 0; pc < PC_CNT; pc++) 
+        {
+            all ^= g->pieces[pc]; 
+            col[get_col(pc)] ^= g->pieces[pc]; 
+        }
+
+        if (all != g->all) { printf("info string ERROR piece bitboards don't match accumulated board\n"); valid = false; } 
+        if (col[COL_W] != g->colors[COL_W]) { printf("info string ERROR piece bitboards don't match accumulated white board\n"); valid = false; } 
+        if (col[COL_B] != g->colors[COL_B]) { printf("info string ERROR piece bitboards don't match accumulated black board\n"); valid = false; } 
+    }
+
+    // check 
+    {
+        square ksq = lsb(g->pieces[make_pc(PC_K, g->turn)]); 
+        bool actually_in_check = is_attacked(g, ksq, g->turn); 
+        if (actually_in_check ^ g->in_check) 
+        {
+            printf("info string ERROR check flag is incorrect: %d instead of %d\n", g->in_check, actually_in_check); 
+            printf("info string       king on %s\n", str_sq(ksq)); 
+            valid = false; 
+        }
+    }
+
+    // pc_at 
+    {
+        for (square sq = 0; sq < SQ_CNT; sq++) 
+        {
+            piece pc = pc_at(g, sq); 
+            if (pc > NO_SQ) 
+            {
+                printf("info string ERROR mailbox piece is invalid: %d at %s\n", pc, str_sq(sq)); 
+                valid = false; 
+            }
+            else if (pc == NO_PC) 
+            {
+                if (get_bit(g->all, sq)) 
+                {
+                    printf("info string ERROR mailbox has no piece but should have one: %s\n", str_sq(sq)); 
+                    valid = false; 
+                }
+            }
+            else // valid piece 
+            {
+                if (!get_bit(g->pieces[pc], sq)) 
+                {
+                    printf("info string ERROR mailbox has %s but should be empty: %s\n", str_pc(pc), str_sq(sq)); 
+                    valid = false; 
+                }
+            }
+        }
+    }
+
+    // castling 
+    {
+        if (g->castle & CASTLE_WK) 
+        {
+            if (pc_at(g, E1) != PC_WK || pc_at(g, H1) != PC_WR) 
+            {
+                printf("info string ERROR white O-O flag is set but no longer possible\n"); 
+                valid = false; 
+            }
+        }
+        if (g->castle & CASTLE_WQ) 
+        {
+            if (pc_at(g, E1) != PC_WK || pc_at(g, A1) != PC_WR) 
+            {
+                printf("info string ERROR white O-O-O flag is set but no longer possible\n"); 
+                valid = false; 
+            }
+        }
+        if (g->castle & CASTLE_BK) 
+        {
+            if (pc_at(g, E8) != PC_BK || pc_at(g, H8) != PC_BR) 
+            {
+                printf("info string ERROR black O-O flag is set but no longer possible\n"); 
+                valid = false; 
+            }
+        }
+        if (g->castle & CASTLE_BQ) 
+        {
+            if (pc_at(g, E8) != PC_BK || pc_at(g, A8) != PC_BR) 
+            {
+                printf("info string ERROR black O-O-O flag is set but no longer possible\n"); 
+                valid = false; 
+            }
+        }
+    }
+
+    // hash 
+    {
+        zobrist hash = 0; 
+
+        // color 
+        if (g->turn) 
+        {
+            hash ^= col_zb(); 
+        }
+
+        // castling 
+        hash ^= castle_zb(g->castle); 
+
+        // ep 
+        hash ^= ep_zb(g->ep); 
+
+        // pieces 
+        for (piece pc = 0; pc < PC_CNT; pc++) 
+        {
+            FOR_EACH_BIT(g->pieces[pc], 
+            {
+                hash ^= sq_pc_zb(sq, pc); 
+            });
+        }
+
+        if (hash != g->hash) 
+        {
+            printf("info string ERROR zobrist hashing is invalid: ");
+            print_zb_end(g->hash, " instead of "); 
+            print_zb_end(hash, ", remainder: ");
+            find_print_zb(hash ^ g->hash);  
+            valid = false;  
+        }
+    }
+
+    if (!valid) 
+    {
+        printf("info string ERROR game state is not valid, exitting\n"); 
+        print_game(g); 
+    }
+
+    return valid; 
 }
 
 static inline uint64_t perft_(game *g, mvlist *moves, int depth) 

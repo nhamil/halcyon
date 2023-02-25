@@ -1,3 +1,4 @@
+#include "bitboard.h"
 #include "game.h" 
 #include "piece.h"
 
@@ -242,6 +243,7 @@ void load_fen(game *g, const char *fen)
     for (piece pc = PC_P; pc < PC_CNT; pc++) 
     {
         g->colors[get_col(pc)] |= g->pieces[pc]; 
+        g->counts[pc] = popcnt(g->pieces[pc]); 
     }
 
     g->all = g->colors[COL_W] | g->colors[COL_B]; 

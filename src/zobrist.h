@@ -12,9 +12,9 @@
 
 typedef uint64_t zobrist; 
 
-extern zobrist SQ_PC_HASH[SQ_CNT][PC_CNT]; 
+extern zobrist SQ_PC_HASH[SQ_CNT][PC_CNT + 1]; 
 extern zobrist CASTLE_HASH[CASTLE_ALL + 1]; 
-extern zobrist EP_HASH[8]; 
+extern zobrist EP_HASH[8 + 1]; 
 extern zobrist COL_HASH; 
 
 void init_zb(void); 
@@ -48,3 +48,5 @@ static void print_zb_end(zobrist hash, const char *end)
 {
     printf("%016" PRIx64 "%s", hash, end); 
 }
+
+void find_print_zb(zobrist hash); 

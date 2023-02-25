@@ -31,15 +31,39 @@
 // defines the bitboard `remain` and the current square of `board`, `sq` for the duration of the loop
 #define FOR_EACH_BIT(board, action) do { \
         bboard remain = (board); \
+        square sq; \
+        while (remain) \
+        { \
+            sq = lsb(remain); \
+            remain &= INV_BB[sq]; \
+            action; \
+        } \
+    } while (0); 
+
+#define REPEAT_0(x) 
+#define REPEAT_1(x) x; 
+#define REPEAT_2(x) REPEAT_1(x) REPEAT_1(x) 
+#define REPEAT_3(x) REPEAT_2(x) REPEAT_1(x) 
+#define REPEAT_4(x) REPEAT_3(x) REPEAT_1(x) 
+#define REPEAT_5(x) REPEAT_4(x) REPEAT_1(x) 
+#define REPEAT_6(x) REPEAT_5(x) REPEAT_1(x) 
+#define REPEAT_7(x) REPEAT_6(x) REPEAT_1(x) 
+#define REPEAT_8(x) REPEAT_7(x) REPEAT_1(x) 
+#define REPEAT_9(x) REPEAT_8(x) REPEAT_1(x) 
+#define REPEAT_10(x) REPEAT_9(x) REPEAT_1(x) 
+#define REPEAT_N(n, x) REPEAT_##n(x) 
+
+#define FOR_EACH_BIT_N(n, board, action) do { \
+        bboard remain = (board); \
         square sq = A1 - 1; \
         int next; \
-        while ((sq < H8) & (remain != 0)) \
+        REPEAT_##n( \
         { \
             next = lsb(remain) + 1; \
             remain >>= next; \
             sq += next; \
             action; \
-        } \
+        }) \
     } while (0); 
 
 typedef enum check_dir 
@@ -73,10 +97,29 @@ extern const uint8_t PIN_IDX[SQ_CNT][SQ_CNT];
 extern const uint8_t POPCNT16[1 << 16]; 
 extern const uint64_t REV8OFF[8][256]; 
 
-static inline bboard make_pos(square sq) 
+static const bboard INV_BB[64] = 
 {
-    return 1ULL << sq; 
-}
+    ~(1ULL << 0),  ~(1ULL << 1),  ~(1ULL << 2),  ~(1ULL << 3),  ~(1ULL << 4),  ~(1ULL << 5),  ~(1ULL << 6),  ~(1ULL << 7), 
+    ~(1ULL << 8),  ~(1ULL << 9),  ~(1ULL << 10), ~(1ULL << 11), ~(1ULL << 12), ~(1ULL << 13), ~(1ULL << 14), ~(1ULL << 15), 
+    ~(1ULL << 16), ~(1ULL << 17), ~(1ULL << 18), ~(1ULL << 19), ~(1ULL << 20), ~(1ULL << 21), ~(1ULL << 22), ~(1ULL << 23), 
+    ~(1ULL << 24), ~(1ULL << 25), ~(1ULL << 26), ~(1ULL << 27), ~(1ULL << 28), ~(1ULL << 29), ~(1ULL << 30), ~(1ULL << 31), 
+    ~(1ULL << 32), ~(1ULL << 33), ~(1ULL << 34), ~(1ULL << 35), ~(1ULL << 36), ~(1ULL << 37), ~(1ULL << 38), ~(1ULL << 39), 
+    ~(1ULL << 40), ~(1ULL << 41), ~(1ULL << 42), ~(1ULL << 43), ~(1ULL << 44), ~(1ULL << 45), ~(1ULL << 46), ~(1ULL << 47), 
+    ~(1ULL << 48), ~(1ULL << 49), ~(1ULL << 50), ~(1ULL << 51), ~(1ULL << 52), ~(1ULL << 53), ~(1ULL << 54), ~(1ULL << 55), 
+    ~(1ULL << 56), ~(1ULL << 57), ~(1ULL << 58), ~(1ULL << 59), ~(1ULL << 60), ~(1ULL << 61), ~(1ULL << 62), ~(1ULL << 63), 
+};
+
+static const bboard BB[64] = 
+{
+    (1ULL << 0),  (1ULL << 1),  (1ULL << 2),  (1ULL << 3),  (1ULL << 4),  (1ULL << 5),  (1ULL << 6),  (1ULL << 7), 
+    (1ULL << 8),  (1ULL << 9),  (1ULL << 10), (1ULL << 11), (1ULL << 12), (1ULL << 13), (1ULL << 14), (1ULL << 15), 
+    (1ULL << 16), (1ULL << 17), (1ULL << 18), (1ULL << 19), (1ULL << 20), (1ULL << 21), (1ULL << 22), (1ULL << 23), 
+    (1ULL << 24), (1ULL << 25), (1ULL << 26), (1ULL << 27), (1ULL << 28), (1ULL << 29), (1ULL << 30), (1ULL << 31), 
+    (1ULL << 32), (1ULL << 33), (1ULL << 34), (1ULL << 35), (1ULL << 36), (1ULL << 37), (1ULL << 38), (1ULL << 39), 
+    (1ULL << 40), (1ULL << 41), (1ULL << 42), (1ULL << 43), (1ULL << 44), (1ULL << 45), (1ULL << 46), (1ULL << 47), 
+    (1ULL << 48), (1ULL << 49), (1ULL << 50), (1ULL << 51), (1ULL << 52), (1ULL << 53), (1ULL << 54), (1ULL << 55), 
+    (1ULL << 56), (1ULL << 57), (1ULL << 58), (1ULL << 59), (1ULL << 60), (1ULL << 61), (1ULL << 62), (1ULL << 63), 
+};
 
 static inline bboard rrow(bboard b) 
 {
@@ -116,7 +159,7 @@ static inline bboard rev(bboard b)
 static inline bboard cast_pos_ray(square sq, bboard ray, bboard occupants) 
 {
     // one bit after current square 
-    bboard b2 = make_pos(sq) << 1; 
+    bboard b2 = BB[sq] << 1; 
 
     // only use bits that the piece can move to on the line 
     bboard relevant_occ = occupants & ray; 

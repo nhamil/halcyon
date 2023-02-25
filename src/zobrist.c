@@ -2,14 +2,15 @@
 
 #include <stdbool.h>
 
+#include "castle.h"
 #include "move.h" 
 #include "random.h" 
 
 bool is_zb_init = false; 
 
-zobrist SQ_PC_HASH[SQ_CNT][PC_CNT]; 
+zobrist SQ_PC_HASH[SQ_CNT][PC_CNT + 1]; 
 zobrist CASTLE_HASH[CASTLE_ALL + 1]; 
-zobrist EP_HASH[8]; 
+zobrist EP_HASH[8 + 1]; 
 zobrist COL_HASH; 
 
 void init_zb(void) 
@@ -51,4 +52,52 @@ void init_zb(void)
     COL_HASH = next_rand(&r); 
 
     is_zb_init = true; 
+}
+
+void find_print_zb(zobrist hash) 
+{
+    if (!hash) 
+    {
+        printf("[none]\n"); 
+        return; 
+    }
+
+    for (size_t i = 0; i < SQ_CNT; i++) 
+    {
+        for (size_t j = 0; j < PC_CNT; j++) 
+        {
+            if (hash == SQ_PC_HASH[i][j]) 
+            {
+                printf("[%s, %s]\n", str_sq(i), str_pc(j)); 
+                return; 
+            }
+        }
+    }
+
+    for (size_t i = 0; i < 8; i++) 
+    {
+        if (hash == EP_HASH[i]) 
+        {
+            printf("[ep %d]\n", (int) i); 
+            return; 
+        }
+    }
+
+    for (castle_flags index = 0; index <= CASTLE_ALL; index++) 
+    {
+        if (hash == CASTLE_HASH[index]) 
+        {
+            printf("[castle %s]\n", str_castle(index)); 
+            return; 
+        }
+    }
+
+    if (hash == COL_HASH) 
+    {
+        printf("[color]\n"); 
+        return; 
+    }
+
+    printf("[unknown "); 
+    print_zb_end(hash, "]\n"); 
 }

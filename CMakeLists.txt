@@ -72,5 +72,14 @@ add_executable(engine src/main.c ${sources})
 target_link_libraries(engine Threads::Threads) 
 set_target_properties(engine PROPERTIES OUTPUT_NAME "${EXE_NAME}")
 
+add_executable(engine-valid EXCLUDE_FROM_ALL src/main.c ${sources})
+target_link_libraries(engine-valid Threads::Threads) 
+set_target_properties(engine-valid PROPERTIES OUTPUT_NAME "${EXE_NAME}-valid")
+target_compile_definitions(engine-valid PRIVATE VALIDATION=1)
+
 add_executable(perft EXCLUDE_FROM_ALL src/perft.c ${sources})
 target_link_libraries(perft Threads::Threads)
+
+add_executable(perft-valid EXCLUDE_FROM_ALL src/perft.c ${sources})
+target_link_libraries(perft-valid Threads::Threads)
+target_compile_definitions(perft-valid PRIVATE VALIDATION=1)

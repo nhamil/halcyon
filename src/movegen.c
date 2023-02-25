@@ -8,8 +8,9 @@
 #include <stdio.h> 
 #include <stdlib.h> 
 
-#define TARGET_SQUARE_PARAMS bboard ok_squares, bboard *pin_dirs, const uint8_t *pin_idx
-#define TARGET_SQUARES ( ok_squares & ( ((get_bit(pin_dirs[pin_idx[sq]], sq) == 0) * ALL_BITS) | pin_dirs[pin_idx[sq]] ) )
+#define TGT_SQ_PARAMS bboard ok_squares, bboard *pin_dirs, const uint8_t *pin_idx
+#define TGT_SQ_PARAM_TYPES bboard, bboard *, const uint8_t *
+#define TGT_SQS ( ok_squares & ( ((get_bit(pin_dirs[pin_idx[sq]], sq) == 0) * ALL_BITS) | pin_dirs[pin_idx[sq]] ) )
 
 mvlist *new_mvlist(void) 
 {
@@ -149,29 +150,19 @@ static inline bool is_attacked_colmask(const game *g, square sq, color chk_col, 
     square ksq = lsb(g->pieces[make_pc(PC_K, col)]); \
     FOR_EACH_BIT(pcs, \
     {\
-        bboard pos = make_pos(sq); \
+        bboard pos = BB[sq]; \
         bboard to = (shift1(pos) | (shift2(pos & shift2_rank) & shift1(empty))) & empty; \
         to |= ATTACKS_P[col][sq] & opp; \
-        to &= TARGET_SQUARES; \
+        to &= TGT_SQS; \
         if (g->ep != NO_SQ && (pos & ATTACKS_P[opp_col(col)][g->ep])) \
         {\
-            if (!is_attacked_mask_add(g, ksq, col, ~(make_pos(sq) | make_pos(g->ep - 8 * col_sign(col))), make_pos(g->ep))) \
+            if (!is_attacked_mask_add(g, ksq, col, ~(BB[sq] | BB[g->ep - 8 * col_sign(col)]), BB[g->ep])) \
             {\
-                to |= make_pos(g->ep); \
+                to |= BB[g->ep]; \
             }\
         }\
         add_moves_to_info(info, pc, sq, to, popcnt(to) + popcnt(to & pro_rank) * 3); \
     });\
-
-static inline void gen_wp_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_P_INFO(COL_W, shift_n, shift_nn, RANK_2, RANK_8); 
-}
-
-static inline void gen_bp_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_P_INFO(COL_B, shift_s, shift_ss, RANK_7, RANK_1); 
-}
 
 #define FN_GEN_K_INFO(col, letter, rank) \
     piece pc = make_pc(PC_K, col); \
@@ -206,34 +197,14 @@ static inline void gen_bp_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info
     }\
     add_moves_to_info(info, pc, ksq, to, n_moves); 
 
-static inline void gen_wk_info(const game *g, mvinfo *info) 
-{
-    FN_GEN_K_INFO(COL_W, W, 1); 
-}
-
-static inline void gen_bk_info(const game *g, mvinfo *info) 
-{
-    FN_GEN_K_INFO(COL_B, B, 8); 
-}
-
 #define FN_GEN_N_INFO(col) \
     piece pc = make_pc(PC_N, col); \
     bboard pcs = g->pieces[pc]; \
     FOR_EACH_BIT(pcs, \
     {\
-        bboard to = MOVES_N[sq] & g->movement & TARGET_SQUARES; \
+        bboard to = MOVES_N[sq] & g->movement & TGT_SQS; \
         add_moves_to_info(info, pc, sq, to, popcnt(to)); \
     });
-
-static inline void gen_wn_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_N_INFO(COL_W); 
-}
-
-static inline void gen_bn_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_N_INFO(COL_B); 
-}
 
 #define FN_GEN_B_INFO(col) \
     piece pc = make_pc(PC_B, col); \
@@ -241,19 +212,9 @@ static inline void gen_bn_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info
     FOR_EACH_BIT(pcs, \
     {\
         bboard to = MAGIC_B_SLIDE[sq][((MAGIC_B_MASK[sq] & g->all) * MAGIC_B[sq]) >> MAGIC_B_SHIFT[sq]]; \
-        to &= g->movement & TARGET_SQUARES; \
+        to &= g->movement & TGT_SQS; \
         add_moves_to_info(info, pc, sq, to, popcnt(to)); \
     });
-
-static inline void gen_wb_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_B_INFO(COL_W); 
-}
-
-static inline void gen_bb_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_B_INFO(COL_B); 
-}
 
 #define FN_GEN_R_INFO(col) \
     piece pc = make_pc(PC_R, col); \
@@ -261,19 +222,9 @@ static inline void gen_bb_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info
     FOR_EACH_BIT(pcs, \
     {\
         bboard to = MAGIC_R_SLIDE[sq][((MAGIC_R_MASK[sq] & g->all) * MAGIC_R[sq]) >> MAGIC_R_SHIFT[sq]]; \
-        to &= g->movement & TARGET_SQUARES; \
+        to &= g->movement & TGT_SQS; \
         add_moves_to_info(info, pc, sq, to, popcnt(to)); \
     });
-
-static inline void gen_wr_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_R_INFO(COL_W); 
-}
-
-static inline void gen_br_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_R_INFO(COL_B); 
-}
 
 #define FN_GEN_Q_INFO(col) \
     piece pc = make_pc(PC_Q, col); \
@@ -282,19 +233,31 @@ static inline void gen_br_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info
     {\
         bboard to = MAGIC_B_SLIDE[sq][((MAGIC_B_MASK[sq] & g->all) * MAGIC_B[sq]) >> MAGIC_B_SHIFT[sq]] \
                   | MAGIC_R_SLIDE[sq][((MAGIC_R_MASK[sq] & g->all) * MAGIC_R[sq]) >> MAGIC_R_SHIFT[sq]]; \
-        to &= g->movement & TARGET_SQUARES; \
+        to &= g->movement & TGT_SQS; \
         add_moves_to_info(info, pc, sq, to, popcnt(to)); \
     });
 
-static inline void gen_wq_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
+static inline void gen_no_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) 
 {
-    FN_GEN_Q_INFO(COL_W); 
-}
+    (void) g; 
+    (void) ok_squares;  
+    (void) pin_dirs; 
+    (void) pin_idx; 
+    (void) info; 
+} 
 
-static inline void gen_bq_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info) 
-{
-    FN_GEN_Q_INFO(COL_B); 
-}
+static inline void gen_wp_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_P_INFO(COL_W, shift_n, shift_nn, RANK_2, RANK_8); } 
+static inline void gen_bp_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_P_INFO(COL_B, shift_s, shift_ss, RANK_7, RANK_1); } 
+static inline void gen_wk_info(const game *g, mvinfo *info) { FN_GEN_K_INFO(COL_W, W, 1); } 
+static inline void gen_bk_info(const game *g, mvinfo *info) { FN_GEN_K_INFO(COL_B, B, 8); } 
+static inline void gen_wn_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_N_INFO(COL_W); } 
+static inline void gen_bn_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_N_INFO(COL_B); } 
+static inline void gen_wb_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_B_INFO(COL_W); } 
+static inline void gen_bb_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_B_INFO(COL_B); } 
+static inline void gen_wr_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_R_INFO(COL_W); } 
+static inline void gen_br_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_R_INFO(COL_B); } 
+static inline void gen_wq_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_Q_INFO(COL_W); } 
+static inline void gen_bq_info(const game *g, TGT_SQ_PARAMS, mvinfo *info) { FN_GEN_Q_INFO(COL_B); } 
 
 // void gen_mvinfo(const game *g, mvinfo *info) 
 #define FN_GEN_MVINFO(col, letter) \
@@ -351,7 +314,7 @@ static inline void gen_bq_info(const game *g, TARGET_SQUARE_PARAMS, mvinfo *info
         if (n_checks == 1) \
         {\
             square attacker = lsb(chk); \
-            bboard ok_squares = SLIDE_TO[ksq][attacker] | make_pos(attacker); \
+            bboard ok_squares = SLIDE_TO[ksq][attacker] | BB[attacker]; \
             gen_##letter##p_info(g, ok_squares, dirs, p_idx, info); \
             gen_##letter##n_info(g, ok_squares, dirs, p_idx, info); \
             gen_##letter##b_info(g, ok_squares, dirs, p_idx, info); \
@@ -418,28 +381,28 @@ static inline bboard disc_attackers(const game *g, square sq, color chk_col, bbo
     }
 }
 
-#define DISC_ATTACKERS(col) (disc_attackers(g, opp_ksq, opp_col(col), ~make_pos(from), make_pos(sq), p_idx[from]))
+#define DISC_ATTACKERS(col) (disc_attackers(g, opp_ksq, opp_col(col), ~BB[from], BB[sq], p_idx[from]))
 #define CHECK_N (MOVES_N[sq] & opp_k)
-#define CHECK_B (b_attacks(sq, g->all & ~make_pos(from)) & opp_k)
-#define CHECK_R (r_attacks(sq, g->all & ~make_pos(from)) & opp_k)
-#define CHECK_Q ((b_attacks(sq, g->all & ~make_pos(from)) | r_attacks(sq, g->all & ~make_pos(from))) & opp_k)
+#define CHECK_B (b_attacks(sq, g->all & ~BB[from]) & opp_k)
+#define CHECK_R (r_attacks(sq, g->all & ~BB[from]) & opp_k)
+#define CHECK_Q ((b_attacks(sq, g->all & ~BB[from]) | r_attacks(sq, g->all & ~BB[from])) & opp_k)
 
 #define FN_GEN_P_MOVES(col, pro_rank, col_letter, opp_letter) \
 {\
     FOR_EACH_BIT(to & ~pro_rank, \
     {\
         moves->moves[moves->size++] = make_move_ep(from, sq, PC_##col_letter##P, (sq == g->ep) ? PC_##opp_letter##P : pc_at(g, sq), sq == g->ep, (sq == g->ep) ? (\
-            (ATTACKS_P[COL_W][sq] & opp_k) | \
-            disc_attackers(g, opp_ksq, opp_col(col), ~(make_pos(from) | make_pos(sq - 8 * col_sign(col))), make_pos(sq), p_idx[from]) | \
-            disc_attackers(g, opp_ksq, opp_col(col), ~(make_pos(from) | make_pos(sq - 8 * col_sign(col))), make_pos(sq), p_idx[sq - 8 * col_sign(col)]) \
+            (ATTACKS_P[col][sq] & opp_k) | \
+            disc_attackers(g, opp_ksq, opp_col(col), ~(BB[from] | BB[sq - 8 * col_sign(col)]), BB[sq], p_idx[from]) | \
+            disc_attackers(g, opp_ksq, opp_col(col), ~(BB[from] | BB[sq - 8 * col_sign(col)]), BB[sq], p_idx[sq - 8 * col_sign(col)]) \
         ) : (\
-            (ATTACKS_P[COL_W][sq] & opp_k) | DISC_ATTACKERS(col) \
+            (ATTACKS_P[col][sq] & opp_k) | DISC_ATTACKERS(col) \
         )); \
     });\
     FOR_EACH_BIT(to & pro_rank, \
     {\
         piece at = pc_at(g, sq); \
-        bboard disc = disc_attackers(g, opp_ksq, opp_col(col), ~make_pos(from), make_pos(sq), p_idx[from]);\
+        bboard disc = disc_attackers(g, opp_ksq, opp_col(col), ~BB[from], BB[sq], p_idx[from]);\
         moves->moves[moves->size++] = make_move_pro(from, sq, PC_##col_letter##P, PC_##col_letter##Q, at, (CHECK_Q) | disc); \
         moves->moves[moves->size++] = make_move_pro(from, sq, PC_##col_letter##P, PC_##col_letter##R, at, (CHECK_R) | disc); \
         moves->moves[moves->size++] = make_move_pro(from, sq, PC_##col_letter##P, PC_##col_letter##B, at, (CHECK_B) | disc); \
@@ -463,7 +426,7 @@ static inline void gen_bp_moves(const game *g, square from, bboard to, square op
     to &= ~castle; \
     FOR_EACH_BIT(to, \
     {\
-        moves->moves[moves->size++] = make_move(from, sq, PC_##letter##K, pc_at(g, sq), disc_attackers(g, opp_ksq, opp_col(g->turn), ~make_pos(from), make_pos(sq), p_idx[from])); \
+        moves->moves[moves->size++] = make_move(from, sq, PC_##letter##K, pc_at(g, sq), disc_attackers(g, opp_ksq, opp_col(g->turn), ~BB[from], BB[sq], p_idx[from])); \
     });\
     FOR_EACH_BIT(castle, \
     {\
