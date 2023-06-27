@@ -1,3 +1,13 @@
+/**
+ * @file Magic.c
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Magic bitboard constants. 
+ */
+
 #include "Magic.h" 
 
 const BBoard MagicRShift[64] = 

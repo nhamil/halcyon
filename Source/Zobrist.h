@@ -1,3 +1,13 @@
+/**
+ * @file Zobrist.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-26
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implements Zobrist hashing. 
+ */
+
 #pragma once 
 
 #include <inttypes.h>

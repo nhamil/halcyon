@@ -1,3 +1,13 @@
+/**
+ * @file Magic.h
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Magic bitboard constants. 
+ */
+
 #pragma once 
 
 #include "BBoard.h" 

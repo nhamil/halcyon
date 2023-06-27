@@ -1,3 +1,13 @@
+/**
+ * @file MoveGen.h
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Defines movement generation utilities. 
+ */
+
 #pragma once 
 
 #include "BBoard.h"

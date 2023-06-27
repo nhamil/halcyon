@@ -1,3 +1,13 @@
+/**
+ * @file MBox.h
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Defines mailbox, used for quick piece queries. 
+ */
+
 #pragma once 
 
 #include <stdbool.h> 
@@ -6,6 +16,7 @@
 
 #include "Piece.h" 
 #include "Square.h"
+#include "Types.h" 
 
 typedef struct MBox MBox; 
 

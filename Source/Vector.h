@@ -1,3 +1,13 @@
+/**
+ * @file Vector.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Dynamically allocated array for general storage. 
+ */
+
 #pragma once 
 
 #include <stdio.h> 

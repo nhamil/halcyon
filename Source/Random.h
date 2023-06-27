@@ -1,6 +1,18 @@
+/**
+ * @file Random.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Xorshift pseudorandom number generator. 
+ */
+
 #pragma once 
 
 #include <stdint.h> 
+
+#include "Types.h" 
 
 typedef struct Random Random; 
 

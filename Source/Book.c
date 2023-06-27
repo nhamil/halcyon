@@ -1,3 +1,13 @@
+/**
+ * @file Book.c
+ * @author Nicholas Hamilton 
+ * @date 2023-01-28
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implementation of Book
+ */
+
 #include "Book.h"
 
 #include <stdio.h> 

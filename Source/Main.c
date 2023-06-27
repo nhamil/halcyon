@@ -1,3 +1,13 @@
+/**
+ * @file Main.c
+ * @author Nicholas Hamilton 
+ * @date 2023-01-11
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Handles UCI communication. 
+ */
+
 #include <stdatomic.h> 
 #include <stdbool.h> 
 #include <stdio.h> 

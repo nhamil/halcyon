@@ -1,3 +1,13 @@
+/**
+ * @file Book.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-28
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Defines struct to store win statistics for openings. 
+ */
+
 #pragma once 
 
 #include <stdbool.h>

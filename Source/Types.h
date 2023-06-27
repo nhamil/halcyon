@@ -1,3 +1,13 @@
+/**
+ * @file Types.h
+ * @author Nicholas Hamilton 
+ * @date 2023-06-27
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Defines common types. 
+ */
+
 #pragma once 
 
 #include <stdint.h> 

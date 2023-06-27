@@ -1,3 +1,13 @@
+/**
+ * @file Perft.c
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Performance testing. Useful for making sure movegen is valid. 
+ */
+
 #include <math.h> 
 #include <stdio.h> 
 #include <time.h> 

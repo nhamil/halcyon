@@ -1,3 +1,14 @@
+/**
+ * @file Game.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Handles a single instance of a chess game, with support for undoing moves 
+ * and playing null moves. 
+ */
+
 #pragma once 
 
 #include <inttypes.h>

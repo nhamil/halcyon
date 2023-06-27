@@ -1,3 +1,13 @@
+/**
+ * @file Game.c
+ * @author Nicholas Hamilton 
+ * @date 2023-01-19
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implements game logic. 
+ */
+
 #include "Game.h" 
 
 #include <stdlib.h> 

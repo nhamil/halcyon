@@ -1,3 +1,13 @@
+/**
+ * @file Fen.c
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Loads a game from FEN notation. 
+ */
+
 #include "BBoard.h"
 #include "Game.h" 
 #include "Piece.h"

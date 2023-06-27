@@ -1,3 +1,13 @@
+/**
+ * @file Castle.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Bit flags for castling. 
+ */
+
 #pragma once 
 
 #define CASTLE_WK 1 

@@ -1,3 +1,13 @@
+/**
+ * @file Piece.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Piece and color constants and utilities. 
+ */
+
 #pragma once 
 
 #include <stdint.h> 

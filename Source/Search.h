@@ -1,3 +1,13 @@
+/**
+ * @file Search.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-19
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Defines functions for finding the best move. 
+ */
+
 #pragma once 
 
 #include <stdatomic.h> 

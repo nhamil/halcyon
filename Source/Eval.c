@@ -1,3 +1,13 @@
+/**
+ * @file Eval.c
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implements static board evaluation. 
+ */
+
 #include "Game.h" 
 
 int PcSq[2][6][64] = 

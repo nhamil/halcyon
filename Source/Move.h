@@ -1,3 +1,13 @@
+/**
+ * @file Move.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Encodes and decodes a single move. 
+ */
+
 #pragma once 
 
 #include <stdbool.h> 

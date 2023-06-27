@@ -1,3 +1,13 @@
+/**
+ * @file Search.c
+ * @author Nicholas Hamilton 
+ * @date 2023-01-19
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implements negamax search and various optimizations. 
+ */
+
 #include "Search.h" 
 #include "Game.h"
 #include "Move.h"

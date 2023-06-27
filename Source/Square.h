@@ -1,3 +1,13 @@
+/**
+ * @file Square.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Square constants and utilities. 
+ */
+
 #pragma once 
 
 #define A1 0

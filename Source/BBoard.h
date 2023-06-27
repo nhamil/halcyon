@@ -1,3 +1,13 @@
+/**
+ * @file BBoard.h
+ * @author Nicholas Hamilton 
+ * @date 2023-01-12
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Bitboard and other bit manipulation utilities. 
+ */
+
 #pragma once 
 
 #include <stdint.h> 

@@ -1,3 +1,13 @@
+/**
+ * @file Zobrist.c
+ * @author Nicholas Hamilton 
+ * @date 2023-01-26
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implements Zobrist hashing utilities. 
+ */
+
 #include "Zobrist.h"
 
 #include <stdbool.h>

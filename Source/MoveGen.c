@@ -1,3 +1,13 @@
+/**
+ * @file MoveGen.c
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implements legal piece movement. 
+ */
+
 #include "MoveGen.h" 
 #include "BBoard.h"
 #include "Game.h"

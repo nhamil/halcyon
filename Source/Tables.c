@@ -1,3 +1,13 @@
+/**
+ * @file Tables.c
+ * @author Nicholas Hamilton 
+ * @date 2023-02-20
+ * 
+ * Copyright (c) 2023 Nicholas Hamilton
+ * 
+ * Implements useful tables. 
+ */
+
 #include "BBoard.h" 
 
 const BBoard MovesK[] = 
