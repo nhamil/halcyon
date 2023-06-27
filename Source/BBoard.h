@@ -3,8 +3,9 @@
 #include <stdint.h> 
 #include <stdio.h> 
 
-#include "piece.h"
-#include "square.h" 
+#include "Piece.h"
+#include "Square.h" 
+#include "Types.h" 
 
 #define NO_FILE_A  0xFEFEFEFEFEFEFEFEULL 
 #define NO_FILE_H  0x7F7F7F7F7F7F7F7FULL 
@@ -30,12 +31,12 @@
 
 // defines the bitboard `remain` and the current square of `board`, `sq` for the duration of the loop
 #define FOR_EACH_BIT(board, action) do { \
-        bboard remain = (board); \
-        square sq; \
+        BBoard remain = (board); \
+        Square sq; \
         while (remain) \
         { \
-            sq = lsb(remain); \
-            remain &= INV_BB[sq]; \
+            sq = Lsb(remain); \
+            remain &= InvBB[sq]; \
             action; \
         } \
     } while (0); 
@@ -54,50 +55,50 @@
 #define REPEAT_N(n, x) REPEAT_##n(x) 
 
 #define FOR_EACH_BIT_N(n, board, action) do { \
-        bboard remain = (board); \
-        square sq = A1 - 1; \
+        BBoard remain = (board); \
+        Square sq = A1 - 1; \
         int next; \
         REPEAT_##n( \
         { \
-            next = lsb(remain) + 1; \
+            next = Lsb(remain) + 1; \
             remain >>= next; \
             sq += next; \
             action; \
         }) \
     } while (0); 
 
-typedef enum check_dir 
+typedef enum CheckDir 
 {
-    CHECK_DIR_N = 0, 
-    CHECK_DIR_S, 
-    CHECK_DIR_E, 
-    CHECK_DIR_W, 
-    CHECK_DIR_R_END = CHECK_DIR_W, 
-    CHECK_DIR_NE, 
-    CHECK_DIR_NW, 
-    CHECK_DIR_SE, 
-    CHECK_DIR_SW, 
-    CHECK_DIR_CNT, 
+    CheckDirN = 0, 
+    CheckDirS, 
+    CheckDirE, 
+    CheckDirW, 
+    CheckDirRookEnd = CheckDirW, 
+    CheckDirNE, 
+    CheckDirNW, 
+    CheckDirSE, 
+    CheckDirSW, 
+    NumCheckDirs, 
 
-    CHECK_PC_N = CHECK_DIR_CNT, 
-    CHECK_PC_P, 
-    CHECK_CNT
-} check_dir;
+    CheckPcN = NumCheckDirs, 
+    CheckPcP, 
+    NumChecks
+} CheckDir;
 
-typedef uint64_t bboard; 
+typedef U64 BBoard; 
 
-extern const bboard MOVES_K[SQ_CNT]; 
-extern const bboard MOVES_N[SQ_CNT]; 
-extern const bboard ATTACKS_P[COL_CNT][SQ_CNT]; 
+extern const BBoard MovesK[NUM_SQ]; 
+extern const BBoard MovesN[NUM_SQ]; 
+extern const BBoard AttacksP[NUM_COLS][NUM_SQ]; 
 
-extern const bboard SLIDE_TO[SQ_CNT][SQ_CNT]; 
+extern const BBoard SlideTo[NUM_SQ][NUM_SQ]; 
 
-extern const uint8_t PIN_IDX[SQ_CNT][SQ_CNT]; 
+extern const U8 PinIdx[NUM_SQ][NUM_SQ]; 
 
-extern const uint8_t POPCNT16[1 << 16]; 
-extern const uint64_t REV8OFF[8][256]; 
+extern const U8 Popcnt16[1 << 16]; 
+extern const U64 Rev8Off[8][256]; 
 
-static const bboard INV_BB[64] = 
+static const BBoard InvBB[64] = 
 {
     ~(1ULL << 0),  ~(1ULL << 1),  ~(1ULL << 2),  ~(1ULL << 3),  ~(1ULL << 4),  ~(1ULL << 5),  ~(1ULL << 6),  ~(1ULL << 7), 
     ~(1ULL << 8),  ~(1ULL << 9),  ~(1ULL << 10), ~(1ULL << 11), ~(1ULL << 12), ~(1ULL << 13), ~(1ULL << 14), ~(1ULL << 15), 
@@ -109,7 +110,7 @@ static const bboard INV_BB[64] =
     ~(1ULL << 56), ~(1ULL << 57), ~(1ULL << 58), ~(1ULL << 59), ~(1ULL << 60), ~(1ULL << 61), ~(1ULL << 62), ~(1ULL << 63), 
 };
 
-static const bboard BB[64] = 
+static const BBoard BB[64] = 
 {
     (1ULL << 0),  (1ULL << 1),  (1ULL << 2),  (1ULL << 3),  (1ULL << 4),  (1ULL << 5),  (1ULL << 6),  (1ULL << 7), 
     (1ULL << 8),  (1ULL << 9),  (1ULL << 10), (1ULL << 11), (1ULL << 12), (1ULL << 13), (1ULL << 14), (1ULL << 15), 
@@ -121,48 +122,48 @@ static const bboard BB[64] =
     (1ULL << 56), (1ULL << 57), (1ULL << 58), (1ULL << 59), (1ULL << 60), (1ULL << 61), (1ULL << 62), (1ULL << 63), 
 };
 
-static inline bboard rrow(bboard b) 
+static inline BBoard RRow(BBoard b) 
 {
     b = (b & 0xFFFF0000FFFF0000ULL) >> 16 | (b & 0x0000FFFF0000FFFFULL) << 16; 
     b = (b & 0xFF00FF00FF00FF00ULL) >>  8 | (b & 0x00FF00FF00FF00FFULL) <<  8; 
     return b >> 32 | b << 32; 
 }
 
-static inline bboard bswap(bboard b) 
+static inline BBoard BSwap(BBoard b) 
 {
-    return rrow(b); 
+    return RRow(b); 
 }
 
-static inline bboard rcol(bboard b) 
+static inline BBoard RCol(BBoard b) 
 {
     b = (b & 0xF0F0F0F0F0F0F0F0ULL) >> 4 | (b & 0x0F0F0F0F0F0F0F0FULL) << 4; 
     b = (b & 0xCCCCCCCCCCCCCCCCULL) >> 2 | (b & 0x3333333333333333ULL) << 2; 
     return (b & 0xAAAAAAAAAAAAAAAAULL) >> 1 | (b & 0x5555555555555555ULL) << 1; 
 }
 
-static inline bboard rev(bboard b) 
+static inline BBoard Rev(BBoard b) 
 {
-    // return rrow(rcol(b)); 
-    return REV8OFF[7][((b) & 255)] | 
-           REV8OFF[6][((b >>  8) & 255)] | 
-           REV8OFF[5][((b >> 16) & 255)] | 
-           REV8OFF[4][((b >> 24) & 255)] | 
-           REV8OFF[3][((b >> 32) & 255)] | 
-           REV8OFF[2][((b >> 40) & 255)] | 
-           REV8OFF[1][((b >> 48) & 255)] | 
-           REV8OFF[0][((b >> 56))];
+    // return RRow(RCol(b)); 
+    return Rev8Off[7][((b) & 255)] | 
+           Rev8Off[6][((b >>  8) & 255)] | 
+           Rev8Off[5][((b >> 16) & 255)] | 
+           Rev8Off[4][((b >> 24) & 255)] | 
+           Rev8Off[3][((b >> 32) & 255)] | 
+           Rev8Off[2][((b >> 40) & 255)] | 
+           Rev8Off[1][((b >> 48) & 255)] | 
+           Rev8Off[0][((b >> 56))];
 }
 
 // see: https://www.chessprogramming.org/Subtracting_a_Rook_from_a_Blocking_Piece
 // uses the o^(o-2r) trick
 // only finds positive rays (squares with values higher than [sq])
-static inline bboard cast_pos_ray(square sq, bboard ray, bboard occupants) 
+static inline BBoard CastPosRay(Square sq, BBoard ray, BBoard occupants) 
 {
     // one bit after current square 
-    bboard b2 = BB[sq] << 1; 
+    BBoard b2 = BB[sq] << 1; 
 
     // only use bits that the piece can move to on the line 
-    bboard relevant_occ = occupants & ray; 
+    BBoard relevantOcc = occupants & ray; 
 
     // Subtract 2*b from the occupants. Since we only kept bits on the line 
     // the very first bit found on the line will be removed and ones will fill 
@@ -171,24 +172,24 @@ static inline bboard cast_pos_ray(square sq, bboard ray, bboard occupants)
     // squares (including outside of the line) up to and including the first 
     // target found. XOR with the original occupants to get all the bits that 
     // changed and AND with the line so we ignore all changes outside of it. 
-    return ((relevant_occ - b2) ^ relevant_occ) & ray; 
+    return ((relevantOcc - b2) ^ relevantOcc) & ray; 
 }
 
 // see: https://www.chessprogramming.org/Hyperbola_Quintessence
-static inline bboard cast_ray(square sq, bboard ray, bboard occupants) 
+static inline BBoard CastRay(Square sq, BBoard ray, BBoard occupants) 
 {
     // do o^(o-2r) trick on reverse board as well (for negative rays) 
-    return cast_pos_ray(sq, ray, occupants) | 
-           rev(cast_pos_ray(63 - sq, rev(ray), rev(occupants))); 
+    return CastPosRay(sq, ray, occupants) | 
+           Rev(CastPosRay(63 - sq, Rev(ray), Rev(occupants))); 
 }
 
 // see: https://www.chessprogramming.org/BitScan 
 // finds the least significant bit of a nonzero value
 // note that this will not work with a value of 0
-static inline int lsb(bboard b) 
+static inline int Lsb(BBoard b) 
 {
     // pre-calculated hash results  
-    static const int POSITIONS[] = 
+    static const int Positions[] = 
     {
         63,  0,  1, 28,  2,  6, 29, 54, 
          3, 18, 13,  7, 50, 30, 21, 55, 
@@ -211,95 +212,95 @@ static inline int lsb(bboard b)
     // multiply (b & -b) that by a pre-generated constant to perfect 
     // hash all possible nonzero values to unique 6-bit indices in a 
     // lookup table
-    return POSITIONS[(b & -b) * 0x45949D0DED5CC7EULL >> 58]; 
+    return Positions[(b & -b) * 0x45949D0DED5CC7EULL >> 58]; 
 }
 
-static inline int msb(bboard b) 
+static inline int Msb(BBoard b) 
 {
-    return 63 - lsb(rev(b)); 
+    return 63 - Lsb(Rev(b)); 
 }
 
-static inline int popcnt(bboard b) 
+static inline int Popcnt(BBoard b) 
 {
-    return POPCNT16[((b >>  0) & 65535)]
-         + POPCNT16[((b >> 16) & 65535)]
-         + POPCNT16[((b >> 32) & 65535)]
-         + POPCNT16[((b >> 48) & 65535)];
+    return Popcnt16[((b >>  0) & 65535)]
+         + Popcnt16[((b >> 16) & 65535)]
+         + Popcnt16[((b >> 32) & 65535)]
+         + Popcnt16[((b >> 48) & 65535)];
 }
 
-static inline int popcnt16(uint16_t b) 
+static inline int PopcntShort(U16 b) 
 {
-    return POPCNT16[b]; 
+    return Popcnt16[b]; 
 }
 
-static inline bboard shift_nn(bboard b) 
+static inline BBoard ShiftNN(BBoard b) 
 {
     return b << 16; 
 }
 
-static inline bboard shift_ss(bboard b) 
+static inline BBoard ShiftSS(BBoard b) 
 {
     return b >> 16; 
 }
 
-static inline bboard shift_n(bboard b) 
+static inline BBoard ShiftN(BBoard b) 
 {
     return b << 8; 
 }
 
-static inline bboard shift_s(bboard b) 
+static inline BBoard ShiftS(BBoard b) 
 {
     return b >> 8; 
 }
 
-static inline bboard shift_e(bboard b) 
+static inline BBoard ShiftE(BBoard b) 
 {
     return (b << 1) & NO_FILE_A; 
 }
 
-static inline bboard shift_w(bboard b) 
+static inline BBoard ShiftW(BBoard b) 
 {
     return (b >> 1) & NO_FILE_H; 
 }
 
-static inline bboard shift_ne(bboard b) 
+static inline BBoard ShiftNE(BBoard b) 
 {
     return (b << 9) & NO_FILE_A; 
 }
 
-static inline bboard shift_nw(bboard b) 
+static inline BBoard ShiftNW(BBoard b) 
 {
     return (b << 7) & NO_FILE_H; 
 }
 
-static inline bboard shift_se(bboard b) 
+static inline BBoard ShiftSE(BBoard b) 
 {
     return (b >> 7) & NO_FILE_A; 
 }
 
-static inline bboard shift_sw(bboard b) 
+static inline BBoard ShiftSW(BBoard b) 
 {
     return (b >> 9) & NO_FILE_H; 
 }
 
-static inline int get_bit(bboard b, square sq) 
+static inline int GetBit(BBoard b, Square sq) 
 {
     return (b >> sq) & 1; 
 }
 
-static inline bboard set_bit(bboard b, square sq) 
+static inline BBoard SetBit(BBoard b, Square sq) 
 {
     return b | (1ULL << sq); 
 }
 
-static inline bboard clear_bit(bboard b, square sq) 
+static inline BBoard ClearBit(BBoard b, Square sq) 
 {
     return b & ~(1ULL << sq); 
 }
 
-static void print_bits(bboard b) 
+static void PrintBits(BBoard b) 
 {
-    b = rrow(b); 
+    b = RRow(b); 
     printf("+---------------+\n"); 
     for (int i = 0; i < 64; i++) 
     {
@@ -308,7 +309,7 @@ static void print_bits(bboard b)
     printf("+---------------+\n"); 
 }
 
-static void print_bits_bin(bboard b) 
+static void PrintBitsBin(BBoard b) 
 {
     for (int i = 0; i < 64; i++) 
     {

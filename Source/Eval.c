@@ -1,6 +1,6 @@
-#include "game.h" 
+#include "Game.h" 
 
-int PC_SQ[2][6][64] = 
+int PcSq[2][6][64] = 
 {
     {
         { // pawn
@@ -128,53 +128,36 @@ int PC_SQ[2][6][64] =
     }, 
 };
 
-static inline void eval_w_pc_sq(const game *g, piece pc, int *mg, int *eg) 
+static inline void EvalWPcSq(const Game* g, Piece pc, int* mg, int* eg) 
 {
-    bboard pcs = rrow(g->pieces[pc]); 
+    BBoard pcs = RRow(g->Pieces[pc]); 
     FOR_EACH_BIT(pcs, 
     {
-        *mg += PC_SQ[0][pc][sq]; 
-        *eg += PC_SQ[1][pc][sq]; 
+        *mg += PcSq[0][pc][sq]; 
+        *eg += PcSq[1][pc][sq]; 
     });
 }
 
-static inline void eval_b_pc_sq(const game *g, piece pc, int *mg, int *eg) 
+static inline void EvalBPcSq(const Game* g, Piece pc, int* mg, int* eg) 
 {
-    bboard pcs = g->pieces[make_pc(pc, COL_B)]; 
+    BBoard pcs = g->Pieces[MakePc(pc, COL_B)]; 
     FOR_EACH_BIT(pcs, 
     {
-        *mg -= PC_SQ[0][pc][sq]; 
-        *eg -= PC_SQ[1][pc][sq]; 
+        *mg -= PcSq[0][pc][sq]; 
+        *eg -= PcSq[1][pc][sq]; 
     });
 }
 
-// bool is_special_draw(const game *g) 
-// {
-//     // check for repitition 
-//     for (size_t i = 1; i <= 8; i += 2)
-//     {
-//         if (i >= g->hist.size) break; 
-
-//         zobrist hash = ((const game *) at_vec_const(&g->hist, g->hist.size - i - 1))->hash; 
-//         if (g->hash == hash || (g->hash ^ col_zb()) == hash) 
-//         {
-//             return true; 
-//         }
-//     }
-
-//     return false; 
-// }
-
-int evaluate(const game *g, int n_moves, bool draw) 
+int Evaluate(const Game* g, int nMoves, bool draw) 
 {
     if (draw) return 0; 
 
-    if (n_moves == 0) 
+    if (nMoves == 0) 
     {
-        if (g->in_check) 
+        if (g->InCheck) 
         {
             // lower value the farther out the mate is (prioritize faster mates)
-            return (100000 - g->ply) * (-1 + 2 * g->turn); 
+            return (100000 - g->Ply) * (-1 + 2 * g->Turn); 
         }
         else 
         {
@@ -183,18 +166,18 @@ int evaluate(const game *g, int n_moves, bool draw)
         }
     }
 
-    int wp = g->counts[PC_WP]; 
-    int bp = g->counts[PC_BP]; 
-    int wn = g->counts[PC_WN]; 
-    int bn = g->counts[PC_BN]; 
-    int wb = g->counts[PC_WB]; 
-    int bb = g->counts[PC_BB]; 
-    int wr = g->counts[PC_WR]; 
-    int br = g->counts[PC_BR]; 
-    int wq = g->counts[PC_WQ]; 
-    int bq = g->counts[PC_BQ]; 
-    int wk = g->counts[PC_WK]; 
-    int bk = g->counts[PC_BK]; 
+    int wp = g->Counts[PC_WP]; 
+    int bp = g->Counts[PC_BP]; 
+    int wn = g->Counts[PC_WN]; 
+    int bn = g->Counts[PC_BN]; 
+    int wb = g->Counts[PC_WB]; 
+    int bb = g->Counts[PC_BB]; 
+    int wr = g->Counts[PC_WR]; 
+    int br = g->Counts[PC_BR]; 
+    int wq = g->Counts[PC_WQ]; 
+    int bq = g->Counts[PC_BQ]; 
+    int wk = g->Counts[PC_WK]; 
+    int bk = g->Counts[PC_BK]; 
 
     int eval = 0; 
     int mg = 0; 
@@ -210,18 +193,18 @@ int evaluate(const game *g, int n_moves, bool draw)
     // bishop pair 
     eval += 15 * ((wb >= 2) - (bb >= 2)); 
 
-    eval_w_pc_sq(g, PC_P, &mg, &eg); 
-    eval_b_pc_sq(g, PC_P, &mg, &eg); 
-    eval_w_pc_sq(g, PC_N, &mg, &eg); 
-    eval_b_pc_sq(g, PC_N, &mg, &eg); 
-    eval_w_pc_sq(g, PC_B, &mg, &eg); 
-    eval_b_pc_sq(g, PC_B, &mg, &eg); 
-    eval_w_pc_sq(g, PC_R, &mg, &eg); 
-    eval_b_pc_sq(g, PC_R, &mg, &eg); 
-    eval_w_pc_sq(g, PC_Q, &mg, &eg); 
-    eval_b_pc_sq(g, PC_Q, &mg, &eg); 
-    eval_w_pc_sq(g, PC_K, &mg, &eg); 
-    eval_b_pc_sq(g, PC_K, &mg, &eg); 
+    EvalWPcSq(g, PC_P, &mg, &eg); 
+    EvalBPcSq(g, PC_P, &mg, &eg); 
+    EvalWPcSq(g, PC_N, &mg, &eg); 
+    EvalBPcSq(g, PC_N, &mg, &eg); 
+    EvalWPcSq(g, PC_B, &mg, &eg); 
+    EvalBPcSq(g, PC_B, &mg, &eg); 
+    EvalWPcSq(g, PC_R, &mg, &eg); 
+    EvalBPcSq(g, PC_R, &mg, &eg); 
+    EvalWPcSq(g, PC_Q, &mg, &eg); 
+    EvalBPcSq(g, PC_Q, &mg, &eg); 
+    EvalWPcSq(g, PC_K, &mg, &eg); 
+    EvalBPcSq(g, PC_K, &mg, &eg); 
 
     // int p = 0 * (wp - bp);  
     int n = 1 * (wn + bn); 

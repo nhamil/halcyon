@@ -57,29 +57,29 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 set(sources 
-    # src/book.c 
-    src/eval.c 
-    src/fen.c 
-    src/game.c 
-    src/magic.c 
-    src/movegen.c 
-    src/search.c 
-    src/tables.c 
-    src/zobrist.c
+    # Source/Book.c 
+    Source/Eval.c 
+    Source/Fen.c 
+    Source/Game.c 
+    Source/Magic.c 
+    Source/MoveGen.c 
+    Source/Search.c 
+    Source/Tables.c 
+    Source/Zobrist.c
 )
 
-add_executable(engine src/main.c ${sources})
+add_executable(engine Source/Main.c ${sources})
 target_link_libraries(engine Threads::Threads) 
 set_target_properties(engine PROPERTIES OUTPUT_NAME "${EXE_NAME}")
 
-add_executable(engine-valid EXCLUDE_FROM_ALL src/main.c ${sources})
+add_executable(engine-valid EXCLUDE_FROM_ALL Source/Main.c ${sources})
 target_link_libraries(engine-valid Threads::Threads) 
 set_target_properties(engine-valid PROPERTIES OUTPUT_NAME "${EXE_NAME}-valid")
 target_compile_definitions(engine-valid PRIVATE VALIDATION=1)
 
-add_executable(perft EXCLUDE_FROM_ALL src/perft.c ${sources})
+add_executable(perft EXCLUDE_FROM_ALL Source/Perft.c ${sources})
 target_link_libraries(perft Threads::Threads)
 
-add_executable(perft-valid EXCLUDE_FROM_ALL src/perft.c ${sources})
+add_executable(perft-valid EXCLUDE_FROM_ALL Source/Perft.c ${sources})
 target_link_libraries(perft-valid Threads::Threads)
 target_compile_definitions(perft-valid PRIVATE VALIDATION=1)

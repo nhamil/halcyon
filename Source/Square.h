@@ -64,29 +64,29 @@
 #define F8 61
 #define G8 62
 #define H8 63
-#define SQ_CNT 64
-#define NO_SQ SQ_CNT 
+#define NUM_SQ 64
+#define NO_SQ NUM_SQ 
 
-typedef int square; 
+typedef int Square; 
 
-static inline square make_sq(int file, int rank) 
+static inline Square MakeSq(int file, int rank) 
 {
     return file | rank << 3; 
 }
 
-static inline int get_file(square sq) 
+static inline int GetFile(Square sq) 
 {
     return sq & 7; 
 }
 
-static inline int get_rank(square sq) 
+static inline int GetRank(Square sq) 
 {
     return sq >> 3; 
 }
 
-static inline int get_diag(square sq) 
+static inline int GetDiag(Square sq) 
 {
-    static const int DIAG[] = 
+    static const int Diag[] = 
     {
         7, 8, 9, 10, 11, 12, 13, 14, 
         6, 7, 8, 9, 10, 11, 12, 13, 
@@ -97,12 +97,12 @@ static inline int get_diag(square sq)
         1, 2, 3, 4, 5, 6, 7, 8, 
         0, 1, 2, 3, 4, 5, 6, 7 
     };
-    return DIAG[sq]; 
+    return Diag[sq]; 
 }
 
-static inline int get_anti(square sq) 
+static inline int GetAnti(Square sq) 
 {
-    static const int ANTI[] = 
+    static const int Anti[] = 
     {
         0, 1, 2, 3, 4, 5, 6, 7, 
         1, 2, 3, 4, 5, 6, 7, 8, 
@@ -113,17 +113,17 @@ static inline int get_anti(square sq)
         6, 7, 8, 9, 10, 11, 12, 13, 
         7, 8, 9, 10, 11, 12, 13, 14
     };
-    return ANTI[sq]; 
+    return Anti[sq]; 
 }
 
-static inline square rrank(square sq) 
+static inline Square RRank(Square sq) 
 {
-    return make_sq(get_file(sq), 7 - get_rank(sq)); 
+    return MakeSq(GetFile(sq), 7 - GetRank(sq)); 
 }
 
-static inline const char* str_sq(square sq) 
+static inline const char* StrSq(Square sq) 
 {
-    static const char* STR[] = 
+    static const char* Str[] = 
     {
         "a1", "b1", "c1", "d1", "e1", "f1", "g1", "h1", 
         "a2", "b2", "c2", "d2", "e2", "f2", "g2", "h2", 
@@ -135,5 +135,5 @@ static inline const char* str_sq(square sq)
         "a8", "b8", "c8", "d8", "e8", "f8", "g8", "h8", 
         "none"
     };
-    return STR[sq]; 
+    return Str[sq]; 
 }

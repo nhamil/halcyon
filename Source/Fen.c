@@ -1,17 +1,17 @@
-#include "bitboard.h"
-#include "game.h" 
-#include "piece.h"
+#include "BBoard.h"
+#include "Game.h" 
+#include "Piece.h"
 
-static const char *load_fen_board(game *g, const char *fen) 
+static const char* LoadFenBoard(Game* g, const char* fen) 
 {
-    square sq = A1; 
+    Square sq = A1; 
 
     while (*fen) 
     {
         char c = *fen++; 
         if (c == ' ') break; 
 
-        piece pc = NO_PC; 
+        Piece pc = NO_PC; 
         switch (c) 
         {
             case 'P': pc = PC_WP; break; 
@@ -49,9 +49,9 @@ static const char *load_fen_board(game *g, const char *fen)
 
         if (pc != NO_PC) 
         {
-            square real_sq = rrank(sq); 
-            set_mbox(&g->mailbox, real_sq, pc); 
-            g->pieces[pc] = set_bit(g->pieces[pc], real_sq); 
+            Square realSq = RRank(sq); 
+            SetMBox(&g->Mailbox, realSq, pc); 
+            g->Pieces[pc] = SetBit(g->Pieces[pc], realSq); 
 
             sq++; 
         }
@@ -60,7 +60,7 @@ static const char *load_fen_board(game *g, const char *fen)
     return fen; 
 }
 
-static const char *load_fen_col(game *g, const char *fen) 
+static const char* LoadFenCol(Game* g, const char* fen) 
 {
     while (*fen) 
     {
@@ -70,10 +70,10 @@ static const char *load_fen_col(game *g, const char *fen)
         switch (c) 
         {
             case 'w': 
-                g->turn = COL_W; 
+                g->Turn = COL_W; 
                 break; 
             case 'b': 
-                g->turn = COL_B; 
+                g->Turn = COL_B; 
                 break; 
             default: 
                 printf("info string Unknown FEN character (color): %c\n", c); 
@@ -84,36 +84,36 @@ static const char *load_fen_col(game *g, const char *fen)
     return fen; 
 }
 
-static const char *load_fen_castle(game *g, const char *fen) 
+static const char* LoadFenCastle(Game* g, const char* fen) 
 {
     while (*fen) 
     {
         char c = *fen++; 
         if (c == ' ') break; 
 
-        castle_flags cf = 0; 
+        CastleFlags cf = 0; 
         switch (c) 
         {
             case 'K': cf = CASTLE_WK; break; 
             case 'Q': cf = CASTLE_WQ; break; 
             case 'k': cf = CASTLE_BK; break; 
             case 'q': cf = CASTLE_BQ; break; 
-            case '-': g->castle = 0; break; 
+            case '-': g->Castle = 0; break; 
 
             default: 
                 printf("info string Unknown FEN character (castling): %c\n", c); 
                 break; 
         }
 
-        g->castle |= cf; 
+        g->Castle |= cf; 
     }
 
     return fen; 
 }
 
-static const char *load_fen_ep(game *g, const char *fen) 
+static const char* LoadFenEP(Game* g, const char* fen) 
 {
-    square ep = NO_SQ; 
+    Square ep = NO_SQ; 
 
     while (*fen) 
     {
@@ -130,7 +130,7 @@ static const char *load_fen_ep(game *g, const char *fen)
             case 'f': 
             case 'g': 
             case 'h': 
-                ep = make_sq(c - 'a', get_rank(ep)); 
+                ep = MakeSq(c - 'a', GetRank(ep)); 
                 break; 
 
             case '1': 
@@ -141,7 +141,7 @@ static const char *load_fen_ep(game *g, const char *fen)
             case '6': 
             case '7': 
             case '8': 
-                ep = make_sq(get_file(ep), c - '1'); 
+                ep = MakeSq(GetFile(ep), c - '1'); 
                 break; 
 
             case '-': 
@@ -154,12 +154,12 @@ static const char *load_fen_ep(game *g, const char *fen)
         }
     }
 
-    g->ep = ep; 
+    g->EP = ep; 
 
     return fen; 
 }
 
-static const char *load_fen_halfmove(game *g, const char *fen) 
+static const char* LoadFenHalfmove(Game* g, const char* fen) 
 {
     while (*fen) 
     {
@@ -178,7 +178,7 @@ static const char *load_fen_halfmove(game *g, const char *fen)
             case '7': 
             case '8': 
             case '9': 
-                g->halfmove = g->halfmove * 10 + c - '0'; 
+                g->Halfmove = g->Halfmove * 10 + c - '0'; 
                 break; 
 
             default: 
@@ -190,7 +190,7 @@ static const char *load_fen_halfmove(game *g, const char *fen)
     return fen; 
 }
 
-static const char *load_fen_turn(game *g, const char *fen) 
+static const char* LoadFenTurn(Game* g, const char* fen) 
 {
     bool found = false; 
 
@@ -212,7 +212,7 @@ static const char *load_fen_turn(game *g, const char *fen)
             case '8': 
             case '9': 
                 found = true; 
-                g->ply = g->ply * 10 + c - '0'; 
+                g->Ply = g->Ply * 10 + c - '0'; 
                 break; 
 
             default: 
@@ -221,53 +221,53 @@ static const char *load_fen_turn(game *g, const char *fen)
         }
     }
 
-    g->ply *= 2; 
-    g->ply += g->turn; 
+    g->Ply *= 2; 
+    g->Ply += g->Turn; 
 
-    if (found) g->ply -= 2; 
+    if (found) g->Ply -= 2; 
 
     return fen; 
 }
 
-void load_fen(game *g, const char *fen) 
+void LoadFen(Game* g, const char* fen) 
 {
-    reset_game(g); 
+    ResetGame(g); 
 
-    fen = load_fen_board(g, fen); 
-    fen = load_fen_col(g, fen); 
-    fen = load_fen_castle(g, fen); 
-    fen = load_fen_ep(g, fen); 
-    fen = load_fen_halfmove(g, fen); 
-    fen = load_fen_turn(g, fen); 
+    fen = LoadFenBoard(g, fen); 
+    fen = LoadFenCol(g, fen); 
+    fen = LoadFenCastle(g, fen); 
+    fen = LoadFenEP(g, fen); 
+    fen = LoadFenHalfmove(g, fen); 
+    fen = LoadFenTurn(g, fen); 
 
-    for (piece pc = PC_P; pc < PC_CNT; pc++) 
+    for (Piece pc = PC_P; pc < NUM_PC; pc++) 
     {
-        g->colors[get_col(pc)] |= g->pieces[pc]; 
-        g->counts[pc] = popcnt(g->pieces[pc]); 
+        g->Colors[GetCol(pc)] |= g->Pieces[pc]; 
+        g->Counts[pc] = Popcnt(g->Pieces[pc]); 
     }
 
-    g->all = g->colors[COL_W] | g->colors[COL_B]; 
-    g->movement = ~g->colors[g->turn]; 
+    g->All = g->Colors[COL_W] | g->Colors[COL_B]; 
+    g->Movement = ~g->Colors[g->Turn]; 
 
-    g->in_check = is_attacked(g, lsb(g->pieces[make_pc(PC_K, g->turn)]), g->turn); 
+    g->InCheck = IsAttacked(g, Lsb(g->Pieces[MakePc(PC_K, g->Turn)]), g->Turn); 
 
-    for (square sq = A1; sq <= H8; sq++) 
+    for (Square sq = A1; sq <= H8; sq++) 
     {
-        for (piece pc = 0; pc < PC_CNT; pc++) 
+        for (Piece pc = 0; pc < NUM_PC; pc++) 
         {
-            if (get_bit(g->pieces[pc], sq)) 
+            if (GetBit(g->Pieces[pc], sq)) 
             {
-                g->hash ^= sq_pc_zb(sq, pc); 
+                g->Hash ^= SqPcZb(sq, pc); 
             }
         }
     }
 
-    g->hash ^= castle_zb(g->castle); 
-    g->hash ^= ep_zb(g->ep); 
-    g->hash ^= (g->turn == COL_B) * col_zb(); 
+    g->Hash ^= CastleZb(g->Castle); 
+    g->Hash ^= EPZb(g->EP); 
+    g->Hash ^= (g->Turn == COL_B) * ColZb(); 
 }
 
-void to_fen(const game *g, char *out) 
+void ToFen(const Game* g, char* out) 
 {
     // board position 
     for (int rank = 7; rank >= 0; rank--) 
@@ -275,8 +275,8 @@ void to_fen(const game *g, char *out)
         int empty = 0; 
         for (int file = 0; file < 8; file++) 
         {
-            square sq = make_sq(file, rank); 
-            if (pc_at(g, sq) != NO_PC) 
+            Square sq = MakeSq(file, rank); 
+            if (PcAt(g, sq) != NO_PC) 
             {
                 // add empty squares before this piece
                 if (empty > 0) 
@@ -287,7 +287,7 @@ void to_fen(const game *g, char *out)
 
                 // all pieces are 1 character, so dereferencing 
                 // should be okay 
-                *out++ = *str_pc(pc_at(g, sq)); 
+                *out++ = *StrPc(PcAt(g, sq)); 
             }
             else 
             {
@@ -311,19 +311,19 @@ void to_fen(const game *g, char *out)
 
     // color to play 
     char turn[2] = { 'w', 'b' }; 
-    *out++ = turn[g->turn]; 
+    *out++ = turn[g->Turn]; 
     *out++ = ' '; 
 
     // castling 
-    const char *tmp = str_castle(g->castle); 
-    if (!g->castle) tmp = "-"; 
+    const char* tmp = StrCastle(g->Castle); 
+    if (!g->Castle) tmp = "-"; 
     strcpy(out, tmp); 
     out += strlen(tmp); 
     *out++ = ' '; 
 
     // en passant 
-    tmp = str_sq(g->ep); 
-    if (g->ep == NO_SQ) 
+    tmp = StrSq(g->EP); 
+    if (g->EP == NO_SQ) 
     {
         *out++ = '-'; 
     }
@@ -335,12 +335,12 @@ void to_fen(const game *g, char *out)
     *out++ = ' '; 
 
     // halfmove clock
-    sprintf(out, "%d", g->halfmove); 
+    sprintf(out, "%d", g->Halfmove); 
     out += strlen(out); 
     *out++ = ' '; 
 
     // fullmove counter 
-    sprintf(out, "%d", g->ply / 2 + 1); 
+    sprintf(out, "%d", g->Ply / 2 + 1); 
     out += strlen(out); 
     *out++ = ' '; 
 

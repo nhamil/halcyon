@@ -11,11 +11,11 @@
 #define CASTLE_ALL 15 
 #define CASTLE_NONE 0 
 
-typedef int castle_flags; 
+typedef int CastleFlags; 
 
-static const char *str_castle(castle_flags cf) 
+static const char* StrCastle(CastleFlags cf) 
 {
-    static const char *STR[] = 
+    static const char* Str[] = 
     {
         "(none)", 
         "K", 
@@ -34,5 +34,5 @@ static const char *str_castle(castle_flags cf)
         "Qkq", 
         "KQkq", 
     };
-    return STR[cf]; 
+    return Str[cf]; 
 }
