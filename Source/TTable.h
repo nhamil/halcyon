@@ -39,14 +39,12 @@ struct TTable
 struct TTableEntry 
 {
     Zobrist Key; 
-    // MBox Mailbox; 
-    // Game State; 
-    int Type; 
     int Score; 
-    int Depth; 
+    char Depth; 
+    char Type; 
 };
 
-void CreateTTable(TTable* tt, U64 maxSize); 
+void CreateTTable(TTable* tt, U64 sizeInMB); 
 
 void DestroyTTable(TTable* tt); 
 

@@ -32,6 +32,14 @@
 
 #define UCI_MAX_INPUT 4096
 
+#define UCI_MIN_TT 1 
+#define UCI_MAX_TT 16384
+#define UCI_DEF_TT 16
+
+#define UCI_MIN_CONTEMPT -1000
+#define UCI_MAX_CONTEMPT  1000
+#define UCI_DEF_CONTEMPT  0
+
 Game* s_UciGame; 
 SearchCtx s_Engine; 
 
@@ -51,6 +59,8 @@ bool UciCmdUci(void)
 {
     printf("id name %s\n", ENGINE_NAME); 
     printf("id author Nicholas Hamilton\n"); 
+    printf("option name Hash type spin default %d min %d max %d\n", UCI_DEF_TT, UCI_MIN_TT, UCI_MAX_TT); 
+    printf("option name Contempt type spin default %d min %d max %d\n", UCI_DEF_CONTEMPT, UCI_MIN_CONTEMPT, UCI_MAX_CONTEMPT); 
     printf("uciok\n"); 
     return true; 
 }
@@ -357,6 +367,48 @@ bool UciCmdStop(void)
     return true; 
 }
 
+bool UciCmdSetOption(void) 
+{
+    const char* token = UciNextToken(); 
+    if (!UciEquals(token, "name")) return false; 
+
+    token = UciNextToken(); 
+    if (UciEquals(token, "Hash")) 
+    {
+        token = UciNextToken(); 
+        if (!UciEquals(token, "value")) return false; 
+        token = UciNextToken(); 
+        if (!token) return false; 
+
+        int value = atoi(token); 
+        if (value > UCI_MAX_TT) value = UCI_MAX_TT; 
+        if (value < UCI_MIN_TT) value = UCI_MIN_TT; 
+
+        DestroyTTable(&s_Engine.TT); 
+        CreateTTable(&s_Engine.TT, value); 
+
+        return true; 
+    }
+    else if (UciEquals(token, "Contempt")) 
+    {
+        token = UciNextToken(); 
+        if (!UciEquals(token, "value")) return false; 
+        token = UciNextToken(); 
+        if (!token) return false; 
+
+        int value = atoi(token); 
+        if (value > UCI_MAX_CONTEMPT) value = UCI_MAX_CONTEMPT; 
+        if (value < UCI_MIN_CONTEMPT) value = UCI_MIN_CONTEMPT; 
+
+        s_Engine.Contempt = value; 
+
+        return true; 
+    }
+
+    printf("Unknown option: %s\n", token); 
+    return true; 
+}
+
 bool UciParse(const char* origCmd) 
 {
     // remove spaces at the beginning
@@ -376,6 +428,7 @@ bool UciParse(const char* origCmd)
         if (UciEquals(token, "print")) return UciCmdPrint(); 
         if (UciEquals(token, "go")) return UciCmdGo(); 
         if (UciEquals(token, "stop")) return UciCmdStop(); 
+        if (UciEquals(token, "setoption")) return UciCmdSetOption(); 
     }
 
     return false; 
@@ -389,6 +442,10 @@ int main(void)
     s_UciGame = NewGame(); 
     LoadFen(s_UciGame, START_FEN); 
     CreateSearchCtx(&s_Engine); 
+
+    DestroyTTable(&s_Engine.TT); 
+    CreateTTable(&s_Engine.TT, UCI_DEF_TT); 
+    s_Engine.Contempt = UCI_DEF_CONTEMPT; 
 
     char input[UCI_MAX_INPUT]; 
     while (true) 

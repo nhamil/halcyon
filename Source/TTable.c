@@ -12,14 +12,16 @@
 
 #include <stdlib.h> 
 
-void CreateTTable(TTable* tt, U64 maxSize) 
+void CreateTTable(TTable* tt, U64 sizeInMB) 
 {
+    U64 entriesInSize = (sizeInMB * 1024 * 1024) / sizeof(TTableEntry); 
     // get highest power of two 
-    tt->Size = 1ULL << Msb(maxSize); 
+    entriesInSize = 1ULL << Msb(entriesInSize); 
+    tt->Size = entriesInSize; 
     tt->Mask = tt->Size - 1; 
     tt->Entries = malloc(tt->Size * sizeof(TTableEntry)); 
 
-    printf("info string Created TT of size %.2fmb\n", tt->Size * sizeof(TTableEntry) / 1024.0 / 1024.0); 
+    // printf("info string Created TT of size %.2fmb\n", tt->Size * sizeof(TTableEntry) / 1024.0 / 1024.0); 
 } 
 
 void DestroyTTable(TTable* tt) 

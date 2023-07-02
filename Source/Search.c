@@ -651,7 +651,7 @@ void CreateSearchCtx(SearchCtx* ctx)
     ctx->Board = NewGame(); 
     ctx->Moves = NewMvList(); 
     ctx->Contempt = 50; 
-    CreateTTable(&ctx->TT, 1024 * 10000); 
+    CreateTTable(&ctx->TT, 1); 
 
     pthread_mutex_init(&ctx->Lock, NULL); 
 } 
