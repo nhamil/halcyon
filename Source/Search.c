@@ -207,12 +207,12 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
     HandleOutOfTime(ctx); 
 
     bool draw = IsSpecialDraw(g); 
-    if (draw) return -ctx->Contempt * ctx->StartCol * ColSign(g->Turn); 
+    if (draw) return -ctx->ColContempt * ColSign(g->Turn); 
 
     GenMoves(g, moves); 
     U64 numMoves = moves->Size - start; 
 
-    int standPat = ColSign(g->Turn) * Evaluate(g, numMoves, draw); 
+    int standPat = ColSign(g->Turn) * Evaluate(g, numMoves, draw, -ctx->ColContempt); 
 
     // check for beta cutoff
     if (standPat >= beta) 
@@ -323,7 +323,10 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
 
     // 3-fold repetition etc 
     bool draw = IsSpecialDraw(g); 
-    if (draw && ctx->Ply > 0) return -ctx->Contempt * ctx->StartCol * ColSign(g->Turn); 
+    if (draw && ctx->Ply > 0) 
+    {
+        return -ctx->ColContempt * ColSign(g->Turn); 
+    }
 
     // collect all moves from current position 
     // these moves must be cleared before returning
@@ -516,6 +519,7 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
     UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, g); 
 
     PopMvList(moves, start); 
+
     return alpha; 
 }
 
@@ -542,24 +546,38 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
     {
         int matePly = 100000 - abs(eval); 
         int plies = matePly - ctx->Board->Ply + 1; 
-        printf("info depth %d seldepth %zu multipv 1 score mate %d time %.0f nodes %" PRIu64 " nps %.0f pv ", depth, ctx->PV.NumMoves, (eval > 0 ? 1 : -1) * (plies/2), startDuration, nodes, nps); 
+        printf("info depth %d seldepth %zu multipv 1 score mate %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
+            depth, 
+            ctx->PV.NumMoves, 
+            (eval > 0 ? 1 : -1) * (plies/2), 
+            startDuration, 
+            nodes, 
+            nps, 
+            1000.0f * ctx->TT.Used / ctx->TT.Size); 
     }
     else 
     {
-        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f pv ", depth, ctx->PV.NumMoves, eval, startDuration, nodes, nps); 
+        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
+            depth, 
+            ctx->PV.NumMoves, 
+            eval, 
+            startDuration, 
+            nodes, 
+            nps, 
+            1000.0f * ctx->TT.Used / ctx->TT.Size); 
     }
     for (U64 i = 0; i < ctx->PV.NumMoves; i++) 
     {
         PrintMoveEnd(ctx->PV.Moves[i], " "); 
     }
     printf("\n"); 
-    printf("info string TT pct %.1f hits %" PRIu64 " coll %" PRIu64 " srch %" PRIu64 " hitpct %.1f\n", 
-        100.0f * ctx->TT.Used / ctx->TT.Size, 
-        ctx->TT.Hits, 
-        ctx->TT.Collisions, 
-        ctx->TT.Searches, 
-        100.0f * ctx->TT.Hits / ctx->TT.Searches
-    );
+    // printf("info string TT pct %.1f hits %" PRIu64 " coll %" PRIu64 " srch %" PRIu64 " hitpct %.1f\n", 
+    //     100.0f * ctx->TT.Used / ctx->TT.Size, 
+    //     ctx->TT.Hits, 
+    //     ctx->TT.Collisions, 
+    //     ctx->TT.Searches, 
+    //     100.0f * ctx->TT.Hits / ctx->TT.Searches
+    // );
     // printf("info string nodes %zu leaves %zu mbf %.2f qpct %.0f\n", ctx->NumNodes, ctx->NumLeaves, (double) ctx->NumNodes / (ctx->NumNodes - ctx->NumLeaves), 100.0 * ctx->NumQNodes / (ctx->NumNodes + ctx->NumQNodes)); 
     fflush(stdout); 
 }
@@ -632,8 +650,8 @@ void CreateSearchCtx(SearchCtx* ctx)
     // board should always be initialized
     ctx->Board = NewGame(); 
     ctx->Moves = NewMvList(); 
-    ctx->Contempt = 100; 
-    CreateTTable(&ctx->TT, 1024 * 100000); 
+    ctx->Contempt = 50; 
+    CreateTTable(&ctx->TT, 1024 * 10000); 
 
     pthread_mutex_init(&ctx->Lock, NULL); 
 } 
@@ -667,7 +685,6 @@ void Search(SearchCtx* ctx, SearchParams* params)
 {
     StopSearchCtx(ctx); 
 
-    ctx->StartCol = ctx->Board->Turn; 
     ctx->PV.NumMoves = 0; 
     ctx->Nodes = 0; 
     ctx->Nps = 0; 
@@ -692,6 +709,9 @@ void Search(SearchCtx* ctx, SearchParams* params)
 
     CopyGame(ctx->Board, params->Board); 
     NoDepth(ctx->Board); 
+
+    ctx->StartCol = ctx->Board->Turn; 
+    ctx->ColContempt = ColSign(ctx->StartCol) * ctx->Contempt; 
 
     pthread_create(&ctx->Thread, NULL, StartPThreadSearch, ctx); 
 }

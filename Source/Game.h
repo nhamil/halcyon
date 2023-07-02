@@ -103,7 +103,7 @@ U64 Perft(Game* g, int depth);
 
 bool IsSpecialDraw(const Game* g);
 
-int Evaluate(const Game* g, int nMoves, bool draw); 
+int Evaluate(const Game* g, int nMoves, bool draw, int contempt); 
 
 bool ValidateGame(const Game* g); 
 

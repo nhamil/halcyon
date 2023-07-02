@@ -158,9 +158,13 @@ static inline void EvalBPcSq(const Game* g, Piece pc, int* mg, int* eg)
     });
 }
 
-int Evaluate(const Game* g, int nMoves, bool draw) 
+int Evaluate(const Game* g, int nMoves, bool draw, int contempt) 
 {
-    if (draw) return 0; 
+    if (draw) 
+    {   
+        printf("info string Draw, color is %d, contempt is %d\n", g->Turn, contempt); 
+        return contempt; 
+    }
 
     if (nMoves == 0) 
     {
@@ -172,7 +176,7 @@ int Evaluate(const Game* g, int nMoves, bool draw)
         else 
         {
             // stalemate
-            return 0; 
+            return contempt; 
         }
     }
 

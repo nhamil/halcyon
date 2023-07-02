@@ -66,6 +66,7 @@ struct SearchCtx
     bool NullMove; 
     bool InPV; 
     int Contempt; 
+    int ColContempt; 
     Color StartCol; 
 };
 
