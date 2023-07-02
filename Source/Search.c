@@ -207,6 +207,7 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
     HandleOutOfTime(ctx); 
 
     bool draw = IsSpecialDraw(g); 
+    if (draw) return -ctx->Contempt * ctx->StartCol * ColSign(g->Turn); 
 
     GenMoves(g, moves); 
     U64 numMoves = moves->Size - start; 
@@ -318,8 +319,11 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
     MvList* moves = ctx->Moves; 
     U64 start = moves->Size; 
 
+    int alphaOrig = alpha; 
+
     // 3-fold repetition etc 
     bool draw = IsSpecialDraw(g); 
+    if (draw && ctx->Ply > 0) return -ctx->Contempt * ctx->StartCol * ColSign(g->Turn); 
 
     // collect all moves from current position 
     // these moves must be cleared before returning
@@ -335,6 +339,35 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
 
         PopMvList(moves, start); 
         return QSearch(ctx, alpha, beta, 16); 
+    }
+
+    if (!ctx->InPV && ctx->Ply > 0) 
+    {
+        TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, depth, g); 
+        if (entry) 
+        {
+            if (entry->Type == PV_NODE) 
+            {
+                PopMvList(moves, start); 
+                return entry->Score; 
+            }
+            else if (entry->Type == FAIL_HIGH) 
+            {
+                // alpha = max(entry, alpha)
+                if (entry->Score > alpha) alpha = entry->Score; 
+            }
+            else if (entry->Type == FAIL_LOW) 
+            {
+                // beta = min(entry, beta) 
+                if (entry->Score < beta) beta = entry->Score; 
+            }
+
+            if (alpha >= beta) 
+            {
+                PopMvList(moves, start); 
+                return beta; 
+            }
+        }
     }
 
     if (ctx->NullMove) 
@@ -378,6 +411,7 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
     // - InPV
 
     ctx->Ply++; 
+    int score = -EVAL_MAX; 
     bool foundPV = false; 
     bool nodeInPV = ctx->InPV; 
     for (U64 i = start; i < moves->Size; i++) 
@@ -394,7 +428,6 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
 
         // false if no further searching (and pruning) is needed
         bool fullSearch = true; 
-        int score; 
 
         bool lmr = true; 
         lmr &= !capture; 
@@ -448,10 +481,12 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
                 ctx->History[g->Turn][GetNoCol(FromPc(mv))][ToSq(mv)] = depth * depth; 
             }
 
-            ctx->Ply--; 
-            ctx->InPV = nodeInPV; 
-            PopMvList(moves, start); 
-            return beta; 
+            // ctx->Ply--; 
+            // ctx->InPV = nodeInPV; 
+            // PopMvList(moves, start); 
+            // return beta; 
+            alpha = beta; 
+            break; 
         }
 
         // improves score: pv node 
@@ -467,6 +502,18 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
     }
     ctx->Ply--; 
     ctx->InPV = nodeInPV; 
+
+    int ttType = PV_NODE; 
+    if (alpha <= alphaOrig) 
+    {
+        ttType = FAIL_LOW; 
+    }
+    else if (alpha >= beta) 
+    {
+        ttType = FAIL_HIGH; 
+    }
+
+    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, g); 
 
     PopMvList(moves, start); 
     return alpha; 
@@ -506,6 +553,13 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
         PrintMoveEnd(ctx->PV.Moves[i], " "); 
     }
     printf("\n"); 
+    printf("info string TT pct %.1f hits %" PRIu64 " coll %" PRIu64 " srch %" PRIu64 " hitpct %.1f\n", 
+        100.0f * ctx->TT.Used / ctx->TT.Size, 
+        ctx->TT.Hits, 
+        ctx->TT.Collisions, 
+        ctx->TT.Searches, 
+        100.0f * ctx->TT.Hits / ctx->TT.Searches
+    );
     // printf("info string nodes %zu leaves %zu mbf %.2f qpct %.0f\n", ctx->NumNodes, ctx->NumLeaves, (double) ctx->NumNodes / (ctx->NumNodes - ctx->NumLeaves), 100.0 * ctx->NumQNodes / (ctx->NumNodes + ctx->NumQNodes)); 
     fflush(stdout); 
 }
@@ -578,6 +632,8 @@ void CreateSearchCtx(SearchCtx* ctx)
     // board should always be initialized
     ctx->Board = NewGame(); 
     ctx->Moves = NewMvList(); 
+    ctx->Contempt = 100; 
+    CreateTTable(&ctx->TT, 1024 * 100000); 
 
     pthread_mutex_init(&ctx->Lock, NULL); 
 } 
@@ -587,6 +643,7 @@ void DestroySearchCtx(SearchCtx* ctx)
     StopSearchCtx(ctx); 
     FreeGame(ctx->Board); 
     FreeMvList(ctx->Moves); 
+    DestroyTTable(&ctx->TT); 
     pthread_mutex_destroy(&ctx->Lock); 
 }
 
@@ -598,6 +655,7 @@ void StopSearchCtx(SearchCtx* ctx)
         pthread_join(ctx->Thread, NULL); 
 
         ClearMvList(ctx->Moves); 
+        // ResetTTable(&ctx->TT); 
         ctx->Running = false; 
     }
 
@@ -609,6 +667,7 @@ void Search(SearchCtx* ctx, SearchParams* params)
 {
     StopSearchCtx(ctx); 
 
+    ctx->StartCol = ctx->Board->Turn; 
     ctx->PV.NumMoves = 0; 
     ctx->Nodes = 0; 
     ctx->Nps = 0; 

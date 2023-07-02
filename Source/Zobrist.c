@@ -34,19 +34,19 @@ void InitZb(void)
     {
         for (U64 j = 0; j < NUM_PC; j++) 
         {
-            SqPcHash[i][j] = NextRandom(&r); 
+            SqPcHash[i][j] = NextU64(&r); 
         }
     }
 
     for (U64 i = 0; i < 8; i++) 
     {
-        EPHash[i] = NextRandom(&r); 
+        EPHash[i] = NextU64(&r); 
     }
 
     Zobrist castle[4]; 
     for (U64 i = 0; i < 4; i++) 
     {
-        castle[i] = NextRandom(&r); 
+        castle[i] = NextU64(&r); 
     }
 
     for (CastleFlags index = 0; index <= CASTLE_ALL; index++) 
@@ -59,7 +59,7 @@ void InitZb(void)
         CastleHash[index] = hash; 
     }
 
-    ColHash = NextRandom(&r); 
+    ColHash = NextU64(&r); 
 
     s_IsZbInit = true; 
 }

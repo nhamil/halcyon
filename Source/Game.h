@@ -83,6 +83,8 @@ void ResetGame(Game* g);
 
 void CopyGame(Game* g, const Game* from); 
 
+bool EqualsTTableGame(const Game* a, const Game* b); 
+
 void LoadFen(Game* g, const char* fen); 
 
 void ToFen(const Game* g, char* out); 

@@ -19,6 +19,7 @@
 #include "MoveGen.h"
 #include "Piece.h"
 #include "Square.h"
+#include "TTable.h" 
 
 #define INF_DEPTH (-1) 
 #define INF_TIME (-1) 
@@ -53,6 +54,7 @@ struct SearchCtx
 
     MvList* Moves; 
     PVLine Lines[MAX_DEPTH]; 
+    TTable TT; 
     U64 NumNodes; 
     U64 NumLeaves; 
     U64 NumQNodes; 
@@ -63,6 +65,8 @@ struct SearchCtx
     int History[2][NUM_PC][NUM_SQ]; 
     bool NullMove; 
     bool InPV; 
+    int Contempt; 
+    Color StartCol; 
 };
 
 struct SearchParams 

@@ -64,6 +64,7 @@ set(sources
     Source/Magic.c 
     Source/MoveGen.c 
     Source/Search.c 
+    Source/TTable.c 
     Source/Tables.c 
     Source/Zobrist.c
 )

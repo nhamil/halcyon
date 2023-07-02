@@ -78,6 +78,33 @@ void CopyGame(Game* g, const Game* from)
     }
 }
 
+#define GAME_EQ(prop) if (a->prop != b->prop) { printf("Not equal: %s\n", #prop); return false; }
+
+bool EqualsTTableGame(const Game* a, const Game* b) 
+{
+    if (!EqualsMBox(&a->Mailbox, &b->Mailbox)) { printf("Not equal: Mailbox\n"); return false; } 
+    if (memcmp(a->Pieces, b->Pieces, sizeof(a->Pieces) - sizeof(BBoard)) != 0) { printf("Not equal: Pieces\n"); return false; }
+    if (memcmp(a->Colors, b->Colors, sizeof(a->Colors)) != 0) { printf("Not equal: Colors\n"); return false; }
+    if (memcmp(a->Counts, b->Counts, sizeof(a->Counts) - sizeof(int)) != 0) { printf("Not equal: Counts\n"); return false; }
+    GAME_EQ(All); 
+    GAME_EQ(Movement); 
+    GAME_EQ(Hash); 
+    GAME_EQ(Castle); 
+    GAME_EQ(EP); 
+    // GAME_EQ(Ply); 
+    // GAME_EQ(Halfmove); 
+    GAME_EQ(Turn); 
+    GAME_EQ(InCheck); 
+    // GAME_EQ(Nodes); 
+    // GAME_EQ(Depth); 
+    // for (int i = 0; i < a->Depth; i++) 
+    // {
+    //     if (a->Hist[i] != b->Hist[i]) return false; 
+    // }
+
+    return true; 
+}
+
 void PrintGame(const Game* g) 
 {
     char fen[FEN_LEN]; 
