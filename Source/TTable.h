@@ -40,7 +40,7 @@ struct TTableEntry
 {
     Zobrist Key; 
     int Score; 
-    char Depth; 
+    unsigned char Depth; 
     char Type; 
 };
 
