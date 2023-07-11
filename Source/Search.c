@@ -33,6 +33,11 @@ static inline bool OutOfTime(const SearchCtx* ctx)
     return ctx->PV.NumMoves && (ctx->ShouldExit || (ctx->TgtTime >= 0 && clock() > ctx->EndAt)); 
 }
 
+static inline clock_t NSecFromNow(int num) 
+{
+    return clock() + num * CLOCKS_PER_SEC; 
+}
+
 static inline bool HandleOutOfTime(SearchCtx* ctx) 
 {
     if (ctx->CheckTime++ < CHECK_TIME) return false; 
@@ -57,6 +62,17 @@ static inline bool HandleOutOfTime(SearchCtx* ctx)
 
         pthread_exit(NULL); 
         return true; 
+    }
+
+    clock_t curTime = clock(); 
+    if (curTime >= ctx->NextMsgAt) 
+    {
+        U64 nodes = ctx->Board->Nodes; 
+        double dur = (double) (curTime - ctx->StartAt) / CLOCKS_PER_SEC; 
+        double nps = nodes / dur; 
+        printf("info depth %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %" PRIu64 "\n", ctx->Depth+1, dur*1000, nodes, nps, 1000*ctx->TT.Used/ctx->TT.Size);
+        fflush(stdout); 
+        ctx->NextMsgAt = NSecFromNow(1); 
     }
 
     return false; 
@@ -421,6 +437,19 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
     {
         Move mv = NextMove(ctx, i); 
 
+        if (ctx->Ply == 1)
+        {
+            clock_t curTime = clock(); 
+            if (curTime >= ctx->CurMoveAt)
+            {
+                printf("info currmove "); 
+                PrintMoveEnd(mv, " currmovenumber "); 
+                printf("%d\n", (int) (i-start+1)); 
+                fflush(stdout); 
+            }
+            
+        }
+
         bool capture = IsCapture(mv); 
         bool pro = IsPro(mv); 
         bool check = g->InCheck; 
@@ -689,6 +718,9 @@ void Search(SearchCtx* ctx, SearchParams* params)
     ctx->Depth = 0; 
     ctx->Eval = 0; 
     ctx->Running = true; 
+    ctx->StartAt = clock(); 
+    ctx->CurMoveAt = NSecFromNow(2); 
+    ctx->NextMsgAt = NSecFromNow(1); 
 
     ClearMvList(ctx->Moves); 
     ctx->Ply = 0; 

@@ -51,6 +51,9 @@ struct SearchCtx
     int Depth; 
     int Eval; 
     bool Running; 
+    clock_t StartAt; 
+    clock_t CurMoveAt; 
+    clock_t NextMsgAt; 
 
     MvList* Moves; 
     PVLine Lines[MAX_DEPTH]; 
