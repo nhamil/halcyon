@@ -525,15 +525,13 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
 
 static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t start, clock_t end, int depth, int eval, const PVLine* line) 
 {
-    U64 nodes = ctx->Board->Nodes;// ctx->NumLeaves; 
+    (void) start; 
 
-    float duration = end - start; 
-    if (duration <= 0) duration = 1; 
-    duration /= CLOCKS_PER_SEC; 
-    float nps = nodes / duration; 
+    U64 nodes = ctx->Board->Nodes;// ctx->NumLeaves; 
 
     float startDuration = (end - searchStart); 
     if (startDuration <= 0) startDuration = 1; 
+    float nps = nodes / (startDuration / CLOCKS_PER_SEC); 
     startDuration /= CLOCKS_PER_SEC * 0.001; 
 
     ctx->PV = *line; 
