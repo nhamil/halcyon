@@ -2,3 +2,11 @@
 .env/
 .cache/
 tmp/
+varied.bin
+tmp.txt
+ltc.pgn
+stc.pgn
+sprt.txt 
+ltc-release.pgn
+stc-release.pgn
+release.txt
