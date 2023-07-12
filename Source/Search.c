@@ -308,22 +308,105 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
     ctx->Lines[ctx->Ply + offset].NumMoves = 0; 
 }
 
-static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth) 
-{
-    // reset data on root node 
-    if (ctx->Ply == 0) 
-    {
-        ctx->NumNodes = 0; 
-        ctx->NumLeaves = 0; 
-        ctx->NumQNodes = 0; 
-        ctx->NumQLeaves = 0; 
-        ctx->CheckTime = 0; 
-        memset(ctx->Killer, 0, sizeof(ctx->Killer)); 
-        memset(ctx->History, 0, sizeof(ctx->History)); 
-        ctx->NullMove = true; 
-        ctx->InPV = true; 
-    }
+#define NEGAMAX_LOOP_MOVES(onMove) \
+    /* search moves if there is remaining depth */ \
+    /* must reset: */ \
+    /* - Ply */ \
+    /* - InPV */ \
+\
+    ctx->Ply++; \
+    int score = -EVAL_MAX; \
+    bool foundPV = false; \
+    bool nodeInPV = ctx->InPV; \
+    for (U64 i = start; i < moves->Size; i++) \
+    {\
+        Move mv = NextMove(ctx, i); \
+\
+        onMove; \
+\
+        bool capture = IsCapture(mv); \
+        bool pro = IsPro(mv); \
+        bool check = g->InCheck; \
+\
+        /* search position after applying move */ \
+        PushMove(g, mv); \
+        bool givesCheck = g->InCheck; \
+\
+        /* false if no further searching (and pruning) is needed */ \
+        bool fullSearch = true; \
+\
+        bool lmr = true; \
+        lmr &= !capture; \
+        lmr &= !pro; \
+        lmr &= !check; \
+        lmr &= !givesCheck; \
+        lmr &= i - start >= 4; \
+        lmr &= depth > 3; \
+        int lmrAmt = lmr * 2; \
+\
+        if (!check && !givesCheck && foundPV) /* principal variation search */ \
+        {\
+            /* check if the move is at all better than current best */ \
+            score = -Negamax_(ctx, -alpha - 1, -alpha, depth - 1 - lmrAmt); \
+\
+            if (score <= alpha || score >= beta) \
+            {\
+                fullSearch = false; \
+            }\
+        }\
+        else if (lmr) /* late move reduction */ \
+        {\
+            score = -Negamax_(ctx, -alpha - 1, -alpha, depth - 1 - lmrAmt); \
+        \
+            if (score <= alpha || score >= beta) \
+            {\
+                fullSearch = false; \
+            }\
+        }\
+\
+        if (fullSearch) \
+        {\
+            score = -Negamax_(ctx, -beta, -alpha, depth - 1); \
+        }\
+        \
+        PopMove(g, mv); \
+\
+        /* beta cutoff */ \
+        if (score >= beta) \
+        {\
+            if (IsQuiet(mv)) \
+            {\
+                /* killer move heuristic */ \
+                if (ctx->Killer[ctx->Ply][0] != mv) \
+                {\
+                    ctx->Killer[ctx->Ply][1] = ctx->Killer[ctx->Ply][0]; \
+                    ctx->Killer[ctx->Ply][0] = mv; \
+                }\
+\
+                /* history heuristic */ \
+                ctx->History[g->Turn][GetNoCol(FromPc(mv))][ToSq(mv)] = depth * depth; \
+            }\
+\
+            alpha = beta; \
+            break; \
+        }\
+\
+        /* improves score: pv node */ \
+        if (score > alpha) \
+        {\
+            foundPV = true; \
+            alpha = score; \
+            UpdatePV(ctx, mv, -1); /* ply is incremented right now: -1 offset */ \
+        }\
+\
+        /* only way to be in previous PV is to be the leftmost node */ \
+        ctx->InPV = false; \
+    } \
+    ctx->Ply--; \
+    ctx->InPV = nodeInPV; 
 
+static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth) 
+{
     // init node 
     ClearPV(ctx, 0); 
     ctx->NumNodes++; 
@@ -339,7 +422,7 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
 
     // 3-fold repetition etc 
     bool draw = IsSpecialDraw(g); 
-    if (draw && ctx->Ply > 0) 
+    if (draw) 
     {
         return -ctx->ColContempt * ColSign(g->Turn); 
     }
@@ -350,7 +433,7 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
     U64 numMoves = moves->Size - start; 
 
     // end of search or end of game 
-    if (depth <= 0 || numMoves == 0 || (draw && ctx->Ply > 0)) 
+    if (depth <= 0 || numMoves == 0 || draw) 
     {
         // no move found for node so this is a leaf node
         ClearPV(ctx, 0); 
@@ -360,7 +443,7 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
         return QSearch(ctx, alpha, beta, 16); 
     }
 
-    if (!ctx->InPV && ctx->Ply > 0) 
+    if (!ctx->InPV) 
     {
         TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, depth, g); 
         if (entry) 
@@ -405,7 +488,7 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
 
             PushNullMove(g); 
             // check if full search would have beta cutoff 
-            int score = -Negamax(ctx, -beta, -beta + 1, depth - 1 - R); 
+            int score = -Negamax_(ctx, -beta, -beta + 1, depth - 1 - R); 
             PopNullMove(g); 
 
             if (score >= beta) 
@@ -424,116 +507,79 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
         }
     }
 
-    // search moves if there is remaining depth 
-    // must reset: 
-    // - Ply 
-    // - InPV
+    NEGAMAX_LOOP_MOVES(); 
 
-    ctx->Ply++; 
-    int score = -EVAL_MAX; 
-    bool foundPV = false; 
-    bool nodeInPV = ctx->InPV; 
-    for (U64 i = start; i < moves->Size; i++) 
+    int ttType = PV_NODE; 
+    if (alpha <= alphaOrig) 
     {
-        Move mv = NextMove(ctx, i); 
-
-        if (ctx->Ply == 1)
-        {
-            clock_t curTime = clock(); 
-            if (curTime >= ctx->CurMoveAt)
-            {
-                printf("info currmove "); 
-                PrintMoveEnd(mv, " currmovenumber "); 
-                printf("%d\n", (int) (i-start+1)); 
-                fflush(stdout); 
-            }
-            
-        }
-
-        bool capture = IsCapture(mv); 
-        bool pro = IsPro(mv); 
-        bool check = g->InCheck; 
-
-        // search position after applying move 
-        PushMove(g, mv); 
-        bool givesCheck = g->InCheck; 
-
-        // false if no further searching (and pruning) is needed
-        bool fullSearch = true; 
-
-        bool lmr = true; 
-        lmr &= !capture; 
-        lmr &= !pro; 
-        lmr &= !check; 
-        lmr &= !givesCheck; 
-        lmr &= i - start >= 4;
-        lmr &= depth > 3; 
-        int lmrAmt = lmr * 2; 
-
-        if (!check && !givesCheck && foundPV) // principal variation search 
-        {
-            // check if the move is at all better than current best 
-            score = -Negamax(ctx, -alpha - 1, -alpha, depth - 1 - lmrAmt); 
-
-            if (score <= alpha || score >= beta) 
-            {
-                fullSearch = false; 
-            }
-        }
-        else if (lmr) // late move reduction
-        {
-            score = -Negamax(ctx, -alpha - 1, -alpha, depth - 1 - lmrAmt); 
-        
-            if (score <= alpha || score >= beta) 
-            {
-                fullSearch = false; 
-            }
-        }
-
-        if (fullSearch) 
-        {
-            score = -Negamax(ctx, -beta, -alpha, depth - 1); 
-        }
-        
-        PopMove(g, mv); 
-
-        // beta cutoff 
-        if (score >= beta) 
-        {
-            if (IsQuiet(mv)) 
-            {
-                // killer move heuristic 
-                if (ctx->Killer[ctx->Ply][0] != mv) 
-                {
-                    ctx->Killer[ctx->Ply][1] = ctx->Killer[ctx->Ply][0]; 
-                    ctx->Killer[ctx->Ply][0] = mv; 
-                }
-
-                // history heuristic 
-                ctx->History[g->Turn][GetNoCol(FromPc(mv))][ToSq(mv)] = depth * depth; 
-            }
-
-            // ctx->Ply--; 
-            // ctx->InPV = nodeInPV; 
-            // PopMvList(moves, start); 
-            // return beta; 
-            alpha = beta; 
-            break; 
-        }
-
-        // improves score: pv node 
-        if (score > alpha) 
-        {
-            foundPV = true; 
-            alpha = score; 
-            UpdatePV(ctx, mv, -1); // ply is incremented right now: -1 offset
-        }
-
-        // only way to be in previous PV is to be the leftmost node 
-        ctx->InPV = false; 
+        ttType = FAIL_LOW; 
     }
-    ctx->Ply--; 
-    ctx->InPV = nodeInPV; 
+    else if (alpha >= beta) 
+    {
+        ttType = FAIL_HIGH; 
+    }
+
+    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, g); 
+
+    PopMvList(moves, start); 
+
+    return alpha; 
+}
+
+static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth) 
+{
+    // reset data on root node 
+    ctx->NumNodes = 0; 
+    ctx->NumLeaves = 0; 
+    ctx->NumQNodes = 0; 
+    ctx->NumQLeaves = 0; 
+    ctx->CheckTime = 0; 
+    memset(ctx->Killer, 0, sizeof(ctx->Killer)); 
+    memset(ctx->History, 0, sizeof(ctx->History)); 
+    ctx->NullMove = true; 
+    ctx->InPV = true; 
+
+    // init node 
+    ClearPV(ctx, 0); 
+    ctx->NumNodes++; 
+
+    // break out if search should end 
+    HandleOutOfTime(ctx); 
+
+    Game* g = ctx->Board; 
+    MvList* moves = ctx->Moves; 
+    U64 start = moves->Size; 
+
+    int alphaOrig = alpha; 
+
+    // collect all moves from current position 
+    // these moves must be cleared before returning
+    GenMoves(g, moves); 
+    U64 numMoves = moves->Size - start; 
+
+    // end of search or end of game 
+    if (depth <= 0 || numMoves == 0) 
+    {
+        // no move found for node so this is a leaf node
+        ClearPV(ctx, 0); 
+        ctx->NumLeaves++; 
+
+        PopMvList(moves, start); 
+        return QSearch(ctx, alpha, beta, 16); 
+    }
+
+    clock_t curTime = clock(); 
+    bool printCurMove = curTime >= ctx->CurMoveAt; 
+
+    NEGAMAX_LOOP_MOVES(
+        if (printCurMove)
+        {
+            printf("info currmove "); 
+            PrintMoveEnd(mv, " currmovenumber "); 
+            printf("%d\n", (int) (i-start+1)); 
+            fflush(stdout); 
+        }
+    );
 
     int ttType = PV_NODE; 
     if (alpha <= alphaOrig) 
