@@ -45,7 +45,7 @@ static inline U32 NextU32(Random* r)
     return (U32) NextRandom(r); 
 }
 
-static inline U32 NextS32(Random* r) 
+static inline S32 NextS32(Random* r) 
 {
     U32 x = NextU32(r); 
     return *(S32*) &x; 
@@ -56,7 +56,7 @@ static inline U64 NextU64(Random* r)
     return (NextRandom(r) & 0xFFFFFFFF) << 32 | (NextRandom(r) & 0xFFFFFFFF); 
 }
 
-static inline U64 NextS64(Random* r) 
+static inline S64 NextS64(Random* r) 
 {
     U64 x = NextU64(r); 
     return *(S64*) &x; 
