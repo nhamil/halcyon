@@ -333,12 +333,6 @@ bool UciCmdGo(void)
         fflush(stdout); 
     }
 
-    if (timeMs > 20000) 
-    {
-        // limit to <= 20sec if time remaining is given 
-        timeMs = 20000; 
-    }
-
     if (moveTime > 0) 
     {
         timeMs = moveTime; 
