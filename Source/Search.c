@@ -87,22 +87,26 @@ static inline int Mvvlva(SearchCtx* ctx, Move mv)
 
 static inline int QMoveVal(SearchCtx* ctx, Move mv) 
 {
+    if (IsQuiet(mv)) return -1000000; 
+
+    int val = 0; 
+
     if (IsCapture(mv)) 
     {
-        return Mvvlva(ctx, mv); 
+        val += Mvvlva(ctx, mv); 
     }
 
     if (IsPro(mv)) 
     {
-        return PcValues[GetNoCol(ProPc(mv))]; 
+        val += 10 * PcValues[GetNoCol(ProPc(mv))]; 
     }
 
     if (IsCheck(mv)) 
     {
-        return 100000; 
+        val += 1000; 
     }
 
-    return -100000; 
+    return val; 
 }
 
 static inline int MoveVal(SearchCtx* ctx, Move mv) 
