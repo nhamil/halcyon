@@ -105,30 +105,6 @@ static inline int QMoveVal(SearchCtx* ctx, Move mv)
     return -100000; 
 }
 
-static inline Move NextQMove(SearchCtx* ctx, U64 start) 
-{
-    MvList* moves = ctx->Moves; 
-
-    // swap current index with highest priority move 
-    U64 bestI = start; 
-    int bestVal = Mvvlva(ctx, moves->Moves[start]); 
-    for (U64 i = start + 1; i < moves->Size; i++) 
-    {
-        Move mv = moves->Moves[i]; 
-        int val = QMoveVal(ctx, mv); 
-        
-        if (val > bestVal) 
-        {
-            bestI = i; 
-            bestVal = val; 
-        }
-    }
-
-    // put best move in first place and return it 
-    SwapMvList(moves, start, bestI); 
-    return moves->Moves[start]; 
-}
-
 static inline int MoveVal(SearchCtx* ctx, Move mv) 
 {
     Game* g = ctx->Board; 
@@ -188,17 +164,26 @@ static inline int MoveVal(SearchCtx* ctx, Move mv)
     }
 }
 
-static inline Move NextMove(SearchCtx* ctx, U64 start) 
+static inline void GetMoveOrder(SearchCtx* ctx, U64 start, int (*moveVal)(SearchCtx*,Move), int* values) 
+{
+    MvList* moves = ctx->Moves; 
+
+    for (U64 i = start; i < moves->Size; i++) 
+    {
+        *(values++) = moveVal(ctx, moves->Moves[i]); 
+    }
+}
+
+static inline Move NextMove(SearchCtx* ctx, U64 start, int* values) 
 {
     MvList* moves = ctx->Moves; 
 
     // swap current index with highest priority move 
     U64 bestI = start; 
-    int bestVal = MoveVal(ctx, moves->Moves[start]); 
+    int bestVal = values[0]; 
     for (U64 i = start + 1; i < moves->Size; i++) 
     {
-        Move mv = moves->Moves[i]; 
-        int val = MoveVal(ctx, mv); 
+        int val = values[i - start]; 
         
         if (val > bestVal) 
         {
@@ -209,6 +194,11 @@ static inline Move NextMove(SearchCtx* ctx, U64 start)
 
     // put best move in first place and return it 
     SwapMvList(moves, start, bestI); 
+
+    // swap move value too 
+    values[bestI - start] = values[0]; 
+    values[0] = bestVal; 
+
     return moves->Moves[start]; 
 }
 
@@ -256,9 +246,11 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
     if (!draw) 
     {
         ctx->Ply++; 
+        int moveValues[moves->Size - start]; 
+        GetMoveOrder(ctx, start, QMoveVal, moveValues); 
         for (U64 i = start; i < moves->Size; i++) 
         {
-            Move mv = NextQMove(ctx, i); 
+            Move mv = NextMove(ctx, i, moveValues + (i - start)); 
 
             bool shouldSearch = IsTactical(mv); 
             if (!shouldSearch) continue; 
@@ -318,9 +310,11 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
     int score = -EVAL_MAX; \
     bool foundPV = false; \
     bool nodeInPV = ctx->InPV; \
+    int moveValues[moves->Size - start]; \
+    GetMoveOrder(ctx, start, MoveVal, moveValues); \
     for (U64 i = start; i < moves->Size; i++) \
     {\
-        Move mv = NextMove(ctx, i); \
+        Move mv = NextMove(ctx, i, moveValues + (i - start)); \
 \
         onMove; \
 \

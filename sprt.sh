@@ -6,7 +6,7 @@ cutechess-cli \
     -each proto=uci tc=120/8+0.08 timemargin=9999 book=./varied.bin \
     -pgnout ./stc.pgn \
     -bookmode ram \
-    -sprt elo0=0 elo1=10 alpha=0.01 beta=0.01 \
+    -sprt elo0=0 elo1=10 alpha=0.05 beta=0.05 \
     -ratinginterval 100 \
     -rounds 2000 \
     -concurrency $1 
@@ -19,7 +19,7 @@ cutechess-cli \
     -each proto=uci tc=120/60+0.6 timemargin=9999 book=./varied.bin \
     -pgnout ./ltc.pgn \
     -bookmode ram \
-    -sprt elo0=0 elo1=10 alpha=0.01 beta=0.01 \
+    -sprt elo0=0 elo1=10 alpha=0.05 beta=0.05 \
     -ratinginterval 100 \
     -rounds 2000 \
     -concurrency $1 
