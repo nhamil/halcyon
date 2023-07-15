@@ -85,9 +85,11 @@ static inline int Mvvlva(SearchCtx* ctx, Move mv)
     return 10 * (PcValues[GetNoCol(PcAt(ctx->Board, ToSq(mv)))] - PcValues[pcType]); 
 }
 
-static inline int QMoveVal(SearchCtx* ctx, Move mv) 
+static inline int QMoveVal(SearchCtx* ctx, Move mv, Move hashMove) 
 {
     if (IsQuiet(mv)) return -1000000; 
+
+    if (mv == hashMove) return 999999998; 
 
     int val = 0; 
 
@@ -109,7 +111,7 @@ static inline int QMoveVal(SearchCtx* ctx, Move mv)
     return val; 
 }
 
-static inline int MoveVal(SearchCtx* ctx, Move mv) 
+static inline int MoveVal(SearchCtx* ctx, Move mv, Move hashMove) 
 {
     Game* g = ctx->Board; 
     Piece pcType = GetNoCol(FromPc(mv)); 
@@ -121,8 +123,10 @@ static inline int MoveVal(SearchCtx* ctx, Move mv)
     // so check <= instead of <
     if (ctx->InPV && ctx->Ply <= (S64) ctx->PV.NumMoves) 
     {
-        if (mv == ctx->PV.Moves[ctx->Ply - 1]) return 2000000 + add;  
+        if (mv == ctx->PV.Moves[ctx->Ply - 1]) return 999999999 + add;  
     }
+
+    if (mv == hashMove) return 999999998; 
 
     // capture
     if (IsCapture(mv)) 
@@ -168,13 +172,13 @@ static inline int MoveVal(SearchCtx* ctx, Move mv)
     }
 }
 
-static inline void GetMoveOrder(SearchCtx* ctx, U64 start, int (*moveVal)(SearchCtx*,Move), int* values) 
+static inline void GetMoveOrder(SearchCtx* ctx, U64 start, Move hashMove, int (*moveVal)(SearchCtx*,Move,Move), int* values) 
 {
     MvList* moves = ctx->Moves; 
 
     for (U64 i = start; i < moves->Size; i++) 
     {
-        *(values++) = moveVal(ctx, moves->Moves[i]); 
+        *(values++) = moveVal(ctx, moves->Moves[i], hashMove); 
     }
 }
 
@@ -245,13 +249,16 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
         return alpha; 
     }
 
+    TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, g); 
+    Move hashMove = entry ? entry->Mv : NO_MOVE; 
+
     // search active moves 
     bool foundMove = false; 
     if (!draw) 
     {
         ctx->Ply++; 
         int moveValues[moves->Size - start]; 
-        GetMoveOrder(ctx, start, QMoveVal, moveValues); 
+        GetMoveOrder(ctx, start, hashMove, QMoveVal, moveValues); 
         for (U64 i = start; i < moves->Size; i++) 
         {
             Move mv = NextMove(ctx, i, moveValues + (i - start)); 
@@ -311,11 +318,12 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
     /* - InPV */ \
 \
     ctx->Ply++; \
+    Move bestMove = NO_MOVE; \
     int score = -EVAL_MAX; \
     bool foundPV = false; \
     bool nodeInPV = ctx->InPV; \
     int moveValues[moves->Size - start]; \
-    GetMoveOrder(ctx, start, MoveVal, moveValues); \
+    GetMoveOrder(ctx, start, hashMove, MoveVal, moveValues); \
     for (U64 i = start; i < moves->Size; i++) \
     {\
         Move mv = NextMove(ctx, i, moveValues + (i - start)); \
@@ -386,6 +394,7 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
             }\
 \
             alpha = beta; \
+            bestMove = mv; \
             break; \
         }\
 \
@@ -395,6 +404,7 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
             foundPV = true; \
             alpha = score; \
             UpdatePV(ctx, mv, -1); /* ply is incremented right now: -1 offset */ \
+            bestMove = mv; \
         }\
 \
         /* only way to be in previous PV is to be the leftmost node */ \
@@ -441,10 +451,12 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
         return QSearch(ctx, alpha, beta, 16); 
     }
 
+    TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, g); 
+    Move hashMove = entry ? entry->Mv : NO_MOVE; 
+
     if (!ctx->InPV) 
     {
-        TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, depth, g); 
-        if (entry) 
+        if (entry && entry->Depth >= depth) 
         {
             if (entry->Type == PV_NODE) 
             {
@@ -517,7 +529,7 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
         ttType = FAIL_HIGH; 
     }
 
-    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, g); 
+    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, bestMove, g); 
 
     PopMvList(moves, start); 
 
@@ -566,6 +578,9 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
         return QSearch(ctx, alpha, beta, 16); 
     }
 
+    TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, g); 
+    Move hashMove = entry ? entry->Mv : NO_MOVE; 
+
     clock_t curTime = clock(); 
     bool printCurMove = curTime >= ctx->CurMoveAt; 
 
@@ -589,7 +604,7 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
         ttType = FAIL_HIGH; 
     }
 
-    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, g); 
+    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, bestMove, g); 
 
     PopMvList(moves, start); 
 

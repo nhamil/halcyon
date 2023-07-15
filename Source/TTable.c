@@ -41,7 +41,7 @@ void ResetTTable(TTable* tt)
     }
 } 
 
-TTableEntry* FindTTableEntry(TTable* tt, Zobrist key, int depth, const Game* state) 
+TTableEntry* FindTTableEntry(TTable* tt, Zobrist key, const Game* state) 
 {
     TTableEntry* entry = &tt->Entries[key & tt->Mask]; 
 
@@ -51,7 +51,7 @@ TTableEntry* FindTTableEntry(TTable* tt, Zobrist key, int depth, const Game* sta
     // - no position is stored 
     // - positions are not equal 
     // - requested depth is deeper than stored depth 
-    if (entry->Type == NO_NODE || entry->Key != key || entry->Depth < depth) 
+    if (entry->Type == NO_NODE || entry->Key != key)// || entry->Depth < depth) 
     {
         return NULL; 
     }
@@ -71,7 +71,7 @@ TTableEntry* FindTTableEntry(TTable* tt, Zobrist key, int depth, const Game* sta
     return entry; 
 } 
 
-void UpdateTTable(TTable* tt, Zobrist key, int type, int score, int depth, const Game* state) 
+void UpdateTTable(TTable* tt, Zobrist key, int type, int score, int depth, Move mv, const Game* state) 
 {
     TTableEntry* entry = &tt->Entries[key & tt->Mask]; 
 
@@ -101,5 +101,6 @@ void UpdateTTable(TTable* tt, Zobrist key, int type, int score, int depth, const
     entry->Type = type; 
     entry->Score = score; 
     entry->Depth = depth; 
+    entry->Mv = mv; 
     // CopyGame(&entry->State, state); 
 } 

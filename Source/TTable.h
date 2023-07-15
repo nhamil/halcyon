@@ -39,6 +39,7 @@ struct TTable
 struct TTableEntry 
 {
     Zobrist Key; 
+    Move Mv; 
     int Score; 
     unsigned char Depth; 
     char Type; 
@@ -50,6 +51,6 @@ void DestroyTTable(TTable* tt);
 
 void ResetTTable(TTable* tt); 
 
-TTableEntry* FindTTableEntry(TTable* tt, Zobrist key, int depth, const Game* state); 
+TTableEntry* FindTTableEntry(TTable* tt, Zobrist key, const Game* state); 
 
-void UpdateTTable(TTable* tt, Zobrist key, int type, int score, int depth, const Game* state); 
+void UpdateTTable(TTable* tt, Zobrist key, int type, int score, int depth, Move mv, const Game* state); 
