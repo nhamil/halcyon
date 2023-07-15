@@ -105,48 +105,53 @@ bool EqualsTTableGame(const Game* a, const Game* b)
     return true; 
 }
 
-void PrintGame(const Game* g) 
+void FilePrintGame(const Game* g, FILE* out) 
 {
     char fen[FEN_LEN]; 
     ToFen(g, fen); 
 
-    printf("+---+---+---+---+---+---+---+---+\n"); 
+    fprintf(out, "+---+---+---+---+---+---+---+---+\n"); 
     for (int rank = 7; rank >= 0; rank--) 
     {
-        printf("| "); 
+        fprintf(out, "| "); 
         for (int file = 0; file < 8; file++) 
         {
             Square sq = MakeSq(file, rank); 
-            printf("%s | ", StrPc(PcAt(g, sq))); 
+            fprintf(out, "%s | ", StrPc(PcAt(g, sq))); 
         }
-        printf("%d\n", rank + 1); 
-        printf("+---+---+---+---+---+---+---+---+\n"); 
+        fprintf(out, "%d\n", rank + 1); 
+        fprintf(out, "+---+---+---+---+---+---+---+---+\n"); 
     }
-    printf("  A   B   C   D   E   F   G   H  \n"); 
+    fprintf(out, "  A   B   C   D   E   F   G   H  \n"); 
 
     for (Color col = COL_W; col < NUM_COLS; col++) 
     {
         for (Piece pc = PC_P; pc < NUM_PC_TYPES; pc++) 
         {
             Piece cpc = MakePc(pc, col); 
-            printf("%d%s ", g->Counts[cpc], StrPc(cpc)); 
+            fprintf(out, "%d%s ", g->Counts[cpc], StrPc(cpc)); 
         }
     }
-    printf("\n"); 
+    fprintf(out, "\n"); 
 
-    printf("%s\nHash: ", fen); 
-    PrintZbEnd(g->Hash, "\n");
+    fprintf(out, "%s\nHash: ", fen); 
+    FilePrintZbEnd(g->Hash, "\n", out);
 
-    printf("Ply: %d, ", g->Ply); 
-    printf("Halfmove: %d, ", g->Halfmove); 
-    printf("Castling: %s\n", StrCastle(g->Castle)); 
+    fprintf(out, "Ply: %d, ", g->Ply); 
+    fprintf(out, "Halfmove: %d, ", g->Halfmove); 
+    fprintf(out, "Castling: %s\n", StrCastle(g->Castle)); 
 
-    printf("En passant: %s, ", StrSq(g->EP)); 
-    printf("In check: %s\n", g->InCheck ? "yes" : "no"); 
+    fprintf(out, "En passant: %s, ", StrSq(g->EP)); 
+    fprintf(out, "In check: %s\n", g->InCheck ? "yes" : "no"); 
 
-    printf("Special draw: %s, ", IsSpecialDraw(g) ? "yes" : "no");
+    fprintf(out, "Special draw: %s, ", IsSpecialDraw(g) ? "yes" : "no");
 
-    printf("%s to move\n", g->Turn ? "Black" : "White"); 
+    fprintf(out, "%s to move\n", g->Turn ? "Black" : "White"); 
+}
+
+void PrintGame(const Game* g) 
+{
+    FilePrintGame(g, stdout); 
 }
 
 void PushMove(Game* g, Move mv) 

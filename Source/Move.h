@@ -233,3 +233,15 @@ static int SNPrintfMove(Move m, char* out, U64 n)
        return snprintf(out, n, "%s%s", StrSq(FromSq(m)), StrSq(ToSq(m))); 
     }
 }
+
+static void FilePrintMoveEnd(Move m, const char* end, FILE* out) 
+{
+    if (IsPro(m)) 
+    {
+        fprintf(out, "%s%s%s%s", StrSq(FromSq(m)), StrSq(ToSq(m)), StrPcType(ProPc(m)), end); 
+    }
+    else 
+    {
+        fprintf(out, "%s%s%s", StrSq(FromSq(m)), StrSq(ToSq(m)), end); 
+    }
+}

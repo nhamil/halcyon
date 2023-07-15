@@ -38,6 +38,27 @@ static inline clock_t NSecFromNow(int num)
     return clock() + num * CLOCKS_PER_SEC; 
 }
 
+static inline bool IsMateScore(int eval) 
+{
+    return eval > 90000 || eval < -90000; 
+}
+
+static inline bool IsScoreLessStrong(int eval, int newEval) 
+{
+    if (eval < 0) 
+    {
+        return newEval > eval; 
+    }
+    else if (eval > 0) 
+    {
+        return newEval < eval; 
+    }
+    else 
+    {
+        return false; 
+    }
+}
+
 static inline bool HandleOutOfTime(SearchCtx* ctx) 
 {
     if (ctx->CheckTime++ < CHECK_TIME) return false; 
@@ -456,7 +477,7 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
 
     if (!ctx->InPV) 
     {
-        if (entry && entry->Depth >= depth) 
+        if (entry && entry->Depth >= depth && !IsMateScore(entry->Score)) 
         {
             if (entry->Type == PV_NODE) 
             {
@@ -628,7 +649,7 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
     ctx->Depth = depth; 
     ctx->Eval = eval; 
 
-    if (eval > 90000 || eval < -90000) 
+    if (IsMateScore(eval)) 
     {
         int matePly = 100000 - abs(eval); 
         int plies = matePly - ctx->Board->Ply + 1; 

@@ -97,6 +97,8 @@ void PushNullMove(Game* g);
 
 void PopNullMove(Game* g); 
 
+void FilePrintGame(const Game* g, FILE* out); 
+
 void PrintGame(const Game* g); 
 
 U64 Perft(Game* g, int depth); 

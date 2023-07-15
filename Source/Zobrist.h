@@ -60,4 +60,9 @@ static void PrintZbEnd(Zobrist hash, const char* end)
     printf("%016" PRIx64 "%s", hash, end); 
 }
 
+static void FilePrintZbEnd(Zobrist hash, const char* end, FILE* out) 
+{
+    fprintf(out, "%016" PRIx64 "%s", hash, end); 
+}
+
 void FindPrintZb(Zobrist hash); 
