@@ -1,17 +1,25 @@
 cmake_minimum_required(VERSION 3.16) 
 project(chess-engine C) 
 
-set(EXE_VERSION "0.3")
+set(ENGINE_VERSION "Dev")
 
 find_package(Git REQUIRED)
-execute_process(COMMAND "${GIT_EXECUTABLE}" rev-parse --abbrev-ref HEAD OUTPUT_VARIABLE BRANCH_NAME OUTPUT_STRIP_TRAILING_WHITESPACE)
-if(NOT BRANCH_NAME STREQUAL "master") 
-    set(EXE_VERSION "${EXE_VERSION}${BRANCH_NAME}")
+if(ENGINE_VERSION STREQUAL "Dev")
+    execute_process(
+	    COMMAND git log -1 --format=%h 
+	    WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR} 
+	    OUTPUT_VARIABLE GIT_HASH 
+	    OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+    set(ENGINE_VERSION "${ENGINE_VERSION} ${GIT_HASH}")
 endif()
 
-add_compile_definitions(ENGINE_NAME="Halcyon ${EXE_VERSION}")
+string(REGEX REPLACE " $" "" ENGINE_VERSION ${ENGINE_VERSION})
+string(TOLOWER ${ENGINE_VERSION} EXE_VERSION)
+string(REPLACE " " "" EXE_VERSION ${EXE_VERSION})
+add_compile_definitions(ENGINE_NAME="Halcyon ${ENGINE_VERSION}")
 
-message(STATUS "Building Halcyon ${EXE_VERSION}")
+message(STATUS "Building Halcyon ${ENGINE_VERSION}")
 
 if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -57,7 +65,6 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 set(sources 
-    # Source/Book.c 
     Source/Eval.c 
     Source/Fen.c 
     Source/Game.c 
@@ -75,7 +82,7 @@ set_target_properties(engine PROPERTIES OUTPUT_NAME "${EXE_NAME}")
 
 add_executable(engine-valid EXCLUDE_FROM_ALL Source/Main.c ${sources})
 target_link_libraries(engine-valid Threads::Threads) 
-set_target_properties(engine-valid PROPERTIES OUTPUT_NAME "${EXE_NAME}-valid")
+set_target_properties(engine-valid PROPERTIES OUTPUT_NAME "${EXE_NAME} Valid")
 target_compile_definitions(engine-valid PRIVATE VALIDATION=1)
 
 add_executable(perft EXCLUDE_FROM_ALL Source/Perft.c ${sources})
