@@ -7,7 +7,6 @@
  * 
  * Implements transposition table. 
  */
-
 #include "TTable.h" 
 
 #include <stdlib.h> 
@@ -55,17 +54,20 @@ TTableEntry* FindTTableEntry(TTable* tt, Zobrist key, const Game* state)
     {
         return NULL; 
     }
-    // if (!EqualsTTableGame(&entry->State, state)) 
-    // {
-    //     printf("info string query hash is equal but position is not:\n"); 
-    //     // PrintMBox(&entry->Mailbox); 
-    //     PrintGame(&entry->State); 
-    //     printf("vs\n"); 
-    //     // PrintMBox(mbox); 
-    //     PrintGame(state); 
-    //     exit(1); 
-    // }
+#ifdef VALIDATION
+    if (!EqualsTTableGame(&entry->State, state)) 
+    {
+        printf("info string query hash is equal but position is not:\n"); 
+        // PrintMBox(&entry->Mailbox); 
+        PrintGame(&entry->State); 
+        printf("vs\n"); 
+        // PrintMBox(mbox); 
+        PrintGame(state); 
+        exit(1); 
+    }
+#else
     (void) state; 
+#endif
 
     tt->Hits++; 
     return entry; 
@@ -85,22 +87,27 @@ void UpdateTTable(TTable* tt, Zobrist key, int type, int score, int depth, Move 
         tt->Collisions++; 
     }
     // key is equal, is there a key collision? 
+#ifdef VALIDATION
+    else if (!EqualsTTableGame(&entry->State, state)) 
+    {
+        printf("info string hash is equal but position is not:\n"); 
+        // PrintMBox(&entry->Mailbox); 
+        PrintGame(&entry->State); 
+        printf("vs\n"); 
+        // PrintMBox(mbox); 
+        PrintGame(state); 
+        exit(1); 
+    }
+#else
     (void) state; 
-    // else if (!EqualsTTableGame(&entry->State, state)) 
-    // {
-    //     printf("info string hash is equal but position is not:\n"); 
-    //     // PrintMBox(&entry->Mailbox); 
-    //     PrintGame(&entry->State); 
-    //     printf("vs\n"); 
-    //     // PrintMBox(mbox); 
-    //     PrintGame(state); 
-    //     exit(1); 
-    // }
+#endif
 
     entry->Key = key; 
     entry->Type = type; 
     entry->Score = score; 
     entry->Depth = depth; 
     entry->Mv = mv; 
-    // CopyGame(&entry->State, state); 
+#ifdef VALIDATION
+    CopyGame(&entry->State, state); 
+#endif
 } 

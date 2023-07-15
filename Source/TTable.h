@@ -38,6 +38,9 @@ struct TTable
 
 struct TTableEntry 
 {
+#ifdef VALIDATION
+    Game State; 
+#endif
     Zobrist Key; 
     Move Mv; 
     int Score; 
