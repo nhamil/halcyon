@@ -163,7 +163,50 @@ static inline BBoard BAttacks(Square sq, BBoard occ)
     return MagicBSlide[sq][((MagicBMask[sq] & occ) * MagicB[sq]) >> MagicBShift[sq]];
 }
 
-static inline bool IsAttacked(const Game* g, Square sq, Color chkCol) 
+static inline int GetAttackUnits(const Game* g, BBoard region, Color chkCol) 
+{
+    Color col = chkCol; 
+    Color opp = OppCol(col); 
+
+    BBoard occ = g->All; 
+
+    int units = 0; 
+
+    BBoard pawns = g->Pieces[MakePc(PC_P, opp)];  
+    if (opp == COL_W) 
+    {
+        pawns = ShiftNW(pawns) | ShiftNE(pawns); 
+    }
+    else 
+    {
+        pawns = ShiftSW(pawns) | ShiftSE(pawns); 
+    }
+    units += Popcnt(pawns & region); 
+
+    FOR_EACH_BIT(g->Pieces[MakePc(PC_N, opp)], 
+    {
+        units += 2 * Popcnt(MovesN[sq] & region);
+    });
+
+    FOR_EACH_BIT(g->Pieces[MakePc(PC_B, opp)], 
+    {
+        units += 2 * Popcnt(BAttacks(sq, occ) & region); 
+    });
+
+    FOR_EACH_BIT(g->Pieces[MakePc(PC_R, opp)], 
+    {
+        units += 3 * Popcnt(RAttacks(sq, occ) & region);
+    });
+
+    FOR_EACH_BIT(g->Pieces[MakePc(PC_Q, opp)], 
+    {
+        units += 5 * Popcnt((BAttacks(sq, occ) | RAttacks(sq, occ)) & region);
+    });
+
+    return units; 
+}
+
+static inline BBoard GetAttackers(const Game* g, Square sq, Color chkCol) 
 {
     Color col = chkCol; 
     Color opp = OppCol(col); 
@@ -186,7 +229,12 @@ static inline bool IsAttacked(const Game* g, Square sq, Color chkCol)
                | (oppN & MovesN[sq]) 
                | (oppP & AttacksP[col][sq]);     
 
-    return chk != 0; 
+    return chk; 
+}
+
+static inline bool IsAttacked(const Game* g, Square sq, Color chkCol) 
+{
+    return GetAttackers(g, sq, chkCol) != 0; 
 }
 
 extern int PcSq[2][NUM_PC_TYPES][NUM_SQ]; 

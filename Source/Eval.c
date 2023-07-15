@@ -10,6 +10,18 @@
 
 #include "Game.h" 
 
+static const int AttackUnitValues[] = 
+{
+    0, 0, 1, 2, 3, 5, 
+    8, 11, 14, 
+    19, 24, 29, 34, 39, 
+    47, 55, 63, 71, 79, 87, 95, 103, 
+    116, 129, 142, 155, 168, 181, 194, 207, 220, 233, 246, 259, 272, 
+    285, 298, 311, 324, 337, 350, 363, 376, 389, 402, 415, 428, 441, 
+    449, 454, 459, 464, 469, 474, 479, 484, 489, 494, 499, 
+    500, 500, 500, 500, 500
+};
+
 int PcSq[2][6][64] = 
 {
     {
@@ -158,6 +170,23 @@ static inline void EvalBPcSq(const Game* g, Piece pc, int* mg, int* eg)
     });
 }
 
+static inline int EvalAttackUnits(const Game* g, Color col) 
+{
+    Square ksq = Lsb(g->Pieces[MakePc(PC_K, col)]); 
+    BBoard region = BB[ksq] | MovesK[ksq]; 
+    if (col == COL_W) 
+    {
+        region |= ShiftN(region); 
+    }
+    else 
+    {
+        region |= ShiftS(region); 
+    }
+    int units = GetAttackUnits(g, region, col); 
+    if (units > 63) units = 63; 
+    return AttackUnitValues[units]; 
+}
+
 int Evaluate(const Game* g, int nMoves, bool draw, int contempt) 
 {
     if (draw) 
@@ -206,6 +235,10 @@ int Evaluate(const Game* g, int nMoves, bool draw, int contempt)
 
     // bishop pair 
     eval += 15 * ((wb >= 2) - (bb >= 2)); 
+
+    // this is reversed because it is checking how (un)safe that color's king is 
+    // and returning a higher value for less safe 
+    eval += EvalAttackUnits(g, COL_B) - EvalAttackUnits(g, COL_W); 
 
     EvalWPcSq(g, PC_P, &mg, &eg); 
     EvalBPcSq(g, PC_P, &mg, &eg); 
