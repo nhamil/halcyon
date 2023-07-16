@@ -3,10 +3,11 @@
 .cache/
 tmp/
 varied.bin
-tmp.txt
+tmp*
 ltc.pgn
 stc.pgn
 sprt.txt 
 ltc-release.pgn
 stc-release.pgn
 release.txt
+tuning*.pgn

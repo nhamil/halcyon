@@ -424,6 +424,21 @@ bool UciCmdEval(bool qsearch)
     return true; 
 }
 
+bool UciCmdGetTune(void) 
+{
+    int N = GetNumEvalParams(); 
+
+    printf("%d weights: ", N); 
+
+    for (int i = 0; i < N; i++) 
+    {
+        printf("%d ", *GetEvalParam(i)); 
+    }
+    printf("\n"); 
+
+    return true; 
+}
+
 bool UciParse(const char* origCmd) 
 {
     // remove spaces at the beginning
@@ -446,6 +461,7 @@ bool UciParse(const char* origCmd)
         if (UciEquals(token, "setoption")) return UciCmdSetOption(); 
         if (UciEquals(token, "seval")) return UciCmdEval(false); 
         if (UciEquals(token, "qeval")) return UciCmdEval(true); 
+        if (UciEquals(token, "gettune")) return UciCmdGetTune(); 
     }
 
     return false; 

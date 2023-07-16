@@ -249,3 +249,11 @@ extern int AttackUnitValues[64];
 extern int PawnStructureValues[4]; 
 
 extern int PcSq[2][NUM_PC_TYPES][NUM_SQ]; 
+
+extern int PcTypeValues[5]; 
+
+extern int BishopPair; 
+
+int* GetEvalParam(int index); 
+
+int GetNumEvalParams(void); 

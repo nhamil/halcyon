@@ -35,6 +35,16 @@ int PassedPawnValues[] =
     0, 10, 15, 20, 30, 40, 50, 0, 
 };
 
+/**
+ * Does not include PC_K as this should not be parameterized 
+ */
+int PcTypeValues[] = 
+{
+    100, 310, 320, 500, 975
+};
+
+int BishopPair = 15; 
+
 int PcSq[2][6][64] = 
 {
     {
@@ -162,6 +172,35 @@ int PcSq[2][6][64] =
         }
     }, 
 };
+
+#define EVAL_PARAM(ary) \
+    if (index < (int) (sizeof(ary) / sizeof(int))) { /*printf("%s[%d] = %d\n", #ary, index, *(((int*) ary) + index));*/ return ((int*) ary) + index; } \
+    index -= (int) (sizeof(ary) / sizeof(int)); 
+
+#define EVAL_1PARAM(val) \
+    if (index < 1) return &val; \
+    index -= 1; 
+
+int* GetEvalParam(int index) 
+{
+    if (index < 0) return NULL; 
+
+    EVAL_PARAM(PcSq); 
+    EVAL_PARAM(AttackUnitValues); 
+    EVAL_PARAM(PawnStructureValues); 
+    EVAL_PARAM(PcTypeValues); 
+    EVAL_1PARAM(BishopPair); 
+
+    return NULL; 
+}
+
+int GetNumEvalParams(void) 
+{
+    int num = 0; 
+    while (GetEvalParam(num)) num++; 
+
+    return num; 
+}
 
 static inline void EvalWPcSq(const Game* g, Piece pc, int* mg, int* eg) 
 {
@@ -344,15 +383,15 @@ int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool ver
     int mg = 0; 
     int eg = 0; 
 
-    eval += 100 * (wp - bp); 
-    eval += 310 * (wn - bn); 
-    eval += 320 * (wb - bb); 
-    eval += 500 * (wr - br); 
-    eval += 975 * (wq - bq); 
+    eval += PcTypeValues[PC_P] * (wp - bp); 
+    eval += PcTypeValues[PC_N] * (wn - bn); 
+    eval += PcTypeValues[PC_B] * (wb - bb); 
+    eval += PcTypeValues[PC_R] * (wr - br); 
+    eval += PcTypeValues[PC_Q] * (wq - bq); 
     eval += 10000 * (wk - bk); 
 
     // bishop pair 
-    eval += 15 * ((wb >= 2) - (bb >= 2)); 
+    eval += BishopPair * ((wb >= 2) - (bb >= 2)); 
 
     // this is reversed because it is checking how (un)safe that color's king is 
     // and returning a higher value for less safe 
