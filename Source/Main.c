@@ -435,6 +435,27 @@ bool UciCmdGetTune(void)
         printf("%d ", *GetEvalParam(i)); 
     }
     printf("\n"); 
+    fflush(stdout); 
+
+    return true; 
+}
+
+bool UciCmdSetTune(void) 
+{
+    int N = GetNumEvalParams(); 
+    int total = 0; 
+
+    for (int i = 0; i < N; i++) 
+    {
+        const char* in = UciNextToken(); 
+        if (!in) break; 
+
+        *GetEvalParam(i) = atoi(in); 
+        total++; 
+    }
+
+    printf("info string Updated %d eval weights\n", total); 
+    fflush(stdout); 
 
     return true; 
 }
@@ -462,6 +483,7 @@ bool UciParse(const char* origCmd)
         if (UciEquals(token, "seval")) return UciCmdEval(false); 
         if (UciEquals(token, "qeval")) return UciCmdEval(true); 
         if (UciEquals(token, "gettune")) return UciCmdGetTune(); 
+        if (UciEquals(token, "settune")) return UciCmdSetTune(); 
     }
 
     return false; 
