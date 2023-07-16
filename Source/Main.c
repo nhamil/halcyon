@@ -403,6 +403,27 @@ bool UciCmdSetOption(void)
     return true; 
 }
 
+bool UciCmdEval(bool qsearch) 
+{
+    if (qsearch) 
+    {
+        printf("Quiescence search evaluation is not supported yet\n"); 
+        return false; 
+    }
+
+    printf("Static Evaluation\n"); 
+    PrintGame(s_UciGame); 
+
+    MvInfo info; 
+    GenMvInfo(s_UciGame, &info); 
+
+    bool draw = IsSpecialDraw(s_UciGame); 
+
+    EvaluateVerbose(s_UciGame, info.NumMoves, draw, s_Engine.Contempt, true); 
+
+    return true; 
+}
+
 bool UciParse(const char* origCmd) 
 {
     // remove spaces at the beginning
@@ -423,6 +444,8 @@ bool UciParse(const char* origCmd)
         if (UciEquals(token, "go")) return UciCmdGo(); 
         if (UciEquals(token, "stop")) return UciCmdStop(); 
         if (UciEquals(token, "setoption")) return UciCmdSetOption(); 
+        if (UciEquals(token, "seval")) return UciCmdEval(false); 
+        if (UciEquals(token, "qeval")) return UciCmdEval(true); 
     }
 
     return false; 

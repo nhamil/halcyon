@@ -105,7 +105,12 @@ U64 Perft(Game* g, int depth);
 
 bool IsSpecialDraw(const Game* g);
 
-int Evaluate(const Game* g, int nMoves, bool draw, int contempt); 
+int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool verbose); 
+
+static inline int Evaluate(const Game* g, int nMoves, bool draw, int contempt) 
+{
+    return EvaluateVerbose(g, nMoves, draw, contempt, false); 
+} 
 
 bool ValidateGame(const Game* g); 
 
@@ -238,5 +243,9 @@ static inline bool IsAttacked(const Game* g, Square sq, Color chkCol)
 {
     return GetAttackers(g, sq, chkCol) != 0; 
 }
+
+extern int AttackUnitValues[64]; 
+
+extern int PawnStructureValues[4]; 
 
 extern int PcSq[2][NUM_PC_TYPES][NUM_SQ]; 
