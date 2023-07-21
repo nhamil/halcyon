@@ -432,7 +432,7 @@ bool UciCmdGetTune(void)
 
     for (int i = 0; i < N; i++) 
     {
-        printf("%d ", *GetEvalParam(i)); 
+        printf("%d ", *GetEvalParam(i, NULL)); 
     }
     printf("\n"); 
     fflush(stdout); 
@@ -450,7 +450,7 @@ bool UciCmdSetTune(void)
         const char* in = UciNextToken(); 
         if (!in) break; 
 
-        *GetEvalParam(i) = atoi(in); 
+        *GetEvalParam(i, NULL) = atoi(in); 
         total++; 
     }
 

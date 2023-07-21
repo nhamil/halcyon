@@ -1,9 +1,9 @@
 .vscode/*
 .env/
 .cache/
-tmp/
-varied.bin
+tmp*/
 tmp*
+varied.bin
 ltc.pgn
 stc.pgn
 sprt.txt 

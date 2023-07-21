@@ -95,4 +95,6 @@ static void InitSearchParams(SearchParams* sp, const Game* board, int depth, int
 
 void Search(SearchCtx* ctx, SearchParams* params); 
 
-int BasicQSearch(const Game* g); 
+int BasicQSearch(SearchCtx* ctx); 
+
+int QStabilize(Game* g, MvList* moves, int alpha, int beta, int depth, Game* out); 

@@ -27,6 +27,8 @@ static const int PcValues[] =
     100, 310, 320, 500, 900, 10000, 0
 };
 
+static bool NoHandleTime = false; 
+
 static inline bool OutOfTime(const SearchCtx* ctx) 
 {
     // need at least depth 1
@@ -61,7 +63,7 @@ static inline bool IsScoreLessStrong(int eval, int newEval)
 
 static inline bool HandleOutOfTime(SearchCtx* ctx) 
 {
-    if (ctx->CheckTime++ < CHECK_TIME) return false; 
+    if (ctx->CheckTime++ < CHECK_TIME || NoHandleTime) return false; 
 
     ctx->CheckTime = 0; 
 
@@ -825,3 +827,10 @@ void Search(SearchCtx* ctx, SearchParams* params)
 
     pthread_create(&ctx->Thread, NULL, StartPThreadSearch, ctx); 
 }
+
+int BasicQSearch(SearchCtx* ctx) 
+{
+    ctx->PV.NumMoves = 0; 
+    NoHandleTime = true; 
+    return QSearch(ctx, -EVAL_MAX, EVAL_MAX, 16); 
+} 

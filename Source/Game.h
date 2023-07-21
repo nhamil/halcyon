@@ -254,6 +254,8 @@ extern int PcTypeValues[5];
 
 extern int BishopPair; 
 
-int* GetEvalParam(int index); 
+#define PARAM_NAME_LEN 512
+
+int* GetEvalParam(int index, char* outName); 
 
 int GetNumEvalParams(void); 

@@ -10,6 +10,29 @@
 
 #include "Game.h" 
 
+int PassedPawnValues[] = 
+{
+    0, 10, 15, 20, 30, 40, 50, 0, 
+};
+
+int BishopPair = 15; 
+
+int PawnStructureValues[] =
+{
+    -20, // isolated 
+    -15, // backward 
+    -20, // doubled (once for every set)
+    -50, // tripled (once for every set)
+};
+
+/**
+ * Does not include PC_K as this should not be parameterized 
+ */
+int PcTypeValues[] = 
+{
+    100, 310, 320, 500, 975
+};
+
 int AttackUnitValues[] = 
 {
     0, 0, 1, 2, 3, 5, 
@@ -21,29 +44,6 @@ int AttackUnitValues[] =
     449, 454, 459, 464, 469, 474, 479, 484, 489, 494, 499, 
     500, 500, 500, 500, 500
 };
-
-int PawnStructureValues[] =
-{
-    -20, // isolated 
-    -15, // backward 
-    -20, // doubled (once for every set)
-    -50, // tripled (once for every set)
-};
-
-int PassedPawnValues[] = 
-{
-    0, 10, 15, 20, 30, 40, 50, 0, 
-};
-
-/**
- * Does not include PC_K as this should not be parameterized 
- */
-int PcTypeValues[] = 
-{
-    100, 310, 320, 500, 975
-};
-
-int BishopPair = 15; 
 
 int PcSq[2][6][64] = 
 {
@@ -173,31 +173,58 @@ int PcSq[2][6][64] =
     }, 
 };
 
-#define EVAL_PARAM(ary) \
-    if (index < (int) (sizeof(ary) / sizeof(int))) { /*printf("%s[%d] = %d\n", #ary, index, *(((int*) ary) + index));*/ return ((int*) ary) + index; } \
+void PrintArrayIndex(char* out, const char* ary, int index, int s1, int s2, int s3) 
+{
+    if (s1 == 0) 
+    {
+        snprintf(out, PARAM_NAME_LEN, "%s", ary);
+    }
+    else if (s2 == 0) 
+    {
+        snprintf(out, PARAM_NAME_LEN, "%s[%d]", ary, index);
+    }
+    else if (s3 == 0) 
+    {
+        int i1 = index % s1;  
+        int i2 = index / s1; 
+        snprintf(out, PARAM_NAME_LEN, "%s[%d][%d]", ary, i2, i1);
+    }
+    else 
+    {
+        int i1 = index % s1;  
+        int i2_ = index / s1; 
+        int i2 = i2_ % s2; 
+        int i3 = i2_ / s2; 
+        snprintf(out, PARAM_NAME_LEN, "%s[%d][%d][%d]", ary, i3, i2, i1);
+    }
+}
+
+#define EVAL_PARAM(ary, s1, s2, s3) \
+    if (index < (int) (sizeof(ary) / sizeof(int))) { if (name) { PrintArrayIndex(name, #ary, index, s1, s2, s3); } return ((int*) ary) + index; } \
     index -= (int) (sizeof(ary) / sizeof(int)); 
 
 #define EVAL_1PARAM(val) \
-    if (index < 1) return &val; \
+    if (index < 1) { if (name) { PrintArrayIndex(name, #val, 0, 0, 0, 0); } return &val; } \
     index -= 1; 
 
-int* GetEvalParam(int index) 
+int* GetEvalParam(int index, char* name) 
 {
     if (index < 0) return NULL; 
 
-    EVAL_PARAM(PcSq); 
-    EVAL_PARAM(AttackUnitValues); 
-    EVAL_PARAM(PawnStructureValues); 
-    EVAL_PARAM(PcTypeValues); 
     EVAL_1PARAM(BishopPair); 
+    EVAL_PARAM(PawnStructureValues, 4, 0, 0); 
+    EVAL_PARAM(PcTypeValues, 5, 0, 0); 
+    EVAL_PARAM(AttackUnitValues, 64, 0, 0); 
+    EVAL_PARAM(PcSq, 64, 6, 2); 
 
+    if (name) name[0] = '\0'; 
     return NULL; 
 }
 
 int GetNumEvalParams(void) 
 {
     int num = 0; 
-    while (GetEvalParam(num)) num++; 
+    while (GetEvalParam(num, NULL)) num++; 
 
     return num; 
 }

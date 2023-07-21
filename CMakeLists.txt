@@ -91,3 +91,9 @@ target_link_libraries(perft Threads::Threads)
 add_executable(perft-valid EXCLUDE_FROM_ALL Source/Perft.c ${sources})
 target_link_libraries(perft-valid Threads::Threads)
 target_compile_definitions(perft-valid PRIVATE VALIDATION=1)
+
+add_executable(tune EXCLUDE_FROM_ALL Source/Tune.c ${sources})
+target_link_libraries(tune Threads::Threads m)
+
+add_executable(stabilize EXCLUDE_FROM_ALL Source/Stabilize.c ${sources})
+target_link_libraries(stabilize Threads::Threads)
