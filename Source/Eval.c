@@ -17,6 +17,8 @@ int PassedPawnValues[] =
 
 int ConnectedRooks = 9; 
 
+int OpenFile = 15; 
+
 int BishopPair = 32; 
 
 int PawnStructureValues[] =
@@ -214,6 +216,7 @@ int* GetEvalParam(int index, char* name)
     if (index < 0) return NULL; 
 
     EVAL_1PARAM(ConnectedRooks); 
+    EVAL_1PARAM(OpenFile); 
     EVAL_PARAM(PassedPawnValues, 8, 0, 0); 
 
     // EVAL_1PARAM(BishopPair); 
@@ -265,6 +268,20 @@ static inline int EvalRooks(const Game* g, Color col)
     }
     
     return 0; 
+}
+
+static inline int EvalOpenFiles(const Game* g, Color col) 
+{
+    BBoard rAttackers = g->Pieces[MakePc(PC_R, col)] | g->Pieces[MakePc(PC_Q, col)]; 
+    BBoard pawns = g->Pieces[PC_WP] | g->Pieces[PC_BP]; 
+    int total = 0; 
+
+    for (int i = 0; i < 8; i++) 
+    {
+        total += ((Files[i] & pawns) == 0) * ((Files[i] & rAttackers) != 0); 
+    }
+
+    return total * OpenFile; 
 }
 
 static inline int EvalAttackUnits(const Game* g, Color col) 
@@ -487,6 +504,10 @@ int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool ver
     int cbr = EvalRooks(g, COL_B); 
     eval += cwr - cbr; 
 
+    int wOpen = EvalOpenFiles(g, COL_W); 
+    int bOpen = EvalOpenFiles(g, COL_B); 
+    eval += wOpen - bOpen; 
+
     // int p = 0 * (wp - bp);  
     int n = 1 * (wn + bn); 
     int b = 1 * (wb + bb); 
@@ -512,6 +533,7 @@ int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool ver
         printf("Tripled pawns (%d-%d): %d\n", wpTrip, bpTrip, (wpTrip-bpTrip) * PawnStructureValues[3]); 
         printf("Passed pawns (%d-%d): %d\n", wpPass, bpPass, wpPassEval - bpPassEval); 
         printf("Connected rooks (%d-%d): %d\n", cwr, cbr, cwr - cbr); 
+        printf("Open files (%d-%d): %d\n", wOpen, bOpen, wOpen - bOpen); 
         printf("Final evaluation: %d\n", eval); 
     }
 
