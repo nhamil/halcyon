@@ -209,7 +209,7 @@ int main(int argc, char** argv)
 
     for (int i = 0; i < NWeights; i++) 
     {   
-        *GetEvalParam(i, NULL) = 0;  
+//        *GetEvalParam(i, NULL) = 0;  
         Weights[i] = *GetEvalParam(i, Names + PARAM_NAME_LEN * i); 
     }
 

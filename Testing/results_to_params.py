@@ -3,8 +3,9 @@ import sys
 file = sys.argv[1]
 maxiter = int(sys.argv[2])
 
+to_c = False
 if len(sys.argv) >= 4: 
-    to_c = bool(sys.argv[3]) 
+    to_c = sys.argv[3].lower() == "true"
 
 p = []
 
