@@ -15,6 +15,8 @@ int PassedPawnValues[] =
     0, 10, 15, 20, 30, 40, 50, 0, 
 };
 
+int ConnectedRooks = 20; 
+
 int BishopPair = 32; 
 
 int PawnStructureValues[] =
@@ -211,11 +213,14 @@ int* GetEvalParam(int index, char* name)
 {
     if (index < 0) return NULL; 
 
-    EVAL_1PARAM(BishopPair); 
-    EVAL_PARAM(PawnStructureValues, 4, 0, 0); 
-    EVAL_PARAM(PcTypeValues, 5, 0, 0); 
-    EVAL_PARAM(AttackUnitValues, 64, 0, 0); 
-    EVAL_PARAM(PcSq, 64, 6, 2); 
+    EVAL_1PARAM(ConnectedRooks); 
+    EVAL_PARAM(PassedPawnValues, 8, 0, 0); 
+
+    // EVAL_1PARAM(BishopPair); 
+    // EVAL_PARAM(PawnStructureValues, 4, 0, 0); 
+    // EVAL_PARAM(PcTypeValues, 5, 0, 0); 
+    // EVAL_PARAM(AttackUnitValues, 64, 0, 0); 
+    // EVAL_PARAM(PcSq, 64, 6, 2); 
 
     if (name) name[0] = '\0'; 
     return NULL; 
@@ -247,6 +252,19 @@ static inline void EvalBPcSq(const Game* g, Piece pc, int* mg, int* eg)
         *mg -= PcSq[0][pc][sq]; 
         *eg -= PcSq[1][pc][sq]; 
     });
+}
+
+static inline int EvalRooks(const Game* g, Color col) 
+{
+    Piece pc = MakePc(PC_R, col); 
+    BBoard board = g->Pieces[pc]; 
+
+    if (g->Counts[pc] >= 2) 
+    {
+        return ConnectedRooks * ((RAttacks(Lsb(board), g->All) & board) != 0); 
+    }
+    
+    return 0; 
 }
 
 static inline int EvalAttackUnits(const Game* g, Color col) 
@@ -465,6 +483,10 @@ int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool ver
     EvalWPcSq(g, PC_K, &mg, &eg); 
     EvalBPcSq(g, PC_K, &mg, &eg); 
 
+    int cwr = EvalRooks(g, COL_W); 
+    int cbr = EvalRooks(g, COL_B); 
+    eval += cwr - cbr; 
+
     // int p = 0 * (wp - bp);  
     int n = 1 * (wn + bn); 
     int b = 1 * (wb + bb); 
@@ -489,6 +511,7 @@ int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool ver
         printf("Doubled pawns (%d-%d): %d\n", wpDoub, bpDoub, (wpDoub-bpDoub) * PawnStructureValues[2]); 
         printf("Tripled pawns (%d-%d): %d\n", wpTrip, bpTrip, (wpTrip-bpTrip) * PawnStructureValues[3]); 
         printf("Passed pawns (%d-%d): %d\n", wpPass, bpPass, wpPassEval - bpPassEval); 
+        printf("Connected rooks (%d-%d): %d\n", cwr, cbr, cwr - cbr); 
         printf("Final evaluation: %d\n", eval); 
     }
 
