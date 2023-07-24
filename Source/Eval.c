@@ -17,7 +17,7 @@ int PassedPawnValues[] =
 
 int ConnectedRooks = 9; 
 
-int OpenFile = 11; 
+int OpenFile = 20; 
 
 int BishopPair = 32; 
 
