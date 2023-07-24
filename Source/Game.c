@@ -466,6 +466,22 @@ bool IsSpecialDraw(const Game* g)
         }
     }
 
+    // insufficient material (guaranteed)
+    if (g->Pieces[PC_WK] == g->Colors[COL_W]) // white only has king
+    {
+        // KN vs K
+        if ((g->Pieces[PC_BK] | g->Pieces[PC_BN]) == g->Colors[COL_B] && g->Counts[PC_BN] <= 1) return true; 
+        // KB vs K
+        if ((g->Pieces[PC_BK] | g->Pieces[PC_BB]) == g->Colors[COL_B] && g->Counts[PC_BB] <= 1) return true;  
+    }
+    else if (g->Pieces[PC_BK] == g->Colors[COL_B]) // black only has king 
+    {
+        // KN vs K
+        if ((g->Pieces[PC_WK] | g->Pieces[PC_WN]) == g->Colors[COL_W] && g->Counts[PC_WN] <= 1) return true; 
+        // KB vs K
+        if ((g->Pieces[PC_WK] | g->Pieces[PC_WB]) == g->Colors[COL_W] && g->Counts[PC_WB] <= 1) return true;  
+    }
+
     return false; 
 }
 
