@@ -75,6 +75,7 @@ bool UciCmdUciNewGame(void)
 {
     StopSearchCtx(&s_Engine); 
     LoadFen(s_UciGame, START_FEN); 
+    ResetTTable(&s_Engine.TT); 
     return true; 
 }
 
