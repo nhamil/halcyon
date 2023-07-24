@@ -12,10 +12,10 @@
 
 int PassedPawnValues[] = 
 {
-    0, 10, 15, 20, 30, 40, 50, 0, 
+    0, 6, 9, 20, 32, 45, 58, 0
 };
 
-int ConnectedRooks = 20; 
+int ConnectedRooks = 9; 
 
 int BishopPair = 32; 
 
