@@ -407,7 +407,7 @@ static inline void EvalBPStructure(
     }
 }
 
-int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool verbose) 
+int EvaluateVerbose(const Game* g, int ply, int nMoves, bool draw, int contempt, bool verbose) 
 {
     if (draw) 
     {   
@@ -419,7 +419,7 @@ int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool ver
         if (g->InCheck) 
         {
             // lower value the farther out the mate is (prioritize faster mates)
-            return (100000 - g->Ply) * (-1 + 2 * g->Turn); 
+            return (99999 - ply) * (-1 + 2 * g->Turn); 
         }
         else 
         {

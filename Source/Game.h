@@ -105,11 +105,11 @@ U64 Perft(Game* g, int depth);
 
 bool IsSpecialDraw(const Game* g);
 
-int EvaluateVerbose(const Game* g, int nMoves, bool draw, int contempt, bool verbose); 
+int EvaluateVerbose(const Game* g, int ply, int nMoves, bool draw, int contempt, bool verbose); 
 
-static inline int Evaluate(const Game* g, int nMoves, bool draw, int contempt) 
+static inline int Evaluate(const Game* g, int ply, int nMoves, bool draw, int contempt) 
 {
-    return EvaluateVerbose(g, nMoves, draw, contempt, false); 
+    return EvaluateVerbose(g, ply, nMoves, draw, contempt, false); 
 } 
 
 bool ValidateGame(const Game* g); 

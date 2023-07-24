@@ -103,7 +103,7 @@ void* EThread(void* data)
         FenState* fen = AtVec(States, i);  
         double result = fen->Result; 
 
-        double add = result - Sigmoid(Evaluate(&fen->Board, fen->NumMoves, fen->Draw, 0)); 
+        double add = result - Sigmoid(Evaluate(&fen->Board, 0, fen->NumMoves, fen->Draw, 0)); 
         ThreadErrors[offset] += add * add; 
     }
 
@@ -126,15 +126,6 @@ double E(void)
         offsets[i] = i; 
         pthread_create(&threads[i], NULL, EThread, &offsets[i]); 
     }
-
-    // for (U64 i = 0; i < States->Size; i++) 
-    // {
-    //     FenState* fen = AtVec(States, i);  
-    //     double result = fen->Result; 
-
-    //     double add = result - Sigmoid(Evaluate(&fen->Board, fen->NumMoves, fen->Draw, 0)); 
-    //     total += add * add; 
-    // }
 
     for (int i = 0; i < NumThreads; i++) 
     {

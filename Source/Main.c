@@ -420,7 +420,7 @@ bool UciCmdEval(bool qsearch)
 
     bool draw = IsSpecialDraw(s_UciGame); 
 
-    EvaluateVerbose(s_UciGame, info.NumMoves, draw, s_Engine.Contempt, true); 
+    EvaluateVerbose(s_UciGame, 0, info.NumMoves, draw, s_Engine.Contempt, true); 
 
     return true; 
 }

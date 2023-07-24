@@ -249,7 +249,7 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
     GenMoves(g, moves); 
     U64 numMoves = moves->Size - start; 
 
-    int standPat = ColSign(g->Turn) * Evaluate(g, numMoves, draw, -ctx->ColContempt); 
+    int standPat = ColSign(g->Turn) * Evaluate(g, ctx->Ply, numMoves, draw, -ctx->ColContempt); 
 
     // check for beta cutoff
     if (standPat >= beta) 
@@ -479,7 +479,7 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
 
     if (!ctx->InPV) 
     {
-        if (entry && entry->Depth >= depth && !IsMateScore(entry->Score)) 
+        if (entry && entry->Depth >= depth) 
         {
             if (entry->Type == PV_NODE) 
             {
@@ -654,7 +654,7 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
     if (IsMateScore(eval)) 
     {
         int matePly = 100000 - abs(eval); 
-        int plies = matePly - ctx->Board->Ply + 1; 
+        int plies = matePly;// - ctx->Board->Ply + 1; 
         printf("info depth %d seldepth %zu multipv 1 score mate %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
             depth, 
             ctx->PV.NumMoves, 
