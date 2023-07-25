@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16) 
 project(halcyon C) 
 
-set(ENGINE_VERSION "1")
+set(ENGINE_VERSION "Dev")
 
 find_package(Git REQUIRED)
 if(ENGINE_VERSION STREQUAL "Dev")
