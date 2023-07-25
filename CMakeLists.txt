@@ -41,11 +41,9 @@ endif()
 
 if(CMAKE_SIZEOF_VOID_P EQUAL 4) 
     message(STATUS "Building 32-bit")
-    set(BIT_FLAG "-m32")
     set(EXE_ARCH "-x32")
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 8) 
     message(STATUS "Building 64-bit")
-    set(BIT_FLAG "-m64")
     set(EXE_ARCH "-x64")
 else() 
     math(EXPR BIT_COUNT "${CMAKE_SIZEOF_VOID_P} * 8")
@@ -53,13 +51,19 @@ else()
 endif() 
 
 set(CMAKE_C_STANDARD 11) 
-set(CMAKE_C_FLAGS "--std=c99 -Wall -Wextra -pedantic ${BIT_FLAG} -Wno-unused-function -Wno-unused-result -Wno-unused-label")
+set(CMAKE_C_FLAGS "--std=c99 -Wall -Wextra -Wformat -Wformat-signedness -pedantic ${BIT_FLAG} -Wno-unused-function -Wno-unused-result -Wno-unused-label")
 set(CMAKE_C_FLAGS_DEBUG "-g")
 set(CMAKE_C_FLAGS_RELEASE "-O3 -funroll-loops")
 
 set(EXE_NAME "halcyon-${EXE_VERSION}${EXE_OS}${EXE_ARCH}")
 
 include_directories(source) 
+
+set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+set(CMAKE_HAVE_THREADS_LIBRARY 1)
+set(CMAKE_USE_WIN32_THREADS_INIT 0)
+set(CMAKE_USE_PTHREADS_INIT 1)
+set(THREADS_PREFER_PTHREAD_FLAG ON)
 
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)

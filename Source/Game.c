@@ -544,7 +544,7 @@ bool ValidateGame(const Game* g)
             Piece pc = PcAt(g, sq); 
             if (pc > NO_SQ) 
             {
-                printf("info string ERROR mailbox piece is invalid: %d at %s\n", pc, StrSq(sq)); 
+                printf("info string ERROR mailbox piece is invalid: %u at %s\n", pc, StrSq(sq)); 
                 valid = false; 
             }
             else if (pc == NO_PC) 

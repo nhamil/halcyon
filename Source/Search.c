@@ -655,7 +655,7 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
     {
         int matePly = 100000 - abs(eval); 
         int plies = matePly;// - ctx->Board->Ply + 1; 
-        printf("info depth %d seldepth %zu multipv 1 score mate %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
+        printf("info depth %d seldepth %" PRIu64 " multipv 1 score mate %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
             depth, 
             ctx->PV.NumMoves, 
             (eval > 0 ? 1 : -1) * (plies/2), 
@@ -666,7 +666,7 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
     }
     else 
     {
-        printf("info depth %d seldepth %zu multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
+        printf("info depth %d seldepth %" PRIu64 " multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
             depth, 
             ctx->PV.NumMoves, 
             eval, 
@@ -680,14 +680,6 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
         PrintMoveEnd(ctx->PV.Moves[i], " "); 
     }
     printf("\n"); 
-    // printf("info string TT pct %.1f hits %" PRIu64 " coll %" PRIu64 " srch %" PRIu64 " hitpct %.1f\n", 
-    //     100.0f * ctx->TT.Used / ctx->TT.Size, 
-    //     ctx->TT.Hits, 
-    //     ctx->TT.Collisions, 
-    //     ctx->TT.Searches, 
-    //     100.0f * ctx->TT.Hits / ctx->TT.Searches
-    // );
-    // printf("info string nodes %zu leaves %zu mbf %.2f qpct %.0f\n", ctx->NumNodes, ctx->NumLeaves, (double) ctx->NumNodes / (ctx->NumNodes - ctx->NumLeaves), 100.0 * ctx->NumQNodes / (ctx->NumNodes + ctx->NumQNodes)); 
     fflush(stdout); 
 }
 
