@@ -301,7 +301,7 @@ bool UciCmdGo(void)
         }
 
         clock_t end = clock(); 
-        printf("Total: %lu", total); 
+        printf("Total: %llu", (unsigned long long) total); 
 
         FreeMvList(moves); 
         FreeGame(pGame); 

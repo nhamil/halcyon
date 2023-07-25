@@ -270,6 +270,9 @@ static inline BBoard CastRay(Square sq, BBoard ray, BBoard occupants)
 // note that this will not work with a value of 0
 static inline int Lsb(BBoard b) 
 {
+#if defined(BMI2) 
+    return __builtin_ctzll(b); 
+#else 
     // pre-calculated hash results  
     static const int Positions[] = 
     {
@@ -295,6 +298,7 @@ static inline int Lsb(BBoard b)
     // hash all possible nonzero values to unique 6-bit indices in a 
     // lookup table
     return Positions[(b & -b) * 0x45949D0DED5CC7EULL >> 58]; 
+#endif
 }
 
 static inline int Msb(BBoard b) 
@@ -304,10 +308,14 @@ static inline int Msb(BBoard b)
 
 static inline int Popcnt(BBoard b) 
 {
+#if defined(POPCNT)
+    return __builtin_popcountll(b);
+#else 
     return Popcnt16[((b >>  0) & 65535)]
          + Popcnt16[((b >> 16) & 65535)]
          + Popcnt16[((b >> 32) & 65535)]
          + Popcnt16[((b >> 48) & 65535)];
+#endif
 }
 
 static inline int PopcntShort(U16 b) 
