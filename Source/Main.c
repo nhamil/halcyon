@@ -556,6 +556,8 @@ badParse:
             printf("Resetting position\n"); 
         }
 
+        ToFen(g, fen); 
+
         SearchParams params; 
         InitSearchParams(&params, g, depth, timeMs); 
 
@@ -569,7 +571,6 @@ badParse:
         }
         PushMove(g, mv); 
 
-        ToFen(g, fen); 
         fprintf(out, "%s ; move ", fen); 
         FilePrintMoveEnd(mv, " ; bestmove ", out); 
         FilePrintMoveEnd(s_Engine.PV.Moves[0], " ; ", out); 
