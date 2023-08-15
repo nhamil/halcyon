@@ -519,6 +519,14 @@ bool UciCmdDataGen(void)
         return true; 
     }
 
+    printf("positions %llu depth %d ms %d bestmove %d maxply %d\n", 
+        (unsigned long long) numPositions, 
+        depth, 
+        timeMs, 
+        bestMovePly, 
+        maxPly
+    );
+
     badData = false; 
 badParse: 
     if (badData) 
@@ -550,10 +558,15 @@ badParse:
         GenMoves(g, moves); 
         if (g->Ply > maxPly || moves->Size == 0 || IsMateScore(s_Engine.Eval) || IsSpecialDraw(g)) 
         {
+            printf("Resetting position maxply=%d nomovse=%d matescore=%d draw=%d\n", 
+                g->Ply > maxPly, 
+                moves->Size == 0, 
+                IsMateScore(s_Engine.Eval), 
+                IsSpecialDraw(g)
+            ); 
             LoadFen(g, START_FEN); 
             GenMoves(g, moves); 
             s_Engine.Eval = 0; 
-            printf("Resetting position\n"); 
         }
 
         ToFen(g, fen); 
@@ -633,7 +646,7 @@ int main(void)
     {
         fflush(stdout); 
         fgets(input, UCI_MAX_INPUT, stdin); 
-        input[strlen(input) - 1] = '\0'; 
+        if (input[strlen(input) - 1] == '\n') input[strlen(input) - 1] = '\0'; 
         if (!UciParse(input)) printf("Unknown command: '%s'\n", input); 
     }
 
