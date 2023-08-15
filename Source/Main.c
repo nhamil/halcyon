@@ -565,6 +565,7 @@ badParse:
                 IsSpecialDraw(g)
             ); 
             LoadFen(g, START_FEN); 
+            ClearMvList(moves); 
             GenMoves(g, moves); 
             s_Engine.Eval = 0; 
         }
