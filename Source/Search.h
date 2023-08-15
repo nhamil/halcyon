@@ -80,11 +80,34 @@ struct SearchParams
     int TimeMs; 
 };
 
+static inline bool IsMateScore(int eval) 
+{
+    return eval > 90000 || eval < -90000; 
+}
+
+static inline bool IsScoreLessStrong(int eval, int newEval) 
+{
+    if (eval < 0) 
+    {
+        return newEval > eval; 
+    }
+    else if (eval > 0) 
+    {
+        return newEval < eval; 
+    }
+    else 
+    {
+        return false; 
+    }
+}
+
 void CreateSearchCtx(SearchCtx* ctx); 
 
 void DestroySearchCtx(SearchCtx* ctx); 
 
 void StopSearchCtx(SearchCtx* ctx); 
+
+void WaitSearchCtx(SearchCtx* ctx); 
 
 static void InitSearchParams(SearchParams* sp, const Game* board, int depth, int timeMs) 
 {

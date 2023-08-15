@@ -461,6 +461,129 @@ bool UciCmdSetTune(void)
     return true; 
 }
 
+bool UciCmdDataGen(void) 
+{
+    // in case we were searching before this command 
+    StopSearchCtx(&s_Engine); 
+
+    bool badData = true; 
+
+    const char* token; 
+    
+    token = UciNextToken(); 
+    if (!token) goto badParse; 
+    const char* file = token; 
+
+    token = UciNextToken(); 
+    if (!token) goto badParse; 
+    U64 numPositions = (U64) atoll(token); 
+    if (numPositions < 1) 
+    {
+        printf("Positions must be greater than 0\n"); 
+        return true; 
+    }
+    
+    token = UciNextToken(); 
+    if (!token) goto badParse; 
+    int depth = (int) atoi(token); 
+    if (depth < 1) 
+    {
+        printf("Depth must be greater than 0\n"); 
+        return true; 
+    }
+
+    token = UciNextToken(); 
+    if (!token) goto badParse; 
+    int timeMs = (int) atoi(token); 
+    if (timeMs < 1) 
+    {
+        printf("Time must be greater than 0\n"); 
+        return true; 
+    }
+
+    token = UciNextToken(); 
+    if (!token) goto badParse; 
+    int bestMovePly = (int) atoi(token); 
+    if (bestMovePly < 0) 
+    {
+        printf("Best move ply must be greater than or equal to 0\n"); 
+        return true; 
+    }
+
+    token = UciNextToken(); 
+    if (!token) goto badParse; 
+    int maxPly = (int) atoi(token); 
+    if (maxPly < 1) 
+    {
+        printf("Max ply must be greater than 0\n"); 
+        return true; 
+    }
+
+    badData = false; 
+badParse: 
+    if (badData) 
+    {
+        printf("Usage: datagen <output file> <num positions> <target depth> <max ms> <bestmove ply> <max ply>\n"); 
+        return true; 
+    }
+
+    FILE* out = fopen(file, "a"); 
+    if (!out) 
+    {
+        printf("Could not open file\n"); 
+        return true; 
+    }
+
+    char fen[FEN_LEN]; 
+
+    Game* g = NewGame(); 
+    LoadFen(g, START_FEN); 
+
+    MvList* moves = NewMvList(); 
+    Random r; 
+    InitRandom(&r, (U64) clock()); 
+
+    s_Engine.Eval = 0; 
+    for (U64 i = 0; i < numPositions; i++) 
+    {
+        ClearMvList(moves); 
+        GenMoves(g, moves); 
+        if (g->Ply > maxPly || moves->Size == 0 || IsMateScore(s_Engine.Eval) || IsSpecialDraw(g)) 
+        {
+            LoadFen(g, START_FEN); 
+            GenMoves(g, moves); 
+            s_Engine.Eval = 0; 
+            printf("Resetting position\n"); 
+        }
+
+        SearchParams params; 
+        InitSearchParams(&params, g, depth, timeMs); 
+
+        Search(&s_Engine, &params); 
+        WaitSearchCtx(&s_Engine); 
+
+        Move mv = moves->Moves[NextU32(&r) % moves->Size]; 
+        if (g->Ply >= bestMovePly) 
+        {
+            mv = s_Engine.PV.Moves[0]; 
+        }
+        PushMove(g, mv); 
+
+        ToFen(g, fen); 
+        fprintf(out, "%s ; move ", fen); 
+        FilePrintMoveEnd(mv, " ; bestmove ", out); 
+        FilePrintMoveEnd(s_Engine.PV.Moves[0], " ; ", out); 
+        fprintf(out, "%.2f/%d \n", s_Engine.Eval / 100.0, s_Engine.Depth); 
+        fflush(out); 
+    }
+
+    fclose(out); 
+    FreeGame(g); 
+    FreeMvList(moves); 
+
+    return true; 
+}
+
 bool UciParse(const char* origCmd) 
 {
     // remove spaces at the beginning
@@ -485,6 +608,7 @@ bool UciParse(const char* origCmd)
         if (UciEquals(token, "qeval")) return UciCmdEval(true); 
         if (UciEquals(token, "gettune")) return UciCmdGetTune(); 
         if (UciEquals(token, "settune")) return UciCmdSetTune(); 
+        if (UciEquals(token, "datagen")) return UciCmdDataGen(); 
     }
 
     return false; 

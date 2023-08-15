@@ -40,27 +40,6 @@ static inline clock_t NSecFromNow(int num)
     return clock() + num * CLOCKS_PER_SEC; 
 }
 
-static inline bool IsMateScore(int eval) 
-{
-    return eval > 90000 || eval < -90000; 
-}
-
-static inline bool IsScoreLessStrong(int eval, int newEval) 
-{
-    if (eval < 0) 
-    {
-        return newEval > eval; 
-    }
-    else if (eval > 0) 
-    {
-        return newEval < eval; 
-    }
-    else 
-    {
-        return false; 
-    }
-}
-
 static inline bool HandleOutOfTime(SearchCtx* ctx) 
 {
     if (ctx->CheckTime++ < CHECK_TIME || NoHandleTime) return false; 
@@ -780,6 +759,14 @@ void StopSearchCtx(SearchCtx* ctx)
 
     ctx->ShouldExit = false; 
     fflush(stdout); 
+}
+
+void WaitSearchCtx(SearchCtx* ctx) 
+{
+    if (ctx->Running) 
+    {
+        pthread_join(ctx->Thread, NULL); 
+    }
 }
 
 void Search(SearchCtx* ctx, SearchParams* params) 
