@@ -35,6 +35,20 @@ The following UCI commands are supported:
     * `value <value>`: New value for the option. 
 * `quit`: Exit the program. 
 
+Halcyon also supports some custom commands: 
+
+* `print`: Prints the current board position. 
+* `seval`: Prints the static evaluation of the position. 
+* `gettune`: Prints the values of all tunable parameters. 
+* `settune [value]...`: Sets the values of tunable parameters. 
+* `datagen`: Generates self-play games. 
+    * `<output>`: File to write to. 
+    * `<positions>`: Total number of positions to generate. 
+    * `<depth>`: Maximum depth to search to for each position. 
+    * `<time>`: Maximum time to search each position in milliseconds. 
+    * `<best ply>`: Ply to start using best moves instead of random moves. 
+    * `<max ply>`: Maximum ply before starting a new game. 
+
 ## Compiling 
 
 This project uses CMake and has only been tested with GCC on Linux and 
