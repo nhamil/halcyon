@@ -15,7 +15,7 @@
 #include <string.h> 
 #include <pthread.h> 
 
-#include "BBoard.h" 
+#include "Bitboard.h" 
 #include "Castle.h"
 #include "Game.h" 
 #include "Move.h"
@@ -30,24 +30,34 @@
     #define ENGINE_NAME "Halcyon"
 #endif 
 
-#define UCI_MAX_INPUT 4096
+#define MaxUciInput 4096
 
-#define UCI_MIN_TT 1 
-#define UCI_MAX_TT 16384
-#define UCI_DEF_TT 16
+#define MinUciTT 1 
+#define MaxUciTT 16384
+#define DefaultUciTT 16
 
-#define UCI_MIN_CONTEMPT -1000
-#define UCI_MAX_CONTEMPT  1000
-#define UCI_DEF_CONTEMPT  0
+#define MinUciContempt -1000
+#define MaxUciContempt  1000
+#define DefaultUciContempt  0
 
-Game* s_UciGame; 
-SearchCtx s_Engine; 
+static Game* UciGame; 
+static SearchContext UciEngine; 
 
+/**
+ * @return Next whitespace-delimited token from user input or null
+ */
 const char* UciNextToken(void) 
 {
     return strtok(NULL, " \n"); 
 }
 
+/**
+ * Checks if two strings are equal. 
+ * 
+ * @param a First string
+ * @param b Second string 
+ * @return True if equal, otherwise false 
+ */
 bool UciEquals(const char* a, const char* b) 
 {
     if (!a || !b) return false; 
@@ -55,35 +65,55 @@ bool UciEquals(const char* a, const char* b)
     return strcmp(a, b) == 0; 
 }
 
-bool UciCmdUci(void) 
+/**
+ * Prints UCI ID and option information. 
+ * 
+ * @return True
+ */
+bool UciCommandUci(void) 
 {
     printf("id name %s\n", ENGINE_NAME); 
     printf("id author Nicholas Hamilton\n"); 
-    printf("option name Hash type spin default %d min %d max %d\n", UCI_DEF_TT, UCI_MIN_TT, UCI_MAX_TT); 
-    printf("option name Contempt type spin default %d min %d max %d\n", UCI_DEF_CONTEMPT, UCI_MIN_CONTEMPT, UCI_MAX_CONTEMPT); 
+    printf("option name Hash type spin default %d min %d max %d\n", DefaultUciTT, MinUciTT, MaxUciTT); 
+    printf("option name Contempt type spin default %d min %d max %d\n", DefaultUciContempt, MinUciContempt, MaxUciContempt); 
     printf("uciok\n"); 
     return true; 
 }
 
-bool UciCmdIsReady(void) 
+/**
+ * Notifies the user that commands can be sent. 
+ * 
+ * @return True
+ */
+bool UciCommandIsReady(void) 
 {
     printf("readyok\n"); 
     return true; 
 }
 
-bool UciCmdUciNewGame(void) 
+/**
+ * Loads starting position and resets transposition table. 
+ * 
+ * @return True
+ */
+bool UciCommandUciNewGame(void) 
 {
-    StopSearchCtx(&s_Engine); 
-    LoadFen(s_UciGame, START_FEN); 
-    ResetTTable(&s_Engine.TT); 
+    StopSearchContext(&UciEngine); 
+    LoadFen(UciGame, StartFen); 
+    ResetTTable(&UciEngine.Transpositions); 
     return true; 
 }
 
-bool UciCmdPosition(void) 
+/**
+ * Loads a position, optionally applying moves. 
+ * 
+ * @return True on success, otherwise false
+ */
+bool UciCommandPosition(void) 
 {
-    MvList* moves = NewMvList(); 
+    MoveList* moves = NewMoveList(); 
 
-    Game* g = s_UciGame; 
+    Game* g = UciGame; 
 
     const char* token = UciNextToken(); 
 
@@ -91,7 +121,7 @@ bool UciCmdPosition(void)
 
     if (UciEquals(token, "startpos")) 
     {
-        LoadFen(g, START_FEN); 
+        LoadFen(g, StartFen); 
         token = UciNextToken(); 
     }
     else if (UciEquals(token, "test1")) 
@@ -122,7 +152,7 @@ bool UciCmdPosition(void)
     else if (UciEquals(token, "fen")) 
     {
         // need to recreate FEN from token list 
-        char fen[UCI_MAX_INPUT]; 
+        char fen[MaxUciInput]; 
         fen[0] = '\0'; 
         while ((token = UciNextToken()) && !UciEquals(token, "moves")) 
         {
@@ -140,10 +170,10 @@ bool UciCmdPosition(void)
     {
         while ((token = UciNextToken())) 
         {
-            ClearMvList(moves); 
+            ClearMoves(moves); 
             GenMoves(g, moves); 
 
-            Piece promote = PC_P; 
+            PieceType promoteType = PieceP; 
 
             if (strlen(token) == 4) 
             {
@@ -162,10 +192,10 @@ bool UciCmdPosition(void)
                 }
                 else 
                 {
-                    if (token[4] == 'q') promote = PC_Q; 
-                    if (token[4] == 'r') promote = PC_R; 
-                    if (token[4] == 'b') promote = PC_B; 
-                    if (token[4] == 'n') promote = PC_N; 
+                    if (token[4] == 'q') promoteType = PieceQ; 
+                    if (token[4] == 'r') promoteType = PieceR; 
+                    if (token[4] == 'b') promoteType = PieceB; 
+                    if (token[4] == 'n') promoteType = PieceN; 
                 }
             }
             else 
@@ -173,31 +203,31 @@ bool UciCmdPosition(void)
                 success = false; goto done; 
             }
 
-            Square from = MakeSq(token[0] - 'a', token[1] - '1'); 
-            Square to = MakeSq(token[2] - 'a', token[3] - '1'); 
+            Square from = MakeSquare(token[0] - 'a', token[1] - '1'); 
+            Square to = MakeSquare(token[2] - 'a', token[3] - '1'); 
 
-            // printf("%s (%s) to %s\n", StrSq(from), StrPc(pcAtOrWP(g, from)), StrSq(to)); 
+            // printf("%s (%s) to %s\n", SquareString(from), PieceString(pcAtOrWP(g, from)), SquareString(to)); 
 
             // if promote is still pawn, then it wasn't promoted -> get the real original piece
-            if (promote == PC_P) 
+            if (promoteType == PieceP) 
             {
-                promote = GetNoCol(PcAt(g, from)); 
+                promoteType = TypeOfPiece(PieceAt(&g->Board, from)); 
             }
 
-            promote = MakePc(promote, g->Turn); 
+            Piece promote = MakePiece(promoteType, g->Turn); 
 
-            // printf("Piece: %s\n", StrPc(promote)); 
+            // printf("Piece: %s\n", PieceString(promote)); 
 
             // make sure the complete move is legal 
             bool found = false; 
             for (U64 i = 0; i < moves->Size; i++) 
             {
                 Move m = moves->Moves[i]; 
-                if (FromSq(m) == from && ToSq(m) == to && ProPc(m) == promote) 
+                if (FromSquare(m) == from && ToSquare(m) == to && PromotionPiece(m) == promote) 
                 {
                     found = true; 
                     PushMove(g, m); 
-                    NoDepth(g); 
+                    ClearDepth(g); 
                 }
             }
 
@@ -213,25 +243,35 @@ bool UciCmdPosition(void)
 done: 
     if (!success) 
     {
-        LoadFen(g, START_FEN); 
+        LoadFen(g, StartFen); 
     }
 
-    FreeMvList(moves); 
+    FreeMoveList(moves); 
     return success; 
 }
 
-bool UciCmdPrint(void) 
+/**
+ * Prints the board. 
+ * 
+ * @return True
+ */
+bool UciCommandPrint(void) 
 {
-    PrintGame(s_UciGame); 
+    PrintGame(UciGame); 
     return true; 
 }
 
-bool UciCmdGo(void) 
+/**
+ * Searches the current game state. 
+ * 
+ * @return True 
+ */
+bool UciCommandGo(void) 
 {
     const char* token; 
-    int depth = INF_DEPTH, timeMs = INF_TIME; 
-    int moveTime = INF_TIME; 
-    int wTime = INF_TIME, bTime = INF_TIME, sideTime = INF_TIME; 
+    int depth = InfDepth, timeMs = InfTime; 
+    int moveTime = InfTime; 
+    int wTime = InfTime, bTime = InfTime, sideTime = InfTime; 
     int wIncr = 0, bIncr = 0, sideIncr = 0; 
     int perftNum = -1; 
 
@@ -248,7 +288,7 @@ bool UciCmdGo(void)
         if (UciEquals(token, "wtime") && (token = UciNextToken())) 
         {
             wTime = atoi(token); 
-            if (s_UciGame->Turn == COL_W) 
+            if (UciGame->Turn == ColorW) 
             {
                 sideTime = wTime; 
                 if (sideTime < 0) sideTime = 0; 
@@ -257,7 +297,7 @@ bool UciCmdGo(void)
         if (UciEquals(token, "btime") && (token = UciNextToken())) 
         {
             bTime = atoi(token); 
-            if (s_UciGame->Turn == COL_B) 
+            if (UciGame->Turn == ColorB) 
             {
                 sideTime = bTime; 
                 if (sideTime < 0) sideTime = 0; 
@@ -266,12 +306,12 @@ bool UciCmdGo(void)
         if (UciEquals(token, "winc") && (token = UciNextToken())) 
         {
             wIncr = atoi(token); 
-            if (s_UciGame->Turn == COL_W) sideIncr = wIncr; 
+            if (UciGame->Turn == ColorW) sideIncr = wIncr; 
         }
         if (UciEquals(token, "binc") && (token = UciNextToken())) 
         {
             bIncr = atoi(token); 
-            if (s_UciGame->Turn == COL_B) sideIncr = bIncr; 
+            if (UciGame->Turn == ColorB) sideIncr = bIncr; 
         }
         if (UciEquals(token, "perft") && (token = UciNextToken())) 
         {
@@ -284,26 +324,26 @@ bool UciCmdGo(void)
         U64 total = 0; 
 
         Game* pGame = NewGame(); 
-        CopyGame(pGame, s_UciGame); 
-        MvList* moves = NewMvList(); 
+        CopyGame(pGame, UciGame); 
+        MoveList* moves = NewMoveList(); 
 
         clock_t start = clock(); 
 
-        GenMoves(s_UciGame, moves); 
+        GenMoves(UciGame, moves); 
         for (U64 i = 0; i < moves->Size; i++) 
         {
             Move mv = moves->Moves[i]; 
             PrintMoveEnd(mv, " - "); 
-            PushMove(s_UciGame, mv); 
-            total += Perft(s_UciGame, perftNum - 1); 
-            PopMove(s_UciGame, mv); 
+            PushMove(UciGame, mv); 
+            total += Perft(UciGame, perftNum - 1); 
+            PopMove(UciGame, mv); 
             printf("\n"); 
         }
 
         clock_t end = clock(); 
-        printf("Total: %llu", (unsigned long long) total); 
+        printf("Total: %lu", total); 
 
-        FreeMvList(moves); 
+        FreeMoveList(moves); 
         FreeGame(pGame); 
 
         double dur = (double) (end - start) / CLOCKS_PER_SEC; 
@@ -321,7 +361,7 @@ bool UciCmdGo(void)
         printf("info string Searching with no depth\n"); 
     }
 
-    if (sideTime > INF_TIME) 
+    if (sideTime > InfTime) 
     {
         int totalTime = sideTime - 2000; 
         if (totalTime < 40) totalTime = 40; 
@@ -350,19 +390,29 @@ bool UciCmdGo(void)
     fflush(stdout); 
 
     SearchParams params; 
-    InitSearchParams(&params, s_UciGame, depth, timeMs); 
+    InitSearchParams(&params, UciGame, depth, timeMs); 
 
-    Search(&s_Engine, &params); 
+    Search(&UciEngine, &params); 
     return true; 
 }
 
-bool UciCmdStop(void) 
+/**
+ * Stops the search if it is running. 
+ * 
+ * @return True 
+ */
+bool UciCommandStop(void) 
 {
-    StopSearchCtx(&s_Engine); 
+    StopSearchContext(&UciEngine); 
     return true; 
 }
 
-bool UciCmdSetOption(void) 
+/**
+ * Sets engine options. 
+ * 
+ * @return True if option is valid, otherwise false
+ */
+bool UciCommandSetOption(void) 
 {
     const char* token = UciNextToken(); 
     if (!UciEquals(token, "name")) return false; 
@@ -376,11 +426,11 @@ bool UciCmdSetOption(void)
         if (!token) return false; 
 
         int value = atoi(token); 
-        if (value > UCI_MAX_TT) value = UCI_MAX_TT; 
-        if (value < UCI_MIN_TT) value = UCI_MIN_TT; 
+        if (value > MaxUciTT) value = MaxUciTT; 
+        if (value < MinUciTT) value = MinUciTT; 
 
-        DestroyTTable(&s_Engine.TT); 
-        CreateTTable(&s_Engine.TT, value); 
+        DestroyTTable(&UciEngine.Transpositions); 
+        CreateTTable(&UciEngine.Transpositions, value); 
 
         return true; 
     }
@@ -392,10 +442,10 @@ bool UciCmdSetOption(void)
         if (!token) return false; 
 
         int value = atoi(token); 
-        if (value > UCI_MAX_CONTEMPT) value = UCI_MAX_CONTEMPT; 
-        if (value < UCI_MIN_CONTEMPT) value = UCI_MIN_CONTEMPT; 
+        if (value > MaxUciContempt) value = MaxUciContempt; 
+        if (value < MinUciContempt) value = MinUciContempt; 
 
-        s_Engine.Contempt = value; 
+        UciEngine.Contempt = value; 
 
         return true; 
     }
@@ -404,7 +454,13 @@ bool UciCmdSetOption(void)
     return true; 
 }
 
-bool UciCmdEval(bool qsearch) 
+/**
+ * Prints current board state static evaluation. 
+ * 
+ * @param qsearch Whether to use quiescence search
+ * @return True if options are supported, otherwise false 
+ */
+bool UciCommandEval(bool qsearch) 
 {
     if (qsearch) 
     {
@@ -413,19 +469,24 @@ bool UciCmdEval(bool qsearch)
     }
 
     printf("Static Evaluation\n"); 
-    PrintGame(s_UciGame); 
+    PrintGame(UciGame); 
 
-    MvInfo info; 
-    GenMvInfo(s_UciGame, &info); 
+    MoveInfo info; 
+    GenMoveInfo(UciGame, &info); 
 
-    bool draw = IsSpecialDraw(s_UciGame); 
+    bool draw = IsSpecialDraw(UciGame); 
 
-    EvaluateVerbose(s_UciGame, 0, info.NumMoves, draw, s_Engine.Contempt, true); 
+    EvaluateVerbose(UciGame, 0, info.NumMoves, draw, UciEngine.Contempt, true); 
 
     return true; 
 }
 
-bool UciCmdGetTune(void) 
+/**
+ * Print all tunable weights. 
+ * 
+ * @return True 
+ */
+bool UciCommandGetTune(void) 
 {
     int N = GetNumEvalParams(); 
 
@@ -441,7 +502,12 @@ bool UciCmdGetTune(void)
     return true; 
 }
 
-bool UciCmdSetTune(void) 
+/**
+ * Sets tunable weights to values given by the user. 
+ * 
+ * @return True
+ */
+bool UciCommandSetTune(void) 
 {
     int N = GetNumEvalParams(); 
     int total = 0; 
@@ -461,10 +527,15 @@ bool UciCmdSetTune(void)
     return true; 
 }
 
-bool UciCmdDataGen(void) 
+/**
+ * Used to selfplay data generation. 
+ * 
+ * @return True 
+ */
+bool UciCommandDataGen(void) 
 {
     // in case we were searching before this command 
-    StopSearchCtx(&s_Engine); 
+    StopSearchContext(&UciEngine); 
 
     bool badData = true; 
 
@@ -542,32 +613,32 @@ badParse:
         return true; 
     }
 
-    char fen[FEN_LEN]; 
+    char fen[MaxFenLength]; 
 
     Game* g = NewGame(); 
-    LoadFen(g, START_FEN); 
+    LoadFen(g, StartFen); 
 
-    MvList* moves = NewMvList(); 
+    MoveList* moves = NewMoveList(); 
     Random r; 
     InitRandom(&r, (U64) clock()); 
 
-    s_Engine.Eval = 0; 
+    UciEngine.Eval = 0; 
     for (U64 i = 0; i < numPositions; i++) 
     {
-        ClearMvList(moves); 
+        ClearMoves(moves); 
         GenMoves(g, moves); 
-        if (g->Ply > maxPly || moves->Size == 0 || IsMateScore(s_Engine.Eval) || IsSpecialDraw(g)) 
+        if (g->Ply > maxPly || moves->Size == 0 || IsMateScore(UciEngine.Eval) || IsSpecialDraw(g)) 
         {
             printf("Resetting position maxply=%d nomovse=%d matescore=%d draw=%d\n", 
                 g->Ply > maxPly, 
                 moves->Size == 0, 
-                IsMateScore(s_Engine.Eval), 
+                IsMateScore(UciEngine.Eval), 
                 IsSpecialDraw(g)
             ); 
-            LoadFen(g, START_FEN); 
-            ClearMvList(moves); 
+            LoadFen(g, StartFen); 
+            ClearMoves(moves); 
             GenMoves(g, moves); 
-            s_Engine.Eval = 0; 
+            UciEngine.Eval = 0; 
         }
 
         ToFen(g, fen); 
@@ -575,83 +646,94 @@ badParse:
         SearchParams params; 
         InitSearchParams(&params, g, depth, timeMs); 
 
-        Search(&s_Engine, &params); 
-        WaitSearchCtx(&s_Engine); 
+        Search(&UciEngine, &params); 
+        WaitForSearchContext(&UciEngine); 
 
         Move mv = moves->Moves[NextU32(&r) % moves->Size]; 
         if (g->Ply >= bestMovePly) 
         {
-            mv = s_Engine.PV.Moves[0]; 
+            mv = UciEngine.BestLine.Moves[0]; 
         }
         PushMove(g, mv); 
 
         fprintf(out, "%s ; move ", fen); 
         FilePrintMoveEnd(mv, " ; bestmove ", out); 
-        FilePrintMoveEnd(s_Engine.PV.Moves[0], " ; ", out); 
-        fprintf(out, "%.2f/%d \n", s_Engine.Eval / 100.0, s_Engine.Depth); 
+        FilePrintMoveEnd(UciEngine.BestLine.Moves[0], " ; ", out); 
+        fprintf(out, "%.2f/%d \n", UciEngine.Eval / 100.0, UciEngine.Depth); 
         fflush(out); 
     }
 
     fclose(out); 
     FreeGame(g); 
-    FreeMvList(moves); 
+    FreeMoveList(moves); 
 
     return true; 
 }
 
-bool UciParse(const char* origCmd) 
+/**
+ * Parses a user command. 
+ * 
+ * @param origCommand The user input 
+ * @return True if command recognized, otherwise false 
+ */
+bool UciParse(const char* origCommand) 
 {
     // remove spaces at the beginning
-    while (*origCmd && *origCmd == ' ') origCmd++; 
+    while (*origCommand && *origCommand == ' ') origCommand++; 
 
-    char cmd[UCI_MAX_INPUT]; 
-    strcpy(cmd, origCmd); 
+    char cmd[MaxUciInput]; 
+    strcpy(cmd, origCommand); 
 
     char* token = strtok(cmd, " \n"); 
     if (token) 
     {
         if (UciEquals(token, "quit")) exit(0); 
-        if (UciEquals(token, "ucinewgame")) return UciCmdUciNewGame(); 
-        if (UciEquals(token, "uci")) return UciCmdUci(); 
-        if (UciEquals(token, "isready")) return UciCmdIsReady(); 
-        if (UciEquals(token, "position")) return UciCmdPosition(); 
-        if (UciEquals(token, "print")) return UciCmdPrint(); 
-        if (UciEquals(token, "go")) return UciCmdGo(); 
-        if (UciEquals(token, "stop")) return UciCmdStop(); 
-        if (UciEquals(token, "setoption")) return UciCmdSetOption(); 
-        if (UciEquals(token, "seval")) return UciCmdEval(false); 
-        if (UciEquals(token, "qeval")) return UciCmdEval(true); 
-        if (UciEquals(token, "gettune")) return UciCmdGetTune(); 
-        if (UciEquals(token, "settune")) return UciCmdSetTune(); 
-        if (UciEquals(token, "datagen")) return UciCmdDataGen(); 
+        if (UciEquals(token, "ucinewgame")) return UciCommandUciNewGame(); 
+        if (UciEquals(token, "uci")) return UciCommandUci(); 
+        if (UciEquals(token, "isready")) return UciCommandIsReady(); 
+        if (UciEquals(token, "position")) return UciCommandPosition(); 
+        if (UciEquals(token, "print")) return UciCommandPrint(); 
+        if (UciEquals(token, "go")) return UciCommandGo(); 
+        if (UciEquals(token, "stop")) return UciCommandStop(); 
+        if (UciEquals(token, "setoption")) return UciCommandSetOption(); 
+        if (UciEquals(token, "seval")) return UciCommandEval(false); 
+        if (UciEquals(token, "qeval")) return UciCommandEval(true); 
+        if (UciEquals(token, "gettune")) return UciCommandGetTune(); 
+        if (UciEquals(token, "settune")) return UciCommandSetTune(); 
+        if (UciEquals(token, "datagen")) return UciCommandDataGen(); 
     }
 
     return false; 
 }
 
+/**
+ * Entry point of the program. 
+ * 
+ * @return 0
+ */
 int main(void) 
 {
     printf("%s by Nicholas Hamilton\n", ENGINE_NAME); 
     fflush(stdout); 
 
-    s_UciGame = NewGame(); 
-    LoadFen(s_UciGame, START_FEN); 
-    CreateSearchCtx(&s_Engine); 
+    UciGame = NewGame(); 
+    LoadFen(UciGame, StartFen); 
+    CreateSearchContext(&UciEngine); 
 
-    DestroyTTable(&s_Engine.TT); 
-    CreateTTable(&s_Engine.TT, UCI_DEF_TT); 
-    s_Engine.Contempt = UCI_DEF_CONTEMPT; 
+    DestroyTTable(&UciEngine.Transpositions); 
+    CreateTTable(&UciEngine.Transpositions, DefaultUciTT); 
+    UciEngine.Contempt = DefaultUciContempt; 
 
-    char input[UCI_MAX_INPUT]; 
+    char input[MaxUciInput]; 
     while (true) 
     {
         fflush(stdout); 
-        fgets(input, UCI_MAX_INPUT, stdin); 
+        fgets(input, MaxUciInput, stdin); 
         if (input[strlen(input) - 1] == '\n') input[strlen(input) - 1] = '\0'; 
         if (!UciParse(input)) printf("Unknown command: '%s'\n", input); 
     }
 
-    FreeGame(s_UciGame); 
-    DestroySearchCtx(&s_Engine); 
+    FreeGame(UciGame); 
+    DestroySearchContext(&UciEngine); 
     return 0; 
 }

@@ -10,16 +10,16 @@
 
 #pragma once 
 
-#include "BBoard.h" 
+#include "Bitboard.h" 
 
-extern const BBoard MagicRShift[NUM_SQ]; 
-extern const BBoard MagicBShift[NUM_SQ]; 
+extern const Bitboard MagicRShift[NumSquares]; 
+extern const Bitboard MagicBShift[NumSquares]; 
 
-extern const BBoard MagicRMask[NUM_SQ]; 
-extern const BBoard MagicBMask[NUM_SQ]; 
+extern const Bitboard MagicRMask[NumSquares]; 
+extern const Bitboard MagicBMask[NumSquares]; 
 
-extern const BBoard* MagicRSlide[NUM_SQ]; 
-extern const BBoard* MagicBSlide[NUM_SQ]; 
+extern const Bitboard* MagicRSlide[NumSquares]; 
+extern const Bitboard* MagicBSlide[NumSquares]; 
 
-extern const BBoard MagicR[NUM_SQ]; 
-extern const BBoard MagicB[NUM_SQ]; 
+extern const Bitboard MagicR[NumSquares]; 
+extern const Bitboard MagicB[NumSquares]; 

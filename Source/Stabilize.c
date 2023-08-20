@@ -5,7 +5,8 @@
  * 
  * Copyright (c) 2023 Nicholas Hamilton
  * 
- * Stabilizes a list of FEN positions. 
+ * Writes a subset of FEN positions whose qsearch value is the same as their
+ * static evaluation. 
  */
 
 #include <math.h> 
@@ -17,11 +18,11 @@
 
 void LoadFens(const char* filename, const char* outfile) 
 {
-    char buf[FEN_LEN]; 
+    char buf[MaxFenLength]; 
     int numGames = 0; 
 
-    SearchCtx ctx[1]; 
-    CreateSearchCtx(ctx); 
+    SearchContext ctx[1]; 
+    CreateSearchContext(ctx); 
 
     printf("Loading FENs from %s and saving non-tactical positions to %s\n", filename, outfile); 
     FILE* fensFile = fopen(filename, "r"); 
@@ -34,11 +35,11 @@ void LoadFens(const char* filename, const char* outfile)
         if (++numGames % 1000 == 0) printf("Loaded %d positions (%"PRIu64" tactical, %"PRIu64" quiet)\n", numGames, tactical, quiet); 
         buf[strlen(buf) - 1] = '\0'; 
         
-        LoadFen(ctx->Board, buf + 3); 
-        MvInfo info; 
-        GenMvInfo(ctx->Board, &info); 
+        LoadFen(ctx->State, buf + 3); 
+        MoveInfo info; 
+        GenMoveInfo(ctx->State, &info); 
 
-        if (Evaluate(ctx->Board, 0, info.NumMoves, false, 0) == ColSign(ctx->Board->Turn) * BasicQSearch(ctx)) 
+        if (Evaluate(ctx->State, 0, info.NumMoves, false, 0) == ColorSign(ctx->State->Turn) * BasicQSearch(ctx)) 
         {
             fprintf(outFile, "%s\n", buf); 
             quiet++; 
@@ -52,7 +53,7 @@ void LoadFens(const char* filename, const char* outfile)
     }
     printf("Done - Read %d FENs\n", numGames); 
 
-    DestroySearchCtx(ctx); 
+    DestroySearchContext(ctx); 
 
     fclose(outFile); 
     fclose(fensFile); 

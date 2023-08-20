@@ -8,7 +8,7 @@
  * Loads a game from FEN notation. 
  */
 
-#include "BBoard.h"
+#include "Bitboard.h"
 #include "Game.h" 
 #include "Piece.h"
 
@@ -21,21 +21,21 @@ static const char* LoadFenBoard(Game* g, const char* fen)
         char c = *fen++; 
         if (c == ' ') break; 
 
-        Piece pc = NO_PC; 
+        Piece pc = NoPiece; 
         switch (c) 
         {
-            case 'P': pc = PC_WP; break; 
-            case 'N': pc = PC_WN; break; 
-            case 'B': pc = PC_WB; break; 
-            case 'R': pc = PC_WR; break; 
-            case 'Q': pc = PC_WQ; break; 
-            case 'K': pc = PC_WK; break; 
-            case 'p': pc = PC_BP; break; 
-            case 'n': pc = PC_BN; break; 
-            case 'b': pc = PC_BB; break; 
-            case 'r': pc = PC_BR; break; 
-            case 'q': pc = PC_BQ; break; 
-            case 'k': pc = PC_BK; break; 
+            case 'P': pc = PieceWP; break; 
+            case 'N': pc = PieceWN; break; 
+            case 'B': pc = PieceWB; break; 
+            case 'R': pc = PieceWR; break; 
+            case 'Q': pc = PieceWQ; break; 
+            case 'K': pc = PieceWK; break; 
+            case 'p': pc = PieceBP; break; 
+            case 'n': pc = PieceBN; break; 
+            case 'b': pc = PieceBB; break; 
+            case 'r': pc = PieceBR; break; 
+            case 'q': pc = PieceBQ; break; 
+            case 'k': pc = PieceBK; break; 
 
             case '8': 
             case '7': 
@@ -57,11 +57,11 @@ static const char* LoadFenBoard(Game* g, const char* fen)
                 break; 
         }
 
-        if (pc != NO_PC) 
+        if (pc != NoPiece) 
         {
-            Square realSq = RRank(sq); 
-            SetMBox(&g->Mailbox, realSq, pc); 
-            g->Pieces[pc] = SetBit(g->Pieces[pc], realSq); 
+            Square realSquare = FlipRank(sq); 
+            SetPieceAt(&g->Board, realSquare, pc); 
+            g->Pieces[pc] = SetBit(g->Pieces[pc], realSquare); 
 
             sq++; 
         }
@@ -70,7 +70,7 @@ static const char* LoadFenBoard(Game* g, const char* fen)
     return fen; 
 }
 
-static const char* LoadFenCol(Game* g, const char* fen) 
+static const char* LoadFenColor(Game* g, const char* fen) 
 {
     while (*fen) 
     {
@@ -80,10 +80,10 @@ static const char* LoadFenCol(Game* g, const char* fen)
         switch (c) 
         {
             case 'w': 
-                g->Turn = COL_W; 
+                g->Turn = ColorW; 
                 break; 
             case 'b': 
-                g->Turn = COL_B; 
+                g->Turn = ColorB; 
                 break; 
             default: 
                 printf("info string Unknown FEN character (color): %c\n", c); 
@@ -104,10 +104,10 @@ static const char* LoadFenCastle(Game* g, const char* fen)
         CastleFlags cf = 0; 
         switch (c) 
         {
-            case 'K': cf = CASTLE_WK; break; 
-            case 'Q': cf = CASTLE_WQ; break; 
-            case 'k': cf = CASTLE_BK; break; 
-            case 'q': cf = CASTLE_BQ; break; 
+            case 'K': cf = CastleWK; break; 
+            case 'Q': cf = CastleWQ; break; 
+            case 'k': cf = CastleBK; break; 
+            case 'q': cf = CastleBQ; break; 
             case '-': g->Castle = 0; break; 
 
             default: 
@@ -121,9 +121,9 @@ static const char* LoadFenCastle(Game* g, const char* fen)
     return fen; 
 }
 
-static const char* LoadFenEP(Game* g, const char* fen) 
+static const char* LoadFenEnPassant(Game* g, const char* fen) 
 {
-    Square ep = NO_SQ; 
+    Square ep = NoSquare; 
 
     while (*fen) 
     {
@@ -140,7 +140,7 @@ static const char* LoadFenEP(Game* g, const char* fen)
             case 'f': 
             case 'g': 
             case 'h': 
-                ep = MakeSq(c - 'a', GetRank(ep)); 
+                ep = MakeSquare(c - 'a', GetRank(ep)); 
                 break; 
 
             case '1': 
@@ -151,11 +151,11 @@ static const char* LoadFenEP(Game* g, const char* fen)
             case '6': 
             case '7': 
             case '8': 
-                ep = MakeSq(GetFile(ep), c - '1'); 
+                ep = MakeSquare(GetFile(ep), c - '1'); 
                 break; 
 
             case '-': 
-                ep = NO_SQ; 
+                ep = NoSquare; 
                 break; 
 
             default: 
@@ -164,7 +164,7 @@ static const char* LoadFenEP(Game* g, const char* fen)
         }
     }
 
-    g->EP = ep; 
+    g->EnPassant = ep; 
 
     return fen; 
 }
@@ -244,37 +244,37 @@ void LoadFen(Game* g, const char* fen)
     ResetGame(g); 
 
     fen = LoadFenBoard(g, fen); 
-    fen = LoadFenCol(g, fen); 
+    fen = LoadFenColor(g, fen); 
     fen = LoadFenCastle(g, fen); 
-    fen = LoadFenEP(g, fen); 
+    fen = LoadFenEnPassant(g, fen); 
     fen = LoadFenHalfmove(g, fen); 
     fen = LoadFenTurn(g, fen); 
 
-    for (Piece pc = PC_P; pc < NUM_PC; pc++) 
+    for (Piece pc = 0; pc < NumPieces; pc++) 
     {
-        g->Colors[GetCol(pc)] |= g->Pieces[pc]; 
-        g->Counts[pc] = Popcnt(g->Pieces[pc]); 
+        g->Colors[ColorOfPiece(pc)] |= g->Pieces[pc]; 
+        g->Counts[pc] = PopCount(g->Pieces[pc]); 
     }
 
-    g->All = g->Colors[COL_W] | g->Colors[COL_B]; 
+    g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
     g->Movement = ~g->Colors[g->Turn]; 
 
-    g->InCheck = IsAttacked(g, Lsb(g->Pieces[MakePc(PC_K, g->Turn)]), g->Turn); 
+    g->InCheck = IsAttacked(g, LeastSigBit(g->Pieces[MakePiece(PieceK, g->Turn)]), g->Turn); 
 
     for (Square sq = A1; sq <= H8; sq++) 
     {
-        for (Piece pc = 0; pc < NUM_PC; pc++) 
+        for (Piece pc = 0; pc < NumPieces; pc++) 
         {
             if (GetBit(g->Pieces[pc], sq)) 
             {
-                g->Hash ^= SqPcZb(sq, pc); 
+                g->Hash ^= HashSquarePiece(sq, pc); 
             }
         }
     }
 
-    g->Hash ^= CastleZb(g->Castle); 
-    g->Hash ^= EPZb(g->EP); 
-    g->Hash ^= (g->Turn == COL_B) * ColZb(); 
+    g->Hash ^= HashCastleFlags(g->Castle); 
+    g->Hash ^= HashEnPassant(g->EnPassant); 
+    g->Hash ^= (g->Turn == ColorB) * HashColor(); 
 }
 
 void ToFen(const Game* g, char* out) 
@@ -285,8 +285,8 @@ void ToFen(const Game* g, char* out)
         int empty = 0; 
         for (int file = 0; file < 8; file++) 
         {
-            Square sq = MakeSq(file, rank); 
-            if (PcAt(g, sq) != NO_PC) 
+            Square sq = MakeSquare(file, rank); 
+            if (PieceAt(&g->Board, sq) != NoPiece) 
             {
                 // add empty squares before this piece
                 if (empty > 0) 
@@ -297,7 +297,7 @@ void ToFen(const Game* g, char* out)
 
                 // all pieces are 1 character, so dereferencing 
                 // should be okay 
-                *out++ = *StrPc(PcAt(g, sq)); 
+                *out++ = *PieceString(PieceAt(&g->Board, sq)); 
             }
             else 
             {
@@ -325,15 +325,15 @@ void ToFen(const Game* g, char* out)
     *out++ = ' '; 
 
     // castling 
-    const char* tmp = StrCastle(g->Castle); 
+    const char* tmp = CastleString(g->Castle); 
     if (!g->Castle) tmp = "-"; 
     strcpy(out, tmp); 
     out += strlen(tmp); 
     *out++ = ' '; 
 
     // en passant 
-    tmp = StrSq(g->EP); 
-    if (g->EP == NO_SQ) 
+    tmp = SquareString(g->EnPassant); 
+    if (g->EnPassant == NoSquare) 
     {
         *out++ = '-'; 
     }

@@ -27,9 +27,9 @@ struct FenState
     bool Draw; 
 };
 
-#define MAX_THREADS 256
+#define MaxThreads 256
 
-static double ThreadErrors[MAX_THREADS]; 
+static double ThreadErrors[MaxThreads]; 
 
 static int NWeights; 
 static Vector States[1]; 
@@ -38,15 +38,15 @@ static char* Names;
 static int Iteration; 
 static int NumThreads; 
 
-typedef char FenStr[FEN_LEN]; 
+typedef char FenStr[MaxFenLength]; 
 
 void LoadFens(const char* filename) 
 {
     FenStr buf; 
 
-    CREATE_VEC(States, FenState); 
+    CreateVectorType(States, FenState); 
 
-    MvList* moves = NewMvList(); 
+    MoveList* moves = NewMoveList(); 
 
     printf("Loading FENs from %s\n", filename); 
     FILE* fensFile = fopen(filename, "r"); 
@@ -69,14 +69,14 @@ void LoadFens(const char* filename)
             printf("Warning - Unknown result: %c\n", resChar); 
         }
 
-        FenState* state = (FenState*) PushVecEmpty(States); 
+        FenState* state = (FenState*) PushEmptyElem(States); 
         LoadFen(&state->Board, buf + 3); 
 
         state->Result = result;  
         state->Draw = IsSpecialDraw(&state->Board); 
 
-        MvInfo info; 
-        GenMvInfo(&state->Board, &info); 
+        MoveInfo info; 
+        GenMoveInfo(&state->Board, &info); 
         state->NumMoves = info.NumMoves; 
     }
     printf("Done - Read %d FENs (%lldmb)\n", 
@@ -84,7 +84,7 @@ void LoadFens(const char* filename)
         (long long) (States->Size * States->ElemSize / 1024 / 1024)
     ); 
 
-    FreeMvList(moves); 
+    FreeMoveList(moves); 
     fclose(fensFile); 
 }
 
@@ -100,7 +100,7 @@ void* EThread(void* data)
 
     for (U64 i = offset; i < States->Size; i += NumThreads) 
     {
-        FenState* fen = AtVec(States, i);  
+        FenState* fen = ElemAt(States, i);  
         double result = fen->Result; 
 
         double add = result - Sigmoid(Evaluate(&fen->Board, 0, fen->NumMoves, fen->Draw, 0)); 
@@ -140,7 +140,7 @@ void LoadFromPrevOutput(const char* filename)
 {
     FILE* f = fopen(filename, "r"); 
 
-    char name[PARAM_NAME_LEN]; 
+    char name[ParamNameLength]; 
     char line[4096]; 
     char* tok; 
 
@@ -188,7 +188,7 @@ int main(int argc, char** argv)
 
     NWeights = GetNumEvalParams(); 
     Weights = calloc(NWeights, sizeof(int)); 
-    Names = calloc(NWeights, PARAM_NAME_LEN); 
+    Names = calloc(NWeights, ParamNameLength); 
 
     NumThreads = atoi(argv[1]); 
     printf("Using %d threads\n", NumThreads); 
@@ -201,7 +201,7 @@ int main(int argc, char** argv)
     for (int i = 0; i < NWeights; i++) 
     {   
 //        *GetEvalParam(i, NULL) = 0;  
-        Weights[i] = *GetEvalParam(i, Names + PARAM_NAME_LEN * i); 
+        Weights[i] = *GetEvalParam(i, Names + ParamNameLength * i); 
     }
 
     LoadFens(argv[2]); 
@@ -218,7 +218,7 @@ int main(int argc, char** argv)
         for (int pi = 0; pi < NWeights; pi++) 
         {
             int start = Weights[pi]; 
-            printf("- Checking param %d %s (%d) ", pi, Names + PARAM_NAME_LEN * pi, start); 
+            printf("- Checking param %d %s (%d) ", pi, Names + ParamNameLength * pi, start); 
             fflush(stdout); 
 
             Weights[pi] += add; 
@@ -253,6 +253,6 @@ int main(int argc, char** argv)
         }
     }
 
-    DestroyVec(States); 
+    DestroyVector(States); 
     free(Weights); 
 }

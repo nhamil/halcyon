@@ -21,31 +21,37 @@
 #include "Square.h"
 #include "TTable.h" 
 
-#define INF_DEPTH (-1) 
-#define INF_TIME (-1) 
+#define InfDepth (-1) 
+#define InfTime (-1) 
 
 typedef struct PVLine PVLine; 
-typedef struct SearchCtx SearchCtx; 
+typedef struct SearchContext SearchContext; 
 typedef struct SearchParams SearchParams; 
 
+/**
+ * Principal variation. 
+ */
 struct PVLine 
 {
     U64 NumMoves; 
-    Move Moves[MAX_DEPTH]; 
+    Move Moves[MaxDepth]; 
 };
 
-struct SearchCtx 
+/**
+ * Data used by search. 
+ */
+struct SearchContext 
 {
-    Game* Board; 
+    Game* State; 
     int StartPly; 
     pthread_t Thread; 
-    int TgtDepth; 
-    int TgtTime; 
+    int TargetDepth; 
+    int TargetTimeMs; 
     clock_t EndAt; 
     bool ShouldExit; 
 
     pthread_mutex_t Lock; 
-    PVLine PV; 
+    PVLine BestLine; 
     U64 Nodes; 
     U64 Nps; 
     int Depth; 
@@ -53,26 +59,29 @@ struct SearchCtx
     bool Running; 
     clock_t StartAt; 
     clock_t CurMoveAt; 
-    clock_t NextMsgAt; 
+    clock_t NextMessageAt; 
 
-    MvList* Moves; 
-    PVLine Lines[MAX_DEPTH]; 
-    TTable TT; 
+    MoveList* Moves; 
+    PVLine Lines[MaxDepth]; 
+    TTable Transpositions; 
     U64 NumNodes; 
     U64 NumLeaves; 
     U64 NumQNodes; 
     U64 NumQLeaves; 
     int CheckTime; 
     int Ply; 
-    Move Killer[MAX_DEPTH][2]; 
-    int History[2][NUM_PC][NUM_SQ]; 
+    Move Killer[MaxDepth][2]; 
+    int History[2][NumPieces][NumSquares]; 
     bool NullMove; 
     bool InPV; 
     int Contempt; 
-    int ColContempt; 
-    Color StartCol; 
+    int ColorContempt; 
+    Color StartColor; 
 };
 
+/**
+ * Search settings 
+ */
 struct SearchParams 
 {
     const Game* Board; 
@@ -80,11 +89,19 @@ struct SearchParams
     int TimeMs; 
 };
 
+/**
+ * @param eval Evaluation score 
+ * @return True if the evaluation is mate-in-N, otherwise false
+ */
 static inline bool IsMateScore(int eval) 
 {
     return eval > 90000 || eval < -90000; 
 }
 
+/**
+ * @param eval Evaluation score 
+ * @return True if the new score is weaker, otherwise false
+ */
 static inline bool IsScoreLessStrong(int eval, int newEval) 
 {
     if (eval < 0) 
@@ -101,14 +118,42 @@ static inline bool IsScoreLessStrong(int eval, int newEval)
     }
 }
 
-void CreateSearchCtx(SearchCtx* ctx); 
+/**
+ * Initializes a search context. 
+ * 
+ * @param ctx The context
+ */
+void CreateSearchContext(SearchContext* ctx); 
 
-void DestroySearchCtx(SearchCtx* ctx); 
+/**
+ * Deinitializes a search context. 
+ * 
+ * @param ctx The context
+ */
+void DestroySearchContext(SearchContext* ctx); 
 
-void StopSearchCtx(SearchCtx* ctx); 
+/**
+ * Stops the search thread if it is running. 
+ * 
+ * @param ctx The context
+ */
+void StopSearchContext(SearchContext* ctx); 
 
-void WaitSearchCtx(SearchCtx* ctx); 
+/**
+ * Blocks the current thread until search is complete. 
+ * 
+ * @param ctx The context 
+ */
+void WaitForSearchContext(SearchContext* ctx); 
 
+/**
+ * Creates search settings 
+ * 
+ * @param sp The settings
+ * @param board Board state 
+ * @param depth Target depth (or InfDepth)
+ * @param timeMs Target time (or InfTime)
+ */
 static void InitSearchParams(SearchParams* sp, const Game* board, int depth, int timeMs) 
 {
     sp->Board = board; 
@@ -116,8 +161,19 @@ static void InitSearchParams(SearchParams* sp, const Game* board, int depth, int
     sp->TimeMs = timeMs; 
 }
 
-void Search(SearchCtx* ctx, SearchParams* params); 
+/**
+ * Starts searching the specified board position on a new thread. 
+ * If the context was already searching then the old search stops. 
+ * 
+ * @param ctx The context
+ * @param params Search parameters 
+ */
+void Search(SearchContext* ctx, SearchParams* params); 
 
-int BasicQSearch(SearchCtx* ctx); 
-
-int QStabilize(Game* g, MvList* moves, int alpha, int beta, int depth, Game* out); 
+/**
+ * Returns quiescence search on the board position. 
+ * 
+ * @param ctx The context 
+ * @return Quiescence search value 
+ */
+int BasicQSearch(SearchContext* ctx); 

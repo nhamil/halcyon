@@ -12,68 +12,123 @@
 
 #include <stdint.h> 
 
-#define COL_W 0 
-#define COL_B 1 
-#define NUM_COLS 2
+/**
+ * Represents different sides. 
+ */
+typedef enum Color
+{
+    ColorW = 0, 
+    ColorB, 
+    NumColors,
+} Color; 
 
-#define PC_P 0
-#define PC_N 1
-#define PC_B 2
-#define PC_R 3
-#define PC_Q 4
-#define PC_K 5
-#define NUM_PC_TYPES 6
-#define NO_PC_TYPE NUM_PC_TYPES
+/**
+ * Type of piece (uncolored). 
+ */
+typedef enum PieceType
+{
+    PieceP = 0,
+    PieceN = 1,
+    PieceB = 2,
+    PieceR = 3,
+    PieceQ = 4,
+    PieceK = 5,
+    NumPieceTypes = 6,
+    NoPieceType = NumPieceTypes
+} PieceType; 
 
-#define PC_WP 0
-#define PC_WN 1
-#define PC_WB 2
-#define PC_WR 3
-#define PC_WQ 4
-#define PC_WK 5
-#define PC_BP 6
-#define PC_BN 7
-#define PC_BB 8
-#define PC_BR 9
-#define PC_BQ 10
-#define PC_BK 11
-#define NUM_PC 12
-#define NO_PC NUM_PC
+/**
+ * Colored pieces. 
+ */
+typedef enum Piece
+{
+    PieceWP = 0,
+    PieceWN = 1,
+    PieceWB = 2,
+    PieceWR = 3,
+    PieceWQ = 4,
+    PieceWK = 5,
+    PieceBP = 6,
+    PieceBN = 7,
+    PieceBB = 8,
+    PieceBR = 9,
+    PieceBQ = 10,
+    PieceBK = 11,
+    NumPieces = 12,
+    NoPiece = NumPieces
+} Piece; 
 
-typedef unsigned Color; 
-typedef unsigned Piece; 
-
-static inline int ColSign(Color c) 
+/**
+ * @param c Color
+ * @return Sign modifier for the color 
+ */
+static inline int ColorSign(Color c) 
 {
     return 1 - 2 * c; 
 }
 
-static inline Color OppCol(Color c) 
+/**
+ * @param c Starting color
+ * @return The opposing color 
+ */
+static inline Color OppositeColor(Color c) 
 {
     return c ^ 1; 
 }
 
-static inline Color GetCol(Piece p) 
+/**
+ * @param pc A colored piece 
+ * @return Color of the piece 
+ */
+static inline Color ColorOfPiece(Piece p) 
 {
     return p >= 6; 
 }
 
-static inline Piece GetNoCol(Piece p) 
+/**
+ * Removes color from a piece type 
+ * 
+ * @param pc Colored piece type 
+ * @return Uncolored piece type 
+ */
+static inline PieceType TypeOfPiece(Piece p) 
 {
-    return p - (p >= 6) * 6; 
+    return (PieceType) (p - (p >= 6) * 6); 
 }
 
-static inline Piece MakePc(Piece colorless, Color col) 
+/**
+ * Colors a piece type. The type should not already be colored. 
+ * 
+ * If the type is colored then use `Recolor` instead. 
+ * 
+ * @param type Uncolored piece type 
+ * @param c Desired color 
+ * @return Colored piece 
+ */
+static inline Piece MakePiece(PieceType colorless, Color col) 
 {
-    return colorless + col * 6; 
+    return (Piece) (colorless + col * 6); 
 }
 
+/**
+ * Recolors a piece. 
+ * 
+ * @param pc Any piece type
+ * @param c New color 
+ * @return Recolored piece
+ */
 static inline Piece Recolor(Piece p, Color col) 
 {
-    return MakePc(GetNoCol(p), col); 
+    return MakePiece(TypeOfPiece(p), col); 
 }
 
-static inline const char* StrPc(Piece p) 
+/**
+ * Gets a readable string for a piece. 
+ * 
+ * @param pc The piece 
+ * @return String for the piece 
+ */
+static inline const char* PieceString(Piece p) 
 {
     static const char* Str[] = 
     {
@@ -84,7 +139,13 @@ static inline const char* StrPc(Piece p)
     return Str[p]; 
 }
 
-static inline const char* StrPcType(Piece p) 
+/**
+ * Gets a readable string for the uncolored type of a piece. 
+ * 
+ * @param pc The piece 
+ * @return String for the piece 
+ */
+static inline const char* PieceTypeString(Piece p) 
 {
     static const char* Str[] = 
     {

@@ -10,58 +10,115 @@
 
 #pragma once 
 
-#include "BBoard.h"
+#include "Bitboard.h"
 #include "Game.h" 
 #include "Move.h"
 
-typedef struct MvList MvList; 
-typedef struct MvInfo MvInfo; 
+/**
+ * Used to quickly generate moves without listing them out. 
+ */
+typedef struct MoveList MoveList; 
 
-#define MAX_MOVES_PER_TURN 218
+/**
+ * Stores moves without needing to add them all to a list. 
+ */
+typedef struct MoveInfo MoveInfo; 
 
-struct MvList 
+/**
+ * Maximum possible moves a color has in a legal position. 
+ */
+#define MaxMovesPerTurn 218
+
+struct MoveList 
 {
-    Move Moves[MAX_MOVES_PER_TURN * MAX_DEPTH]; 
+    Move Moves[MaxMovesPerTurn * MaxDepth]; 
     U64 Size; 
 };
 
-static inline void SwapMvList(MvList* m, U64 a, U64 b) 
+/**
+ * Swaps two elements. 
+ * 
+ * @param m Move list 
+ * @param a First index
+ * @param b Second index 
+ */
+static inline void SwapMoves(MoveList* m, U64 a, U64 b) 
 {
     Move tmp = m->Moves[a]; 
     m->Moves[a] = m->Moves[b]; 
     m->Moves[b] = tmp; 
 }
 
-static inline void PopMvList(MvList* m, U64 toSize) 
+/**
+ * Pops elements to reach a specified size. 
+ * 
+ * @param m Move list 
+ * @param toSize Target size 
+ */
+static inline void PopMovesToSize(MoveList* m, U64 toSize) 
 {
     m->Size = toSize; 
 }
 
-static inline void ClearMvList(MvList* m) 
+/**
+ * Clears all elements. 
+ * 
+ * @param m Move list 
+ */
+static inline void ClearMoves(MoveList* m) 
 {
     m->Size = 0; 
 }
 
-MvList* NewMvList(void); 
+/**
+ * Allocates a new move list. 
+ * 
+ * @return New move list 
+ */
+MoveList* NewMoveList(void); 
 
-void FreeMvList(MvList* moves); 
+/**
+ * Frees a move list. 
+ * 
+ * @param moves Move list 
+ */
+void FreeMoveList(MoveList* moves); 
 
-struct MvInfo 
+struct MoveInfo 
 {
-    BBoard Moves[64]; 
+    Bitboard Moves[64]; 
     Piece Pieces[64]; 
     Square From[64]; 
-    int NumPieces; 
+    int NumPiecess; 
     int NumMoves; 
 };
 
-void GenMvInfo(const Game* g, MvInfo* info); 
+/**
+ * Generate moves without listing them out. 
+ * 
+ * @param g Game state
+ * @param info Info output 
+ */
+void GenMoveInfo(const Game* g, MoveInfo* info); 
 
-void GenMovesMvInfo(const Game* g, const MvInfo* info, MvList* moves); 
+/**
+ * Put move info moves into a list 
+ * 
+ * @param g Game state 
+ * @param info Move info 
+ * @param moves List output
+ */
+void GenMovesFromInfo(const Game* g, const MoveInfo* info, MoveList* moves); 
 
-static inline void GenMoves(const Game* g, MvList* moves) 
+/**
+ * Generate moves and store them in a list. 
+ * 
+ * @param g Game state
+ * @param moves List output 
+ */
+static inline void GenMoves(const Game* g, MoveList* moves) 
 {
-    MvInfo info; 
-    GenMvInfo(g, &info); 
-    GenMovesMvInfo(g, &info, moves); 
+    MoveInfo info; 
+    GenMoveInfo(g, &info); 
+    GenMovesFromInfo(g, &info, moves); 
 }

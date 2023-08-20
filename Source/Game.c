@@ -13,9 +13,9 @@
 #include <stdlib.h> 
 #include <string.h> 
 
-#include "BBoard.h"
+#include "Bitboard.h"
 #include "Castle.h"
-#include "MBox.h"
+#include "Mailbox.h"
 #include "Move.h"
 #include "MoveGen.h"
 #include "Piece.h"
@@ -36,8 +36,8 @@ void FreeGame(Game* g)
 
 void ResetGame(Game* g) 
 {
-    InitZb(); 
-    InitMBox(&g->Mailbox); 
+    InitHash(); 
+    InitMailbox(&g->Board); 
     memset(g->Pieces, 0, sizeof(g->Pieces)); 
     memset(g->Colors, 0, sizeof(g->Colors)); 
     memset(g->Counts, 0, sizeof(g->Counts)); 
@@ -45,10 +45,10 @@ void ResetGame(Game* g)
     g->Movement = 0; 
     g->Hash = 0; 
     g->Castle = 0; 
-    g->EP = NO_SQ; 
+    g->EnPassant = NoSquare; 
     g->Ply = 0; 
     g->Halfmove = 0; 
-    g->Turn = COL_W; 
+    g->Turn = ColorW; 
     g->InCheck = false; 
     g->Nodes = 0; 
     g->Depth = 0; 
@@ -56,8 +56,8 @@ void ResetGame(Game* g)
 
 void CopyGame(Game* g, const Game* from) 
 {
-    InitZb(); 
-    g->Mailbox = from->Mailbox; 
+    InitHash(); 
+    g->Board = from->Board; 
     memcpy(g->Pieces, from->Pieces, sizeof(g->Pieces)); 
     memcpy(g->Colors, from->Colors, sizeof(g->Colors)); 
     memcpy(g->Counts, from->Counts, sizeof(g->Counts)); 
@@ -65,7 +65,7 @@ void CopyGame(Game* g, const Game* from)
     g->Movement = from->Movement; 
     g->Hash = from->Hash; 
     g->Castle = from->Castle; 
-    g->EP = from->EP; 
+    g->EnPassant = from->EnPassant; 
     g->Ply = from->Ply; 
     g->Halfmove = from->Halfmove; 
     g->Turn = from->Turn; 
@@ -78,19 +78,24 @@ void CopyGame(Game* g, const Game* from)
     }
 }
 
+/**
+ * Checks if a single property of game states are equal. 
+ * 
+ * @param prop Property to check 
+ */
 #define GAME_EQ(prop) if (a->prop != b->prop) { printf("Not equal: %s\n", #prop); return false; }
 
 bool EqualsTTableGame(const Game* a, const Game* b) 
 {
-    if (!EqualsMBox(&a->Mailbox, &b->Mailbox)) { printf("Not equal: Mailbox\n"); return false; } 
-    if (memcmp(a->Pieces, b->Pieces, sizeof(a->Pieces) - sizeof(BBoard)) != 0) { printf("Not equal: Pieces\n"); return false; }
+    if (!MailboxEquals(&a->Board, &b->Board)) { printf("Not equal: Mailbox\n"); return false; } 
+    if (memcmp(a->Pieces, b->Pieces, sizeof(a->Pieces) - sizeof(Bitboard)) != 0) { printf("Not equal: Pieces\n"); return false; }// ignore the scratch index
     if (memcmp(a->Colors, b->Colors, sizeof(a->Colors)) != 0) { printf("Not equal: Colors\n"); return false; }
-    if (memcmp(a->Counts, b->Counts, sizeof(a->Counts) - sizeof(int)) != 0) { printf("Not equal: Counts\n"); return false; }
+    if (memcmp(a->Counts, b->Counts, sizeof(a->Counts) - sizeof(int)) != 0) { printf("Not equal: Counts\n"); return false; } // ignore the scratch index
     GAME_EQ(All); 
     GAME_EQ(Movement); 
     GAME_EQ(Hash); 
     GAME_EQ(Castle); 
-    GAME_EQ(EP); 
+    GAME_EQ(EnPassant); 
     // GAME_EQ(Ply); 
     // GAME_EQ(Halfmove); 
     GAME_EQ(Turn); 
@@ -107,7 +112,7 @@ bool EqualsTTableGame(const Game* a, const Game* b)
 
 void FilePrintGame(const Game* g, FILE* out) 
 {
-    char fen[FEN_LEN]; 
+    char fen[MaxFenLength]; 
     ToFen(g, fen); 
 
     fprintf(out, "+---+---+---+---+---+---+---+---+\n"); 
@@ -116,32 +121,32 @@ void FilePrintGame(const Game* g, FILE* out)
         fprintf(out, "| "); 
         for (int file = 0; file < 8; file++) 
         {
-            Square sq = MakeSq(file, rank); 
-            fprintf(out, "%s | ", StrPc(PcAt(g, sq))); 
+            Square sq = MakeSquare(file, rank); 
+            fprintf(out, "%s | ", PieceString(PieceAt(&g->Board, sq))); 
         }
         fprintf(out, "%d\n", rank + 1); 
         fprintf(out, "+---+---+---+---+---+---+---+---+\n"); 
     }
     fprintf(out, "  A   B   C   D   E   F   G   H  \n"); 
 
-    for (Color col = COL_W; col < NUM_COLS; col++) 
+    for (Color col = ColorW; col < NumColors; col++) 
     {
-        for (Piece pc = PC_P; pc < NUM_PC_TYPES; pc++) 
+        for (PieceType pc = 0; pc < NumPieceTypes; pc++) 
         {
-            Piece cpc = MakePc(pc, col); 
-            fprintf(out, "%d%s ", g->Counts[cpc], StrPc(cpc)); 
+            Piece cpc = MakePiece(pc, col); 
+            fprintf(out, "%d%s ", g->Counts[cpc], PieceString(cpc)); 
         }
     }
     fprintf(out, "\n"); 
 
     fprintf(out, "%s\nHash: ", fen); 
-    FilePrintZbEnd(g->Hash, "\n", out);
+    FilePrintHashEnd(g->Hash, "\n", out);
 
     fprintf(out, "Ply: %d, ", g->Ply); 
     fprintf(out, "Halfmove: %d, ", g->Halfmove); 
-    fprintf(out, "Castling: %s\n", StrCastle(g->Castle)); 
+    fprintf(out, "Castling: %s\n", CastleString(g->Castle)); 
 
-    fprintf(out, "En passant: %s, ", StrSq(g->EP)); 
+    fprintf(out, "En passant: %s, ", SquareString(g->EnPassant)); 
     fprintf(out, "In check: %s\n", g->InCheck ? "yes" : "no"); 
 
     fprintf(out, "Special draw: %s, ", IsSpecialDraw(g) ? "yes" : "no");
@@ -158,35 +163,36 @@ void PushMove(Game* g, Move mv)
 {
     g->Nodes++; 
 
+    // store anything that the move doesn't store 
     MoveHist* hist = g->Hist + g->Depth++; 
     hist->Halfmove = g->Halfmove; 
-    hist->EP = g->EP; 
+    hist->EnPassant = g->EnPassant; 
     hist->Castle = g->Castle; 
     hist->InCheck = g->InCheck; 
-
-    
     hist->Hash = g->Hash; 
 
+    // swap color and reset en passant hash
+    g->Hash ^= HashColor(); 
+    g->Hash ^= HashEnPassant(g->EnPassant); 
+
     Color col = g->Turn; 
-    Color opp = OppCol(col); 
+    Color opp = OppositeColor(col); 
 
-    g->Hash ^= ColZb(); 
-    g->Hash ^= EPZb(g->EP); 
+    Piece pc = FromPiece(mv); 
+    Piece pro = PromotionPiece(mv); 
+    Piece tgt = TargetPiece(mv); 
 
-    Piece pc = FromPc(mv); 
-    Piece pro = ProPc(mv); 
-    Piece tgt = TgtPc(mv); 
+    Square src = FromSquare(mv); 
+    Square dst = ToSquare(mv); 
 
-    Square src = FromSq(mv); 
-    Square dst = ToSq(mv); 
+    bool ep = IsEnPassant(mv); 
+    int casIndex = CastleIndex(mv); 
 
-    bool ep = IsEP(mv); 
-    int casIdx = CastleIdx(mv); 
+    Bitboard srcPos = Bits[src]; 
+    Bitboard dstPos = Bits[dst]; 
 
-    BBoard srcPos = BB[src]; 
-    BBoard dstPos = BB[dst]; 
-
-    if (IsCapture(mv) || GetNoCol(pc) == PC_P) 
+    // 50-move rule logic 
+    if (IsCapture(mv) || TypeOfPiece(pc) == PieceP) 
     {
         g->Halfmove = 0; 
     }
@@ -197,97 +203,127 @@ void PushMove(Game* g, Move mv)
 
     if (ep) // en passant 
     {
-        Square rm = g->EP - 8 * ColSign(g->Turn); 
-        BBoard rmPos = BB[rm]; 
+        Square rm = g->EnPassant - 8 * ColorSign(g->Turn); 
+        Bitboard rmPos = Bits[rm]; 
+
+        // move pawn from source to destination
+        // remove enemy piece 
 
         g->Colors[col] ^= srcPos ^ dstPos; 
         g->Colors[opp] ^= rmPos; 
 
-        g->Hash ^= SqPcZb(src, pc); 
-        g->Hash ^= SqPcZb(dst, pc); 
-        g->Hash ^= SqPcZb(rm, tgt); 
-
         g->Pieces[pc] ^= srcPos ^ dstPos; 
         g->Pieces[tgt] ^= rmPos; 
         
-        ClearMBox(&g->Mailbox, src); 
-        ClearMBox(&g->Mailbox, rm); 
-        SetMBox(&g->Mailbox, dst, pc); 
+        g->Hash ^= HashSquarePiece(src, pc); 
+        g->Hash ^= HashSquarePiece(dst, pc); 
+        g->Hash ^= HashSquarePiece(rm, tgt); 
 
+        ClearPieceAt(&g->Board, src); 
+        ClearPieceAt(&g->Board, rm); 
+        SetPieceAt(&g->Board, dst, pc); 
+
+        // enemy piece has been captured 
         g->Counts[tgt]--; 
-        g->EP = NO_SQ; 
+
+        // after en passant, a new en passant square is not possible 
+        g->EnPassant = NoSquare; 
     }
-    else if (casIdx) // castling 
+    else if (casIndex) // castling 
     {
-        g->Colors[col] ^= MoveCastleBBAll[casIdx]; 
+        // MoveCastleBits* arrays handle removing king and rook as well as placing them on new squares  
 
-        g->Hash ^= SqPcZb(MoveCastleSqK[casIdx][0], MoveCastlePcK[casIdx]); 
-        g->Hash ^= SqPcZb(MoveCastleSqK[casIdx][1], MoveCastlePcK[casIdx]); 
-        g->Hash ^= SqPcZb(MoveCastleSqR[casIdx][0], MoveCastlePcR[casIdx]); 
-        g->Hash ^= SqPcZb(MoveCastleSqR[casIdx][1], MoveCastlePcR[casIdx]); 
+        g->Colors[col] ^= MoveCastleBitsAll[casIndex]; 
 
-        g->Pieces[pc] ^= MoveCastleBBK[casIdx]; 
-        g->Pieces[MakePc(PC_R, col)] ^= MoveCastleBBR[casIdx]; 
+        g->Pieces[pc] ^= MoveCastleBitsK[casIndex]; 
+        g->Pieces[MakePiece(PieceR, col)] ^= MoveCastleBitsR[casIndex]; 
 
-        ClearMBox(&g->Mailbox, MoveCastleSqK[casIdx][0]); 
-        ClearMBox(&g->Mailbox, MoveCastleSqR[casIdx][0]); 
-        SetMBox(&g->Mailbox, MoveCastleSqK[casIdx][1], pc); 
-        SetMBox(&g->Mailbox, MoveCastleSqR[casIdx][1], MakePc(PC_R, col)); 
+        g->Hash ^= HashSquarePiece(MoveCastleSquareK[casIndex][0], MoveCastlePieceK[casIndex]); 
+        g->Hash ^= HashSquarePiece(MoveCastleSquareK[casIndex][1], MoveCastlePieceK[casIndex]); 
+        g->Hash ^= HashSquarePiece(MoveCastleSquareR[casIndex][0], MoveCastlePieceR[casIndex]); 
+        g->Hash ^= HashSquarePiece(MoveCastleSquareR[casIndex][1], MoveCastlePieceR[casIndex]); 
 
-        g->EP = NO_SQ; 
+        ClearPieceAt(&g->Board, MoveCastleSquareK[casIndex][0]); 
+        ClearPieceAt(&g->Board, MoveCastleSquareR[casIndex][0]); 
+        SetPieceAt(&g->Board, MoveCastleSquareK[casIndex][1], pc); 
+        SetPieceAt(&g->Board, MoveCastleSquareR[casIndex][1], MakePiece(PieceR, col)); 
+
+        // en passant square is not possible after castling 
+        g->EnPassant = NoSquare; 
     }
     else if (pc != pro) // promotion
     {
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NO_PC) * dstPos; 
+        // remove old piece 
+        // place promoted piece 
+        // remove captured piece if it exists 
+        // target is scratch index if there is no capture so this is okay 
 
-        g->Hash ^= SqPcZb(src, pc); 
-        g->Hash ^= SqPcZb(dst, pro); 
-        g->Hash ^= SqPcZb(dst, tgt); 
+        g->Colors[col] ^= srcPos ^ dstPos; 
+        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
+
+        g->Hash ^= HashSquarePiece(src, pc); 
+        g->Hash ^= HashSquarePiece(dst, pro); 
+        g->Hash ^= HashSquarePiece(dst, tgt); 
 
         g->Pieces[pc] ^= srcPos; 
         g->Pieces[pro] ^= dstPos; 
         g->Pieces[tgt] ^= dstPos; 
         
-        ClearMBox(&g->Mailbox, src); 
-        SetMBox(&g->Mailbox, dst, pro); 
+        ClearPieceAt(&g->Board, src); 
+        SetPieceAt(&g->Board, dst, pro); 
 
         g->Counts[tgt]--; 
         g->Counts[pc]--; 
         g->Counts[pro]++; 
-        g->EP = NO_SQ; 
+
+        // en passant is not possible after promoting a pawn
+        g->EnPassant = NoSquare; 
     }
     else // standard move 
     {
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NO_PC) * dstPos; 
+        // remove old piece and place it on new square 
+        // remove captured piece if it exists 
+        // target is scratch index if there is no capture so this is okay 
 
-        g->Hash ^= SqPcZb(src, pc); 
-        g->Hash ^= SqPcZb(dst, pc); 
-        g->Hash ^= SqPcZb(dst, tgt); 
+        g->Colors[col] ^= srcPos ^ dstPos; 
+        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
+
+        g->Hash ^= HashSquarePiece(src, pc); 
+        g->Hash ^= HashSquarePiece(dst, pc); 
+        g->Hash ^= HashSquarePiece(dst, tgt); 
 
         g->Pieces[pc] ^= srcPos ^ dstPos; 
         g->Pieces[tgt] ^= dstPos; 
         
-        ClearMBox(&g->Mailbox, src); 
-        SetMBox(&g->Mailbox, dst, pc); 
+        ClearPieceAt(&g->Board, src); 
+        SetPieceAt(&g->Board, dst, pc); 
 
         g->Counts[tgt]--; 
-        if (GetNoCol(pc) == PC_P && abs(src - dst) == 16) 
+
+        // en passant is possible if a pawn moved two squares 
+        if (TypeOfPiece(pc) == PieceP && abs((int) src - (int) dst) == 16) 
         {
-            g->EP = ColSign(g->Turn) * 8 + src; 
+            g->EnPassant = ColorSign(g->Turn) * 8 + src; 
         }
         else 
         {
-            g->EP = NO_SQ; 
+            g->EnPassant = NoSquare; 
         }
     }
 
-    g->Castle &= ~(MoveCastleRm[src] | MoveCastleRm[dst]); 
-    g->All = g->Colors[COL_W] | g->Colors[COL_B]; 
+    // remove castling rights if: 
+    // - from square is initial king or rook position (it isn't there anymore or it moved)
+    // - to square is initial king or rook position (it isn't there anymore or it was captured)
+    g->Castle &= ~(MoveCastleRemove[src] | MoveCastleRemove[dst]); 
 
-    g->Hash ^= EPZb(g->EP); 
-    g->Hash ^= CastleZb(g->Castle ^ hist->Castle); 
+    // update occupants 
+    g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
+
+    // re-apply en passant hash 
+    g->Hash ^= HashEnPassant(g->EnPassant); 
+
+    // apply diff of castle flag hash 
+    g->Hash ^= HashCastleFlags(g->Castle ^ hist->Castle); 
 
     // for next movement: 
     //   can move to any square without own pieces 
@@ -302,34 +338,40 @@ void PushMove(Game* g, Move mv)
 void PopMove(Game* g, Move mv) 
 {
     Color opp = g->Turn; 
-    Color col = OppCol(opp); 
+    Color col = OppositeColor(opp); 
 
     g->Ply--; 
     g->Turn = col; 
 
+    // return anything that the move doesn't store 
     MoveHist* hist = g->Hist + --g->Depth; 
     g->Halfmove = hist->Halfmove; 
-    g->EP = hist->EP; 
+    g->EnPassant = hist->EnPassant; 
     g->Castle = hist->Castle; 
     g->InCheck = hist->InCheck; 
+    // no need to recalculate hash 
     g->Hash = hist->Hash; 
 
-    Piece pc = FromPc(mv); 
-    Piece pro = ProPc(mv); 
-    Piece tgt = TgtPc(mv); 
+    Piece pc = FromPiece(mv); 
+    Piece pro = PromotionPiece(mv); 
+    Piece tgt = TargetPiece(mv); 
 
-    Square src = FromSq(mv); 
-    Square dst = ToSq(mv); 
+    Square src = FromSquare(mv); 
+    Square dst = ToSquare(mv); 
 
-    bool ep = IsEP(mv); 
-    int casIdx = CastleIdx(mv); 
+    bool ep = IsEnPassant(mv); 
+    int casIndex = CastleIndex(mv); 
 
-    BBoard srcPos = BB[src]; 
-    BBoard dstPos = BB[dst]; 
+    Bitboard srcPos = Bits[src]; 
+    Bitboard dstPos = Bits[dst]; 
 
-    if (ep) 
+    if (ep) // en passant 
     {
-        BBoard rmPos = BB[g->EP - 8 * ColSign(g->Turn)]; 
+        // piece did not move to the same square as it captured 
+        Bitboard rmPos = Bits[g->EnPassant - 8 * ColorSign(g->Turn)]; 
+
+        // move pawn from destination to source
+        // add enemy piece 
 
         g->Colors[col] ^= srcPos ^ dstPos; 
         g->Colors[opp] ^= rmPos; 
@@ -337,55 +379,71 @@ void PopMove(Game* g, Move mv)
         g->Pieces[pc] ^= srcPos ^ dstPos; 
         g->Pieces[tgt] ^= rmPos; 
         
-        SetMBox(&g->Mailbox, src, pc); 
-        SetMBox(&g->Mailbox, g->EP - 8 * ColSign(g->Turn), tgt); 
-        ClearMBox(&g->Mailbox, dst); 
+        SetPieceAt(&g->Board, src, pc); 
+        SetPieceAt(&g->Board, g->EnPassant - 8 * ColorSign(g->Turn), tgt); 
+        ClearPieceAt(&g->Board, dst); 
 
+        // enemy piece is uncaptured 
         g->Counts[tgt]++; 
     }
-    else if (casIdx) 
+    else if (casIndex) // castling 
     {
-        g->Colors[col] ^= MoveCastleBBAll[casIdx]; 
+        // MoveCastleBits* arrays handle removing king and rook as well as placing them on old squares  
 
-        g->Pieces[pc] ^= MoveCastleBBK[casIdx]; 
-        g->Pieces[MakePc(PC_R, col)] ^= MoveCastleBBR[casIdx]; 
+        g->Colors[col] ^= MoveCastleBitsAll[casIndex]; 
 
-        ClearMBox(&g->Mailbox, MoveCastleSqK[casIdx][1]); 
-        ClearMBox(&g->Mailbox, MoveCastleSqR[casIdx][1]); 
-        SetMBox(&g->Mailbox, MoveCastleSqK[casIdx][0], pc); 
-        SetMBox(&g->Mailbox, MoveCastleSqR[casIdx][0], MakePc(PC_R, col)); 
+        g->Pieces[pc] ^= MoveCastleBitsK[casIndex]; 
+        g->Pieces[MakePiece(PieceR, col)] ^= MoveCastleBitsR[casIndex]; 
+
+        ClearPieceAt(&g->Board, MoveCastleSquareK[casIndex][1]); 
+        ClearPieceAt(&g->Board, MoveCastleSquareR[casIndex][1]); 
+        SetPieceAt(&g->Board, MoveCastleSquareK[casIndex][0], pc); 
+        SetPieceAt(&g->Board, MoveCastleSquareR[casIndex][0], MakePiece(PieceR, col)); 
     }
-    else if (pc != pro) 
+    else if (pc != pro) // promotion 
     {
+        // add old piece 
+        // remove promoted piece 
+        // add enemy piece if there was a capture  
+        // target is scratch index if there is no capture so this is okay 
+
         g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NO_PC) * dstPos; 
+        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
 
         g->Pieces[pc] ^= srcPos; 
         g->Pieces[pro] ^= dstPos; 
         g->Pieces[tgt] ^= dstPos; 
         
-        SetMBox(&g->Mailbox, src, pc); 
-        SetMBox(&g->Mailbox, dst, tgt); 
+        SetPieceAt(&g->Board, src, pc); 
+        SetPieceAt(&g->Board, dst, tgt); 
 
         g->Counts[tgt]++; 
         g->Counts[pc]++; 
         g->Counts[pro]--; 
     }
-    else 
+    else // standard move 
     {
+        // add old piece and remove it from new square 
+        // add captured piece if it exists 
+        // target is scratch index if there is no capture so this is okay 
+
         g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NO_PC) * dstPos; 
+        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
 
         g->Pieces[pc] ^= srcPos ^ dstPos; 
         g->Pieces[tgt] ^= dstPos; 
         
-        SetMBox(&g->Mailbox, src, pc); 
-        SetMBox(&g->Mailbox, dst, tgt); 
+        SetPieceAt(&g->Board, src, pc); 
+        SetPieceAt(&g->Board, dst, tgt); 
 
         g->Counts[tgt]++; 
     }
 
-    g->All = g->Colors[COL_W] | g->Colors[COL_B]; 
+    // update occupants 
+    g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
+
+    // for previous movement: 
+    //   can move to any square without own pieces 
     g->Movement = ~g->Colors[col]; 
 
     VALIDATE_GAME_MOVE(g, mv, "popping"); 
@@ -397,19 +455,20 @@ void PushNullMove(Game* g)
 
     MoveHist* hist = g->Hist + g->Depth++; 
     hist->Halfmove = g->Halfmove; 
-    hist->EP = g->EP; 
+    hist->EnPassant = g->EnPassant; 
     hist->Castle = g->Castle; 
     hist->InCheck = g->InCheck; 
     hist->Hash = g->Hash; 
 
-    g->Hash ^= ColZb(); 
-    g->Hash ^= EPZb(g->EP); 
-
     Color col = g->Turn; 
-    Color opp = OppCol(col); 
+    Color opp = OppositeColor(col); 
 
-    g->EP = NO_SQ; 
-    g->Hash ^= EPZb(g->EP); 
+    g->Hash ^= HashColor(); 
+
+    // opponent should not be able to en passant just because we skipped a turn 
+    g->Hash ^= HashEnPassant(g->EnPassant); 
+    g->EnPassant = NoSquare; 
+    g->Hash ^= HashEnPassant(g->EnPassant); 
 
     // for next movement: 
     //   can move to any square without own pieces 
@@ -418,7 +477,7 @@ void PushNullMove(Game* g)
     g->Ply++; 
     g->Turn = opp; 
 
-    g->InCheck = IsAttacked(g, Lsb(g->Pieces[MakePc(PC_K, opp)]), opp); 
+    g->InCheck = IsAttacked(g, LeastSigBit(g->Pieces[MakePiece(PieceK, opp)]), opp); 
 
     VALIDATE_GAME_MOVE(g, 0, "pushing null"); 
 }
@@ -426,19 +485,19 @@ void PushNullMove(Game* g)
 void PopNullMove(Game* g) 
 {
     Color opp = g->Turn; 
-    Color col = OppCol(opp); 
+    Color col = OppositeColor(opp); 
 
     g->Ply--; 
     g->Turn = col; 
 
     MoveHist* hist = g->Hist + --g->Depth; 
     g->Halfmove = hist->Halfmove; 
-    g->EP = hist->EP; 
+    g->EnPassant = hist->EnPassant; 
     g->Castle = hist->Castle; 
     g->InCheck = hist->InCheck; 
     g->Hash = hist->Hash; 
 
-    g->All = g->Colors[COL_W] | g->Colors[COL_B]; 
+    g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
     g->Movement = ~g->Colors[col]; 
 
     VALIDATE_GAME_MOVE(g, 0, "popping null"); 
@@ -449,7 +508,7 @@ bool IsSpecialDraw(const Game* g)
     // 50-move rule 
     if (g->Halfmove > 99) return true; 
 
-    for (int i = 0; i < DRAW_DEPTH; i++) 
+    for (int i = 0; i < DrawDepth; i++) 
     {
         // (g->Depth-1) is previous ply (opponent made the move)
         // so our first depth to check should be (g->Depth-2)
@@ -458,7 +517,7 @@ bool IsSpecialDraw(const Game* g)
         if (depth >= 0) 
         {
             if (g->Hash == g->Hist[depth].Hash) return true; 
-            if ((g->Hash ^ ColZb()) == g->Hist[depth].Hash) return true; 
+            if ((g->Hash ^ HashColor()) == g->Hist[depth].Hash) return true; 
         }
         else 
         {
@@ -467,19 +526,19 @@ bool IsSpecialDraw(const Game* g)
     }
 
     // insufficient material (guaranteed)
-    if (g->Pieces[PC_WK] == g->Colors[COL_W]) // white only has king
+    if (g->Pieces[PieceWK] == g->Colors[ColorW]) // white only has king
     {
         // KN vs K
-        if ((g->Pieces[PC_BK] | g->Pieces[PC_BN]) == g->Colors[COL_B] && g->Counts[PC_BN] <= 1) return true; 
+        if ((g->Pieces[PieceBK] | g->Pieces[PieceBN]) == g->Colors[ColorB] && g->Counts[PieceBN] <= 1) return true; 
         // KB vs K
-        if ((g->Pieces[PC_BK] | g->Pieces[PC_BB]) == g->Colors[COL_B] && g->Counts[PC_BB] <= 1) return true;  
+        if ((g->Pieces[PieceBK] | g->Pieces[PieceBB]) == g->Colors[ColorB] && g->Counts[PieceBB] <= 1) return true;  
     }
-    else if (g->Pieces[PC_BK] == g->Colors[COL_B]) // black only has king 
+    else if (g->Pieces[PieceBK] == g->Colors[ColorB]) // black only has king 
     {
         // KN vs K
-        if ((g->Pieces[PC_WK] | g->Pieces[PC_WN]) == g->Colors[COL_W] && g->Counts[PC_WN] <= 1) return true; 
+        if ((g->Pieces[PieceWK] | g->Pieces[PieceWN]) == g->Colors[ColorW] && g->Counts[PieceWN] <= 1) return true; 
         // KB vs K
-        if ((g->Pieces[PC_WK] | g->Pieces[PC_WB]) == g->Colors[COL_W] && g->Counts[PC_WB] <= 1) return true;  
+        if ((g->Pieces[PieceWK] | g->Pieces[PieceWB]) == g->Colors[ColorW] && g->Counts[PieceWB] <= 1) return true;  
     }
 
     return false; 
@@ -490,22 +549,22 @@ bool ValidateGame(const Game* g)
     bool valid = true; 
 
     // piece counts 
-    for (Piece pc = 0; pc < NUM_PC; pc++) 
+    for (Piece pc = 0; pc < NumPieces; pc++) 
     {
-        if (g->Counts[pc] != Popcnt(g->Pieces[pc])) 
+        if (g->Counts[pc] != PopCount(g->Pieces[pc])) 
         {
-            printf("info string ERROR %s count is %d but should be %d\n", StrPc(pc), g->Counts[pc], Popcnt(g->Pieces[pc])); 
+            printf("info string ERROR %s count is %d but should be %d\n", PieceString(pc), g->Counts[pc], PopCount(g->Pieces[pc])); 
             valid = false; 
         }
     }
 
     // exactly 1 king 
     {
-        for (Color col = COL_W; col < NUM_COLS; col++) 
+        for (Color col = ColorW; col < NumColors; col++) 
         {
-            if (g->Counts[MakePc(PC_K, col)] != 1) 
+            if (g->Counts[MakePiece(PieceK, col)] != 1) 
             {
-                printf("info string ERROR %s does not have exactly 1 king: %d\n", col ? "white" : "black", g->Counts[MakePc(PC_K, col)]); 
+                printf("info string ERROR %s does not have exactly 1 king: %d\n", col ? "white" : "black", g->Counts[MakePiece(PieceK, col)]); 
                 valid = false; 
             }
         }
@@ -513,45 +572,45 @@ bool ValidateGame(const Game* g)
 
     // bitboards 
     {
-        BBoard all = 0, col[2] = { 0, 0 }; 
-        for (Piece pc = 0; pc < NUM_PC; pc++) 
+        Bitboard all = 0, col[2] = { 0, 0 }; 
+        for (Piece pc = 0; pc < NumPieces; pc++) 
         {
             all ^= g->Pieces[pc]; 
-            col[GetCol(pc)] ^= g->Pieces[pc]; 
+            col[ColorOfPiece(pc)] ^= g->Pieces[pc]; 
         }
 
         if (all != g->All) { printf("info string ERROR piece bitboards don't match accumulated board\n"); valid = false; } 
-        if (col[COL_W] != g->Colors[COL_W]) { printf("info string ERROR piece bitboards don't match accumulated white board\n"); valid = false; } 
-        if (col[COL_B] != g->Colors[COL_B]) { printf("info string ERROR piece bitboards don't match accumulated black board\n"); valid = false; } 
+        if (col[ColorW] != g->Colors[ColorW]) { printf("info string ERROR piece bitboards don't match accumulated white board\n"); valid = false; } 
+        if (col[ColorB] != g->Colors[ColorB]) { printf("info string ERROR piece bitboards don't match accumulated black board\n"); valid = false; } 
     }
 
     // check 
     {
-        Square ksq = Lsb(g->Pieces[MakePc(PC_K, g->Turn)]); 
+        Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, g->Turn)]); 
         bool actuallyInCheck = IsAttacked(g, ksq, g->Turn); 
         if (actuallyInCheck ^ g->InCheck) 
         {
             printf("info string ERROR check flag is incorrect: %d instead of %d\n", g->InCheck, actuallyInCheck); 
-            printf("info string       king on %s\n", StrSq(ksq)); 
+            printf("info string       king on %s\n", SquareString(ksq)); 
             valid = false; 
         }
     }
 
     // pieces 
     {
-        for (Square sq = 0; sq < NUM_SQ; sq++) 
+        for (Square sq = 0; sq < NumSquares; sq++) 
         {
-            Piece pc = PcAt(g, sq); 
-            if (pc > NO_SQ) 
+            Piece pc = PieceAt(&g->Board, sq); 
+            if (pc > NoPiece) 
             {
-                printf("info string ERROR mailbox piece is invalid: %u at %s\n", pc, StrSq(sq)); 
+                printf("info string ERROR mailbox piece is invalid: %u at %s\n", pc, SquareString(sq)); 
                 valid = false; 
             }
-            else if (pc == NO_PC) 
+            else if (pc == NoPiece) 
             {
                 if (GetBit(g->All, sq)) 
                 {
-                    printf("info string ERROR mailbox has no piece but should have one: %s\n", StrSq(sq)); 
+                    printf("info string ERROR mailbox has no piece but should have one: %s\n", SquareString(sq)); 
                     valid = false; 
                 }
             }
@@ -559,7 +618,7 @@ bool ValidateGame(const Game* g)
             {
                 if (!GetBit(g->Pieces[pc], sq)) 
                 {
-                    printf("info string ERROR mailbox has %s but should be empty: %s\n", StrPc(pc), StrSq(sq)); 
+                    printf("info string ERROR mailbox has %s but should be empty: %s\n", PieceString(pc), SquareString(sq)); 
                     valid = false; 
                 }
             }
@@ -568,33 +627,33 @@ bool ValidateGame(const Game* g)
 
     // castling 
     {
-        if (g->Castle & CASTLE_WK) 
+        if (g->Castle & CastleWK) 
         {
-            if (PcAt(g, E1) != PC_WK || PcAt(g, H1) != PC_WR) 
+            if (PieceAt(&g->Board, E1) != PieceWK || PieceAt(&g->Board, H1) != PieceWR) 
             {
                 printf("info string ERROR white O-O flag is set but no longer possible\n"); 
                 valid = false; 
             }
         }
-        if (g->Castle & CASTLE_WQ) 
+        if (g->Castle & CastleWQ) 
         {
-            if (PcAt(g, E1) != PC_WK || PcAt(g, A1) != PC_WR) 
+            if (PieceAt(&g->Board, E1) != PieceWK || PieceAt(&g->Board, A1) != PieceWR) 
             {
                 printf("info string ERROR white O-O-O flag is set but no longer possible\n"); 
                 valid = false; 
             }
         }
-        if (g->Castle & CASTLE_BK) 
+        if (g->Castle & CastleBK) 
         {
-            if (PcAt(g, E8) != PC_BK || PcAt(g, H8) != PC_BR) 
+            if (PieceAt(&g->Board, E8) != PieceBK || PieceAt(&g->Board, H8) != PieceBR) 
             {
                 printf("info string ERROR black O-O flag is set but no longer possible\n"); 
                 valid = false; 
             }
         }
-        if (g->Castle & CASTLE_BQ) 
+        if (g->Castle & CastleBQ) 
         {
-            if (PcAt(g, E8) != PC_BK || PcAt(g, A8) != PC_BR) 
+            if (PieceAt(&g->Board, E8) != PieceBK || PieceAt(&g->Board, A8) != PieceBR) 
             {
                 printf("info string ERROR black O-O-O flag is set but no longer possible\n"); 
                 valid = false; 
@@ -609,30 +668,30 @@ bool ValidateGame(const Game* g)
         // color 
         if (g->Turn) 
         {
-            hash ^= ColZb(); 
+            hash ^= HashColor(); 
         }
 
         // castling 
-        hash ^= CastleZb(g->Castle); 
+        hash ^= HashCastleFlags(g->Castle); 
 
         // ep 
-        hash ^= EPZb(g->EP); 
+        hash ^= HashEnPassant(g->EnPassant); 
 
         // pieces 
-        for (Piece pc = 0; pc < NUM_PC; pc++) 
+        for (Piece pc = 0; pc < NumPieces; pc++) 
         {
             FOR_EACH_BIT(g->Pieces[pc], 
             {
-                hash ^= SqPcZb(sq, pc); 
+                hash ^= HashSquarePiece(sq, pc); 
             });
         }
 
         if (hash != g->Hash) 
         {
             printf("info string ERROR zobrist hashing is invalid: ");
-            PrintZbEnd(g->Hash, " instead of "); 
-            PrintZbEnd(hash, ", remainder: ");
-            FindPrintZb(hash ^ g->Hash);  
+            PrintHashEnd(g->Hash, " instead of "); 
+            PrintHashEnd(hash, ", remainder: ");
+            FindPrintHash(hash ^ g->Hash);  
             valid = false;  
         }
     }
@@ -646,14 +705,14 @@ bool ValidateGame(const Game* g)
     return valid; 
 }
 
-static inline U64 PerftInternal(Game* g, MvList* moves, int depth) 
+static inline U64 PerftInternal(Game* g, MoveList* moves, int depth) 
 {
     U64 total = 0, start = moves->Size, size; 
 
     if (depth == 1) 
     {
-        MvInfo info; 
-        GenMvInfo(g, &info); 
+        MoveInfo info; 
+        GenMoveInfo(g, &info); 
         total += info.NumMoves; 
     }
     else if (depth > 1) 
@@ -671,7 +730,7 @@ static inline U64 PerftInternal(Game* g, MvList* moves, int depth)
             PopMove(g, mv); 
         }
 
-        PopMvList(moves, size); 
+        PopMovesToSize(moves, size); 
     }
     else 
     {
@@ -683,11 +742,11 @@ static inline U64 PerftInternal(Game* g, MvList* moves, int depth)
 
 U64 Perft(Game* g, int depth) 
 {
-    MvList* moves = NewMvList(); 
+    MoveList* moves = NewMoveList(); 
 
     U64 total = PerftInternal(g, moves, depth); 
     printf("Depth: %d, Total: %" PRIu64 "", depth, total); 
 
-    FreeMvList(moves); 
+    FreeMoveList(moves); 
     return total; 
 }

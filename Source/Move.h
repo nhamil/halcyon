@@ -14,26 +14,32 @@
 #include <stdint.h> 
 #include <stdio.h> 
 
-#include "BBoard.h"
+#include "Bitboard.h"
 #include "Castle.h"
 #include "Piece.h" 
 #include "Square.h" 
 
-#define NO_MOVE 0
+#define NoMove 0
 
-#define MOVE_CASTLE_NONE 0 
-#define MOVE_CASTLE_WK 1 
-#define MOVE_CASTLE_WQ 2 
-#define MOVE_CASTLE_BK 3 
-#define MOVE_CASTLE_BQ 4
+typedef enum MoveCastleIndex
+{
+    MoveCastleNone = 0,  
+    MoveCastleWK,  
+    MoveCastleWQ,  
+    MoveCastleBK,  
+    MoveCastleBQ, 
+} MoveCastleIndex;
 
-#define PRO_NONE 0
-#define PRO_N 1
-#define PRO_B 2 
-#define PRO_R 3 
-#define PRO_Q 4
+typedef enum MovePromotionIndex
+{
+    PromoteNone = 0,
+    PromoteN, 
+    PromoteB,  
+    PromoteR,  
+    PromoteQ, 
+} MovePromotionIndex; 
 
-static const BBoard MoveCastleBBK[5] = 
+static const Bitboard MoveCastleBitsK[5] = 
 {
     0, 
     1ULL << E1 | 1ULL << G1, 
@@ -42,7 +48,7 @@ static const BBoard MoveCastleBBK[5] =
     1ULL << E8 | 1ULL << C8
 };
 
-static const BBoard MoveCastleBBR[5] = 
+static const Bitboard MoveCastleBitsR[5] = 
 {
     0, 
     1ULL << H1 | 1ULL << F1, 
@@ -51,7 +57,7 @@ static const BBoard MoveCastleBBR[5] =
     1ULL << A8 | 1ULL << D8
 };
 
-static const BBoard MoveCastleBBAll[5] = 
+static const Bitboard MoveCastleBitsAll[5] = 
 {
     0, 
     1ULL << E1 | 1ULL << G1 | 1ULL << H1 | 1ULL << F1, 
@@ -60,50 +66,50 @@ static const BBoard MoveCastleBBAll[5] =
     1ULL << E8 | 1ULL << C8 | 1ULL << A8 | 1ULL << D8
 };
 
-static const Square MoveCastleSqK[5][2] = 
+static const Square MoveCastleSquareK[5][2] = 
 {
-    { NO_SQ, NO_SQ }, 
+    { NoSquare, NoSquare }, 
     { E1, G1 }, 
     { E1, C1 }, 
     { E8, G8 }, 
     { E8, C8 }
 };
 
-static const Square MoveCastlePcK[5] = 
+static const Piece MoveCastlePieceK[5] = 
 {
-    NO_PC, 
-    PC_WK, 
-    PC_WK, 
-    PC_BK, 
-    PC_BK
+    NoPiece, 
+    PieceWK, 
+    PieceWK, 
+    PieceBK, 
+    PieceBK
 };
 
-static const Square MoveCastleSqR[5][2] = 
+static const Square MoveCastleSquareR[5][2] = 
 {
-    { NO_SQ, NO_SQ }, 
+    { NoSquare, NoSquare }, 
     { H1, F1 }, 
     { A1, D1 }, 
     { H8, F8 }, 
     { A8, D8 }
 };
 
-static const Square MoveCastlePcR[5] = 
+static const Piece MoveCastlePieceR[5] = 
 {
-    NO_PC, 
-    PC_WR, 
-    PC_WR, 
-    PC_BR, 
-    PC_BR
+    NoPiece, 
+    PieceWR, 
+    PieceWR, 
+    PieceBR, 
+    PieceBR
 };
 
-static const CastleFlags MoveCastleRm[NUM_SQ] = 
+static const CastleFlags MoveCastleRemove[NumSquares] = 
 {
-    [A1] = CASTLE_WQ, 
-    [H1] = CASTLE_WK, 
-    [A8] = CASTLE_BQ, 
-    [H8] = CASTLE_BK, 
-    [E1] = CASTLE_W, 
-    [E8] = CASTLE_B, 
+    [A1] = CastleWQ, 
+    [H1] = CastleWK, 
+    [A8] = CastleBQ, 
+    [H8] = CastleBK, 
+    [E1] = CastleW, 
+    [E8] = CastleB, 
 };
 
 /**
@@ -112,136 +118,254 @@ static const CastleFlags MoveCastleRm[NUM_SQ] =
  * piece pc: 12-15 
  * piece pro: 16-19 
  * piece tgt: 20-23 
- * bool takesEP: 24-24 
+ * bool takesEnPassant: 24-24 
  * unsigned castle: 25-28 
  * bool check: 29-29
  */
 typedef U32 Move; 
 
+/**
+ * Creates a standard move 
+ * 
+ * @param from From square 
+ * @param to To square 
+ * @param pc Piece to move 
+ * @param tgt Piece to capture (or NoPiece)
+ * @param check Is check 
+ * @return The move
+ */
 static inline Move MakeMove(Square from, Square to, Piece pc, Piece tgt, bool check) 
 {
     return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) tgt << 20) | ((Move) check << 29); 
 }
 
-static inline Move MakeProMove(Square from, Square to, Piece pc, Piece pro, Piece tgt, bool check) 
+/**
+ * Creates promotion move 
+ * 
+ * @param from From square 
+ * @param to To square 
+ * @param pc Piece to move 
+ * @param pro Promotion piece 
+ * @param tgt Piece to capture (no NoPiece)
+ * @param check Is check 
+ * @return The move
+ */
+static inline Move MakePromotionMove(Square from, Square to, Piece pc, Piece pro, Piece tgt, bool check) 
 {
     return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pro << 16) | ((Move) tgt << 20) | ((Move) check << 29); 
 }
 
-static inline Move MakeEPMove(Square from, Square to, Piece pc, Piece tgt, bool ep, bool check) 
+/**
+ * Creates a (potential) en passant move. 
+ * 
+ * @param from From square 
+ * @param to To square 
+ * @param pc Piece to move 
+ * @param tgt Piece to capture 
+ * @param ep Is the move en passant
+ * @param check Is check 
+ * @return The move
+ */
+static inline Move MakeEnPassantMove(Square from, Square to, Piece pc, Piece tgt, bool ep, bool check) 
 {
     return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) tgt << 20) | ((Move) ep << 24) | ((Move) check << 29); 
 }
 
-static inline Move MakeCastleMove(Square from, Square to, Piece pc, unsigned idx, bool check) 
+/**
+ * Creates a castling move 
+ * 
+ * @param from From square 
+ * @param to To square 
+ * @param pc Piece to move (king)
+ * @param idx Type of castle 
+ * @param check Is check 
+ * @return The move
+ */
+static inline Move MakeCastleMove(Square from, Square to, Piece pc, MoveCastleIndex idx, bool check) 
 {
-    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) NO_PC << 20) | ((Move) idx << 25) | ((Move) check << 29); 
+    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) NoPiece << 20) | ((Move) idx << 25) | ((Move) check << 29); 
 }
 
-static inline Square FromSq(Move m) 
+/**
+ * @param m The move 
+ * @return Start square 
+ */
+static inline Square FromSquare(Move m) 
 {
     return (Square) (m & 63); 
 }
 
-static inline Square ToSq(Move m) 
+/**
+ * @param m The move 
+ * @return Target square 
+ */
+static inline Square ToSquare(Move m) 
 {
     return (Square) ((m >> 6) & 63); 
 }
 
-static inline Piece FromPc(Move m) 
+/**
+ * @param m The move 
+ * @return Piece to move 
+ */
+static inline Piece FromPiece(Move m) 
 {
     return (Piece) ((m >> 12) & 15); 
 }
 
-static inline Piece ProPc(Move m) 
+/**
+ * @param m The move 
+ * @return What the piece will be after the move 
+ */
+static inline Piece PromotionPiece(Move m) 
 {
     return (Piece) ((m >> 16) & 15); 
 }
 
-static inline Piece TgtPc(Move m) 
+/**
+ * @param m The move 
+ * @return Attacked piece or NoPiece
+ */
+static inline Piece TargetPiece(Move m) 
 {
     return (Piece) ((m >> 20) & 15); 
 }
 
-static inline bool IsEP(Move m) 
+/**
+ * @param m The move 
+ * @return Is the move en passant
+ */
+static inline bool IsEnPassant(Move m) 
 {
     return (bool) ((m >> 24) & 1); 
 }
 
-static inline int CastleIdx(Move m) 
+/**
+ * @param m The move 
+ * @return Type of castle
+ */
+static inline int CastleIndex(Move m) 
 {
     return (int) ((m >> 25) & 15); 
 }
 
-static inline bool IsPro(Move m) 
+/**
+ * @param m The move 
+ * @return True if the move is a promotion, false otherwise 
+ */
+static inline bool IsPromotion(Move m) 
 {
-    return ProPc(m) != FromPc(m); 
+    return PromotionPiece(m) != FromPiece(m); 
 }
 
+/**
+ * @param m The move 
+ * @return True if the move is a capture, otherwise false
+ */
 static inline bool IsCapture(Move m) 
 {
-    return TgtPc(m) != NO_PC; 
+    return TargetPiece(m) != NoPiece; 
 }
 
+/**
+ * @param m The move 
+ * @return Does the move check the enemy king
+ */
 static inline bool IsCheck(Move m) 
 {
     return (bool) ((m >> 29) & 1); 
 }
 
+/**
+ * Should the move be considered for quiescence search. 
+ * 
+ * @param m The move 
+ * @return Is the move tactical
+ */
 static inline bool IsTactical(Move m) 
 {
-    return IsCapture(m) || IsCheck(m) || IsPro(m); 
+    return IsCapture(m) || IsCheck(m) || IsPromotion(m); 
 }
 
+/**
+ * @param m The move 
+ * @return Is the move considered quiet
+ */
 static inline bool IsQuiet(Move m) 
 {
-    return !IsCapture(m) && !IsCheck(m) && !IsPro(m); 
+    return !IsCapture(m) && !IsCheck(m) && !IsPromotion(m); 
 }
 
+/**
+ * Prints a move to stdout. 
+ * 
+ * @param m The move 
+ */
 static void PrintMove(Move m) 
 {
-    if (IsPro(m)) 
+    if (IsPromotion(m)) 
     {
-        printf("%s%s%s\n", StrSq(FromSq(m)), StrSq(ToSq(m)), StrPcType(ProPc(m))); 
+        printf("%s%s%s\n", SquareString(FromSquare(m)), SquareString(ToSquare(m)), PieceTypeString(PromotionPiece(m))); 
     }
     else 
     {
-        printf("%s%s\n", StrSq(FromSq(m)), StrSq(ToSq(m))); 
+        printf("%s%s\n", SquareString(FromSquare(m)), SquareString(ToSquare(m))); 
     }
 }
 
+/**
+ * Prints a move to stdout without newline. 
+ * 
+ * @param m The move 
+ * @param end Text to write after the move 
+ */
 static void PrintMoveEnd(Move m, const char* end) 
 {
-    if (IsPro(m)) 
+    if (IsPromotion(m)) 
     {
-        printf("%s%s%s%s", StrSq(FromSq(m)), StrSq(ToSq(m)), StrPcType(ProPc(m)), end); 
+        printf("%s%s%s%s", SquareString(FromSquare(m)), SquareString(ToSquare(m)), PieceTypeString(PromotionPiece(m)), end); 
     }
     else 
     {
-        printf("%s%s%s", StrSq(FromSq(m)), StrSq(ToSq(m)), end); 
+        printf("%s%s%s", SquareString(FromSquare(m)), SquareString(ToSquare(m)), end); 
     }
 }
 
+/**
+ * Writes a move to a buffer. 
+ * 
+ * @param m The move 
+ * @param out The buffer
+ * @param n Max buffer length 
+ * @return Number of characters needed to write the move 
+ */
 static int SNPrintfMove(Move m, char* out, U64 n) 
 {
-    if (IsPro(m)) 
+    if (IsPromotion(m)) 
     {
-        return snprintf(out, n, "%s%s%s", StrSq(FromSq(m)), StrSq(ToSq(m)), StrPcType(ProPc(m))); 
+        return snprintf(out, n, "%s%s%s", SquareString(FromSquare(m)), SquareString(ToSquare(m)), PieceTypeString(PromotionPiece(m))); 
     }
     else 
     {
-       return snprintf(out, n, "%s%s", StrSq(FromSq(m)), StrSq(ToSq(m))); 
+       return snprintf(out, n, "%s%s", SquareString(FromSquare(m)), SquareString(ToSquare(m))); 
     }
 }
 
+/**
+ * Writes a move to file without newline. 
+ * 
+ * @param m The move 
+ * @param end Text to write after the move 
+ * @param out The file 
+ */
 static void FilePrintMoveEnd(Move m, const char* end, FILE* out) 
 {
-    if (IsPro(m)) 
+    if (IsPromotion(m)) 
     {
-        fprintf(out, "%s%s%s%s", StrSq(FromSq(m)), StrSq(ToSq(m)), StrPcType(ProPc(m)), end); 
+        fprintf(out, "%s%s%s%s", SquareString(FromSquare(m)), SquareString(ToSquare(m)), PieceTypeString(PromotionPiece(m)), end); 
     }
     else 
     {
-        fprintf(out, "%s%s%s", StrSq(FromSq(m)), StrSq(ToSq(m)), end); 
+        fprintf(out, "%s%s%s", SquareString(FromSquare(m)), SquareString(ToSquare(m)), end); 
     }
 }

@@ -29,10 +29,7 @@ int PawnStructureValues[] =
     -51, // tripled (once for every set)
 };
 
-/**
- * Does not include PC_K as this should not be parameterized 
- */
-int PcTypeValues[] = 
+int PieceTypeValues[] = 
 {
     91,  321,  331,  519,  964,
 };
@@ -49,7 +46,7 @@ int AttackUnitValues[] =
     496,  496,  504,  504,  504,  504,  507,  510, 
 };
 
-int PcSq[2][6][64] = 
+int PieceSquare[2][NumPieceTypes][NumSquares] = 
 {
     {
         { // pawn
@@ -177,21 +174,31 @@ int PcSq[2][6][64] =
     }, 
 };
 
-void PrintArrayIndex(char* out, const char* ary, int index, int s1, int s2, int s3) 
+/**
+ * Gets the name of a parameter's variable or array and its index in the array
+ * 
+ * @param out Buffer to write to
+ * @param paramName Parameter name
+ * @param index 1D index 
+ * @param s1 Last dimension array length or 0
+ * @param s2 2nd-to-last dimension array length or 0
+ * @param s3 3rd-to-last dimension array length or 0
+ */
+void PrintArrayIndex(char* out, const char* paramName, int index, int s1, int s2, int s3) 
 {
     if (s1 == 0) 
     {
-        snprintf(out, PARAM_NAME_LEN, "%s", ary);
+        snprintf(out, ParamNameLength, "%s", paramName);
     }
     else if (s2 == 0) 
     {
-        snprintf(out, PARAM_NAME_LEN, "%s[%d]", ary, index);
+        snprintf(out, ParamNameLength, "%s[%d]", paramName, index);
     }
     else if (s3 == 0) 
     {
         int i1 = index % s1;  
         int i2 = index / s1; 
-        snprintf(out, PARAM_NAME_LEN, "%s[%d][%d]", ary, i2, i1);
+        snprintf(out, ParamNameLength, "%s[%d][%d]", paramName, i2, i1);
     }
     else 
     {
@@ -199,14 +206,25 @@ void PrintArrayIndex(char* out, const char* ary, int index, int s1, int s2, int 
         int i2_ = index / s1; 
         int i2 = i2_ % s2; 
         int i3 = i2_ / s2; 
-        snprintf(out, PARAM_NAME_LEN, "%s[%d][%d][%d]", ary, i3, i2, i1);
+        snprintf(out, ParamNameLength, "%s[%d][%d][%d]", paramName, i3, i2, i1);
     }
 }
 
-#define EVAL_PARAM(ary, s1, s2, s3) \
-    if (index < (int) (sizeof(ary) / sizeof(int))) { if (name) { PrintArrayIndex(name, #ary, index, s1, s2, s3); } return ((int*) ary) + index; } \
-    index -= (int) (sizeof(ary) / sizeof(int)); 
+/**
+ * Gets a pointer to a parameter in an array. 
+ * 
+ * @param paramName Parameter name
+ * @param s1 Last dimension array length 
+ * @param s2 2nd-to-last dimension array length or 0
+ * @param s3 3rd-to-last dimension array length or 0
+ */
+#define EVAL_PARAM(paramName, s1, s2, s3) \
+    if (index < (int) (sizeof(paramName) / sizeof(int))) { if (name) { PrintArrayIndex(name, #paramName, index, s1, s2, s3); } return ((int*) paramName) + index; } \
+    index -= (int) (sizeof(paramName) / sizeof(int)); 
 
+/**
+ * Gets a pointer to a parameter. 
+ */
 #define EVAL_1PARAM(val) \
     if (index < 1) { if (name) { PrintArrayIndex(name, #val, 0, 0, 0, 0); } return &val; } \
     index -= 1; 
@@ -219,11 +237,11 @@ int* GetEvalParam(int index, char* name)
     EVAL_1PARAM(OpenFile); 
     EVAL_PARAM(PassedPawnValues, 8, 0, 0); 
 
-    // EVAL_1PARAM(BishopPair); 
-    // EVAL_PARAM(PawnStructureValues, 4, 0, 0); 
-    // EVAL_PARAM(PcTypeValues, 5, 0, 0); 
-    // EVAL_PARAM(AttackUnitValues, 64, 0, 0); 
-    // EVAL_PARAM(PcSq, 64, 6, 2); 
+    EVAL_1PARAM(BishopPair); 
+    EVAL_PARAM(PawnStructureValues, 4, 0, 0); 
+    EVAL_PARAM(PieceTypeValues, 5, 0, 0); 
+    EVAL_PARAM(AttackUnitValues, 64, 0, 0); 
+    EVAL_PARAM(PieceSquare, 64, 6, 2); 
 
     if (name) name[0] = '\0'; 
     return NULL; 
@@ -237,58 +255,98 @@ int GetNumEvalParams(void)
     return num; 
 }
 
-static inline void EvalWPcSq(const Game* g, Piece pc, int* mg, int* eg) 
+/**
+ * Add white piece-square bonuses to middlegame and endgame. 
+ * 
+ * @param g The game 
+ * @param pc Type of piece 
+ * @param mg Current middlegame eval
+ * @param eg Current endgame eval 
+ */
+static inline void EvalWPieceSquare(const Game* g, PieceType pc, int* mg, int* eg) 
 {
-    BBoard pcs = RRow(g->Pieces[pc]); 
+    Bitboard pcs = FlipRow(g->Pieces[pc]); 
     FOR_EACH_BIT(pcs, 
     {
-        *mg += PcSq[0][pc][sq]; 
-        *eg += PcSq[1][pc][sq]; 
+        *mg += PieceSquare[0][pc][sq]; 
+        *eg += PieceSquare[1][pc][sq]; 
     });
 }
 
-static inline void EvalBPcSq(const Game* g, Piece pc, int* mg, int* eg) 
+/**
+ * Add black piece-square bonuses to middlegame and endgame. 
+ * 
+ * @param g The game 
+ * @param pc Type of piece 
+ * @param mg Current middlegame eval
+ * @param eg Current endgame eval 
+ */
+static inline void EvalBPieceSquare(const Game* g, PieceType pc, int* mg, int* eg) 
 {
-    BBoard pcs = g->Pieces[MakePc(pc, COL_B)]; 
+    Bitboard pcs = g->Pieces[MakePiece(pc, ColorB)]; 
     FOR_EACH_BIT(pcs, 
     {
-        *mg -= PcSq[0][pc][sq]; 
-        *eg -= PcSq[1][pc][sq]; 
+        *mg -= PieceSquare[0][pc][sq]; 
+        *eg -= PieceSquare[1][pc][sq]; 
     });
 }
 
+/**
+ * Get connected rook eval bonuses
+ * 
+ * @param g The game 
+ * @param col Color to evaluate
+ * @return Rook bonuses
+ */
 static inline int EvalRooks(const Game* g, Color col) 
 {
-    Piece pc = MakePc(PC_R, col); 
-    BBoard board = g->Pieces[pc]; 
+    Piece pc = MakePiece(PieceR, col); 
+    Bitboard board = g->Pieces[pc]; 
 
     if (g->Counts[pc] >= 2) 
     {
-        return ConnectedRooks * ((RAttacks(Lsb(board), g->All) & board) != 0); 
+        return ConnectedRooks * ((RAttacks(LeastSigBit(board), g->All) & board) != 0); 
     }
     
     return 0; 
 }
 
+/**
+ * Get open file control bonuses
+ * 
+ * @param g The game 
+ * @param col Color to evaluate
+ * @return Open file bonuses 
+ */
 static inline int EvalOpenFiles(const Game* g, Color col) 
 {
-    BBoard rAttackers = g->Pieces[MakePc(PC_R, col)] | g->Pieces[MakePc(PC_Q, col)]; 
-    BBoard pawns = g->Pieces[PC_WP] | g->Pieces[PC_BP]; 
+    Bitboard rAttackers = g->Pieces[MakePiece(PieceR, col)] | g->Pieces[MakePiece(PieceQ, col)]; 
+    Bitboard pawns = g->Pieces[PieceWP] | g->Pieces[PieceBP]; 
     int total = 0; 
 
     for (int i = 0; i < 8; i++) 
     {
+        // (file is open) & (rook-style piece on that file)
         total += ((Files[i] & pawns) == 0) * ((Files[i] & rAttackers) != 0); 
     }
 
     return total * OpenFile; 
 }
 
+/**
+ * Get king safety bonuses 
+ * 
+ * @param g The game 
+ * @param col Color to evaluate
+ * @return King safety bonuses 
+ */
 static inline int EvalAttackUnits(const Game* g, Color col) 
 {
-    Square ksq = Lsb(g->Pieces[MakePc(PC_K, col)]); 
-    BBoard region = BB[ksq] | MovesK[ksq]; 
-    if (col == COL_W) 
+    Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, col)]); 
+    Bitboard region = Bits[ksq] | MovesK[ksq]; 
+
+    // one extra rank in front of the king 
+    if (col == ColorW) 
     {
         region |= ShiftN(region); 
     }
@@ -296,12 +354,24 @@ static inline int EvalAttackUnits(const Game* g, Color col)
     {
         region |= ShiftS(region); 
     }
+
     int units = GetAttackUnits(g, region, col); 
     if (units > 63) units = 63; 
     return AttackUnitValues[units]; 
 }
 
-static inline void EvalWPStructure(
+/**
+ * Get white pawn structure bonuses. 
+ * 
+ * @param g The game 
+ * @param isolated Number of isolated pawns 
+ * @param backward Number of backward pawns 
+ * @param doubled Number of doubled pawns
+ * @param tripled Number of tripled+ pawns 
+ * @param passed Number of passed pawns 
+ * @param passedEval Passed pawn bonuses (since it depends on pawn rank)
+ */
+static inline void EvalWPawnStructure(
     const Game* g, 
     int* isolated, 
     int* backward, 
@@ -310,9 +380,9 @@ static inline void EvalWPStructure(
     int* passed, 
     int* passedEval) 
 {
-    BBoard pawns, opp; 
-    BBoard wp = g->Pieces[PC_WP]; 
-    BBoard bp = g->Pieces[PC_BP]; 
+    Bitboard pawns, opp; 
+    Bitboard wp = g->Pieces[PieceWP]; 
+    Bitboard bp = g->Pieces[PieceBP]; 
 
     pawns = wp; 
     opp = bp; 
@@ -342,7 +412,7 @@ static inline void EvalWPStructure(
 
     for (int f = 0; f < 8; f++) 
     {
-        int num = Popcnt(pawns & Files[f]); 
+        int num = PopCount(pawns & Files[f]); 
         if (num >= 3) 
         {
             (*tripled)++; 
@@ -354,7 +424,18 @@ static inline void EvalWPStructure(
     }
 }
 
-static inline void EvalBPStructure(
+/**
+ * Get black pawn structure bonuses. 
+ * 
+ * @param g The game 
+ * @param isolated Number of isolated pawns 
+ * @param backward Number of backward pawns 
+ * @param doubled Number of doubled pawns
+ * @param tripled Number of tripled+ pawns 
+ * @param passed Number of passed pawns 
+ * @param passedEval Passed pawn bonuses (since it depends on pawn rank)
+ */
+static inline void EvalBPawnStructure(
     const Game* g, 
     int* isolated, 
     int* backward, 
@@ -363,9 +444,9 @@ static inline void EvalBPStructure(
     int* passed, 
     int* passedEval) 
 {
-    BBoard pawns, opp; 
-    BBoard wp = g->Pieces[PC_WP]; 
-    BBoard bp = g->Pieces[PC_BP]; 
+    Bitboard pawns, opp; 
+    Bitboard wp = g->Pieces[PieceWP]; 
+    Bitboard bp = g->Pieces[PieceBP]; 
 
     pawns = bp; 
     opp = wp; 
@@ -395,7 +476,7 @@ static inline void EvalBPStructure(
 
     for (int f = 0; f < 8; f++) 
     {
-        int num = Popcnt(pawns & Files[f]); 
+        int num = PopCount(pawns & Files[f]); 
         if (num >= 3) 
         {
             (*tripled)++; 
@@ -428,28 +509,28 @@ int EvaluateVerbose(const Game* g, int ply, int nMoves, bool draw, int contempt,
         }
     }
 
-    int wp = g->Counts[PC_WP]; 
-    int bp = g->Counts[PC_BP]; 
-    int wn = g->Counts[PC_WN]; 
-    int bn = g->Counts[PC_BN]; 
-    int wb = g->Counts[PC_WB]; 
-    int bb = g->Counts[PC_BB]; 
-    int wr = g->Counts[PC_WR]; 
-    int br = g->Counts[PC_BR]; 
-    int wq = g->Counts[PC_WQ]; 
-    int bq = g->Counts[PC_BQ]; 
-    int wk = g->Counts[PC_WK]; 
-    int bk = g->Counts[PC_BK]; 
+    int wp = g->Counts[PieceWP]; 
+    int bp = g->Counts[PieceBP]; 
+    int wn = g->Counts[PieceWN]; 
+    int bn = g->Counts[PieceBN]; 
+    int wb = g->Counts[PieceWB]; 
+    int bb = g->Counts[PieceBB]; 
+    int wr = g->Counts[PieceWR]; 
+    int br = g->Counts[PieceBR]; 
+    int wq = g->Counts[PieceWQ]; 
+    int bq = g->Counts[PieceBQ]; 
+    int wk = g->Counts[PieceWK]; 
+    int bk = g->Counts[PieceBK]; 
 
     int eval = 0; 
     int mg = 0; 
     int eg = 0; 
 
-    eval += PcTypeValues[PC_P] * (wp - bp); 
-    eval += PcTypeValues[PC_N] * (wn - bn); 
-    eval += PcTypeValues[PC_B] * (wb - bb); 
-    eval += PcTypeValues[PC_R] * (wr - br); 
-    eval += PcTypeValues[PC_Q] * (wq - bq); 
+    eval += PieceTypeValues[PieceP] * (wp - bp); 
+    eval += PieceTypeValues[PieceN] * (wn - bn); 
+    eval += PieceTypeValues[PieceB] * (wb - bb); 
+    eval += PieceTypeValues[PieceR] * (wr - br); 
+    eval += PieceTypeValues[PieceQ] * (wq - bq); 
     eval += 10000 * (wk - bk); 
 
     // bishop pair 
@@ -457,7 +538,7 @@ int EvaluateVerbose(const Game* g, int ply, int nMoves, bool draw, int contempt,
 
     // this is reversed because it is checking how (un)safe that color's king is 
     // and returning a higher value for less safe 
-    eval += EvalAttackUnits(g, COL_B) - EvalAttackUnits(g, COL_W); 
+    eval += EvalAttackUnits(g, ColorB) - EvalAttackUnits(g, ColorW); 
 
     int wpIso = 0; 
     int wpBack = 0; 
@@ -465,7 +546,7 @@ int EvaluateVerbose(const Game* g, int ply, int nMoves, bool draw, int contempt,
     int wpTrip = 0; 
     int wpPass = 0; 
     int wpPassEval = 0; 
-    EvalWPStructure(g, &wpIso, &wpBack, &wpDoub, &wpTrip, &wpPass, &wpPassEval); 
+    EvalWPawnStructure(g, &wpIso, &wpBack, &wpDoub, &wpTrip, &wpPass, &wpPassEval); 
 
     eval += wpPassEval
           + wpIso * PawnStructureValues[0] 
@@ -479,7 +560,7 @@ int EvaluateVerbose(const Game* g, int ply, int nMoves, bool draw, int contempt,
     int bpTrip = 0; 
     int bpPass = 0; 
     int bpPassEval = 0; 
-    EvalBPStructure(g, &bpIso, &bpBack, &bpDoub, &bpTrip, &bpPass, &bpPassEval); 
+    EvalBPawnStructure(g, &bpIso, &bpBack, &bpDoub, &bpTrip, &bpPass, &bpPassEval); 
 
     eval -= bpPassEval
           + bpIso * PawnStructureValues[0] 
@@ -487,25 +568,25 @@ int EvaluateVerbose(const Game* g, int ply, int nMoves, bool draw, int contempt,
           + bpDoub * PawnStructureValues[2] 
           + bpTrip * PawnStructureValues[3]; 
 
-    EvalWPcSq(g, PC_P, &mg, &eg); 
-    EvalBPcSq(g, PC_P, &mg, &eg); 
-    EvalWPcSq(g, PC_N, &mg, &eg); 
-    EvalBPcSq(g, PC_N, &mg, &eg); 
-    EvalWPcSq(g, PC_B, &mg, &eg); 
-    EvalBPcSq(g, PC_B, &mg, &eg); 
-    EvalWPcSq(g, PC_R, &mg, &eg); 
-    EvalBPcSq(g, PC_R, &mg, &eg); 
-    EvalWPcSq(g, PC_Q, &mg, &eg); 
-    EvalBPcSq(g, PC_Q, &mg, &eg); 
-    EvalWPcSq(g, PC_K, &mg, &eg); 
-    EvalBPcSq(g, PC_K, &mg, &eg); 
+    EvalWPieceSquare(g, PieceP, &mg, &eg); 
+    EvalBPieceSquare(g, PieceP, &mg, &eg); 
+    EvalWPieceSquare(g, PieceN, &mg, &eg); 
+    EvalBPieceSquare(g, PieceN, &mg, &eg); 
+    EvalWPieceSquare(g, PieceB, &mg, &eg); 
+    EvalBPieceSquare(g, PieceB, &mg, &eg); 
+    EvalWPieceSquare(g, PieceR, &mg, &eg); 
+    EvalBPieceSquare(g, PieceR, &mg, &eg); 
+    EvalWPieceSquare(g, PieceQ, &mg, &eg); 
+    EvalBPieceSquare(g, PieceQ, &mg, &eg); 
+    EvalWPieceSquare(g, PieceK, &mg, &eg); 
+    EvalBPieceSquare(g, PieceK, &mg, &eg); 
 
-    int cwr = EvalRooks(g, COL_W); 
-    int cbr = EvalRooks(g, COL_B); 
+    int cwr = EvalRooks(g, ColorW); 
+    int cbr = EvalRooks(g, ColorB); 
     eval += cwr - cbr; 
 
-    int wOpen = EvalOpenFiles(g, COL_W); 
-    int bOpen = EvalOpenFiles(g, COL_B); 
+    int wOpen = EvalOpenFiles(g, ColorW); 
+    int bOpen = EvalOpenFiles(g, ColorB); 
     eval += wOpen - bOpen; 
 
     // int p = 0 * (wp - bp);  

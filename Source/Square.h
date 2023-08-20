@@ -10,90 +10,121 @@
 
 #pragma once 
 
-#define A1 0
-#define B1 1
-#define C1 2
-#define D1 3
-#define E1 4
-#define F1 5
-#define G1 6
-#define H1 7
-#define A2 8
-#define B2 9
-#define C2 10
-#define D2 11
-#define E2 12
-#define F2 13
-#define G2 14
-#define H2 15
-#define A3 16
-#define B3 17
-#define C3 18
-#define D3 19
-#define E3 20
-#define F3 21
-#define G3 22
-#define H3 23
-#define A4 24
-#define B4 25
-#define C4 26
-#define D4 27
-#define E4 28
-#define F4 29
-#define G4 30
-#define H4 31
-#define A5 32
-#define B5 33
-#define C5 34
-#define D5 35
-#define E5 36
-#define F5 37
-#define G5 38
-#define H5 39
-#define A6 40
-#define B6 41
-#define C6 42
-#define D6 43
-#define E6 44
-#define F6 45
-#define G6 46
-#define H6 47
-#define A7 48
-#define B7 49
-#define C7 50
-#define D7 51
-#define E7 52
-#define F7 53
-#define G7 54
-#define H7 55
-#define A8 56
-#define B8 57
-#define C8 58
-#define D8 59
-#define E8 60
-#define F8 61
-#define G8 62
-#define H8 63
-#define NUM_SQ 64
-#define NO_SQ NUM_SQ 
+/**
+ * A square on the 8x8 board. 
+ * 
+ * A null square is designated with `NoSquare`.
+ */
+typedef enum Square
+{
+    A1 = 0,
+    B1 = 1,
+    C1 = 2,
+    D1 = 3,
+    E1 = 4,
+    F1 = 5,
+    G1 = 6,
+    H1 = 7,
+    A2 = 8,
+    B2 = 9,
+    C2 = 10,
+    D2 = 11,
+    E2 = 12,
+    F2 = 13,
+    G2 = 14,
+    H2 = 15,
+    A3 = 16,
+    B3 = 17,
+    C3 = 18,
+    D3 = 19,
+    E3 = 20,
+    F3 = 21,
+    G3 = 22,
+    H3 = 23,
+    A4 = 24,
+    B4 = 25,
+    C4 = 26,
+    D4 = 27,
+    E4 = 28,
+    F4 = 29,
+    G4 = 30,
+    H4 = 31,
+    A5 = 32,
+    B5 = 33,
+    C5 = 34,
+    D5 = 35,
+    E5 = 36,
+    F5 = 37,
+    G5 = 38,
+    H5 = 39,
+    A6 = 40,
+    B6 = 41,
+    C6 = 42,
+    D6 = 43,
+    E6 = 44,
+    F6 = 45,
+    G6 = 46,
+    H6 = 47,
+    A7 = 48,
+    B7 = 49,
+    C7 = 50,
+    D7 = 51,
+    E7 = 52,
+    F7 = 53,
+    G7 = 54,
+    H7 = 55,
+    A8 = 56,
+    B8 = 57,
+    C8 = 58,
+    D8 = 59,
+    E8 = 60,
+    F8 = 61,
+    G8 = 62,
+    H8 = 63,
+    NumSquares = 64,
+    NoSquare = NumSquares 
+} Square; 
 
-typedef int Square; 
-
-static inline Square MakeSq(int file, int rank) 
+/**
+ * Creates a square from file and rank.
+ * 
+ * @param file The file
+ * @param rank The rank
+ * @return The square 
+ */
+static inline Square MakeSquare(int file, int rank) 
 {
     return file | rank << 3; 
 }
 
+/**
+ * Get the file of a square.
+ * 
+ * @param sq The square
+ * @return The file 
+ */
 static inline int GetFile(Square sq) 
 {
     return sq & 7; 
 }
 
+/**
+ * Get the rank of a square.
+ * 
+ * @param sq The square
+ * @return The rank 
+ */
 static inline int GetRank(Square sq) 
 {
     return sq >> 3; 
 }
 
+/**
+ * Get the diagonal of a square.
+ * 
+ * @param sq The square
+ * @return The diagonal 
+ */
 static inline int GetDiag(Square sq) 
 {
     static const int Diag[] = 
@@ -110,6 +141,12 @@ static inline int GetDiag(Square sq)
     return Diag[sq]; 
 }
 
+/**
+ * Get the antidiagonal of a square.
+ * 
+ * @param sq The square
+ * @return The antidiagonal 
+ */
 static inline int GetAnti(Square sq) 
 {
     static const int Anti[] = 
@@ -126,12 +163,24 @@ static inline int GetAnti(Square sq)
     return Anti[sq]; 
 }
 
-static inline Square RRank(Square sq) 
+/**
+ * Reverse the rank of a square.
+ * 
+ * @param sq The square
+ * @return The transformed square location 
+ */
+static inline Square FlipRank(Square sq) 
 {
-    return MakeSq(GetFile(sq), 7 - GetRank(sq)); 
+    return MakeSquare(GetFile(sq), 7 - GetRank(sq)); 
 }
 
-static inline const char* StrSq(Square sq) 
+/**
+ * Get the string of a square coordinate.
+ * 
+ * @param sq The square 
+ * @return The coordinate string 
+ */
+static inline const char* SquareString(Square sq) 
 {
     static const char* Str[] = 
     {

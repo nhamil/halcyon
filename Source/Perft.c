@@ -12,7 +12,7 @@
 #include <stdio.h> 
 #include <time.h> 
 
-#include "BBoard.h" 
+#include "Bitboard.h" 
 #include "Castle.h"
 #include "Game.h" 
 #include "Move.h"
@@ -31,7 +31,7 @@ struct PerftData
     const U64 Expected[10]; 
 };
 
-#define MIN_SPEED_TIME 0.1
+#define MinPerftSpeedTime 0.1
 
 struct PerftSpeed 
 {
@@ -72,7 +72,7 @@ bool RunPerft(const char* name, const char* fen, const U64* expected)
         double nps = total / time; 
         printf(", Time: %.2lfms, Speed: %.2lfMnps - %s\n", time * 1000, nps / 1000000, e == total ? "PASS" : "FAIL"); 
 
-        if (time >= MIN_SPEED_TIME) 
+        if (time >= MinPerftSpeedTime) 
         {
             speed.N++; 
             speed.Total += nps; 
@@ -248,7 +248,7 @@ int main(void)
     }
 
     printf("%d / %d passed\n", res, s_Total); 
-    printf("\nSpeed (>%.1fs)\n", MIN_SPEED_TIME); 
+    printf("\nSpeed (>%.1fs)\n", MinPerftSpeedTime); 
     printf("Min: %.2fMnps\n", speed.Slow / 1000000); 
     printf("Max: %.2fMnps\n", speed.Fast / 1000000); 
     printf("Mean: %.2fMnps\n", speed.Total / speed.N / 1000000); 

@@ -19,50 +19,92 @@
 #include "Square.h"
 #include "Types.h" 
 
-#define ZB_SEED 0xF72B927A3EED2837ULL
+#define ZobristSeed 0xF72B927A3EED2837ULL
 
 typedef U64 Zobrist; 
 
-extern Zobrist SqPcHash[NUM_SQ][NUM_PC + 1]; 
-extern Zobrist CastleHash[CASTLE_ALL + 1]; 
-extern Zobrist EPHash[8 + 1]; 
-extern Zobrist ColHash; 
+extern Zobrist SquarePieceHashValues[NumSquares][NumPieces + 1]; 
+extern Zobrist CastleHashValues[CastleAll + 1]; 
+extern Zobrist EnPassantHashValues[8 + 1]; 
+extern Zobrist ColorHashValue; 
 
-void InitZb(void); 
+/**
+ * Must be called once before using hashing. 
+ */
+void InitHash(void); 
 
-static inline Zobrist SqPcZb(Square sq, Piece pc) 
+/**
+ * @param sq Square a piece is moving to or from
+ * @param pc The piece 
+ * @return Hash to XOR with
+ */
+static inline Zobrist HashSquarePiece(Square sq, Piece pc) 
 {
-    return SqPcHash[sq][pc]; 
+    return SquarePieceHashValues[sq][pc]; 
 }
 
-static inline Zobrist CastleZb(CastleFlags cf) 
+/**
+ * @param cf Castle flags 
+ * @return Hash to XOR with
+ */
+static inline Zobrist HashCastleFlags(CastleFlags cf) 
 {
-    return CastleHash[cf]; 
+    return CastleHashValues[cf]; 
 } 
 
-static inline Zobrist EPZb(Square sq) 
+/**
+ * @param sq En passant square (can be `NoSquare`)
+ * @return Hash to XOR with
+ */
+static inline Zobrist HashEnPassant(Square sq) 
 {
-    return (sq != NO_SQ) * EPHash[GetFile(sq)]; 
+    return (sq != NoSquare) * EnPassantHashValues[GetFile(sq)]; 
 }
 
-static inline Zobrist ColZb(void) 
+/**
+ * @return Hash to XOR with
+ */
+static inline Zobrist HashColor(void) 
 {
-    return ColHash; 
+    return ColorHashValue; 
 } 
 
-static void PrintZb(Zobrist hash) 
+/**
+ * Print hash to stdout. 
+ * 
+ * @param hash The hash 
+ */
+static void PrintHash(Zobrist hash) 
 {
     printf("%016" PRIx64 "\n", hash); 
 }
 
-static void PrintZbEnd(Zobrist hash, const char* end) 
+/**
+ * Print hash to stdout without newline. 
+ * 
+ * @param hash The hash 
+ * @param end Text to write after
+ */
+static void PrintHashEnd(Zobrist hash, const char* end) 
 {
     printf("%016" PRIx64 "%s", hash, end); 
 }
 
-static void FilePrintZbEnd(Zobrist hash, const char* end, FILE* out) 
+/**
+ * Write hash to a file without newline. 
+ * 
+ * @param hash The hash 
+ * @param end Text to write after 
+ * @param out The file
+ */
+static void FilePrintHashEnd(Zobrist hash, const char* end, FILE* out) 
 {
     fprintf(out, "%016" PRIx64 "%s", hash, end); 
 }
 
-void FindPrintZb(Zobrist hash); 
+/**
+ * Attempt to find what causes a hash and print it to stdout. 
+ * 
+ * @param hash The hash 
+ */
+void FindPrintHash(Zobrist hash); 

@@ -18,41 +18,68 @@
 #include <string.h>
 #include <time.h> 
 
-#define CHECK_TIME 100000
+/**
+ * How often we should check for being out of time. 
+ */
+#define CheckTimeThreshold 100000
 
-typedef struct SearchData SearchData; 
-
-static const int PcValues[] = 
+/**
+ * Simplified piece values for move ordering. 
+ * This should not be used for static evaluation. 
+ */
+static const int PieceValues[] = 
 {
     100, 310, 320, 500, 900, 10000, 0
 };
 
+/**
+ * Should we ignore out of time? 
+ */
 static bool NoHandleTime = false; 
 
-static inline bool OutOfTime(const SearchCtx* ctx) 
+/**
+ * Checks if search should stop due to time. 
+ * 
+ * @param ctx Search context 
+ * @return True if out of time
+ */
+static inline bool IsOutOfTime(const SearchContext* ctx) 
 {
     // need at least depth 1
-    return ctx->PV.NumMoves && (ctx->ShouldExit || (ctx->TgtTime >= 0 && clock() > ctx->EndAt)); 
+    return ctx->BestLine.NumMoves && (ctx->ShouldExit || (ctx->TargetTimeMs >= 0 && clock() > ctx->EndAt)); 
 }
 
-static inline clock_t NSecFromNow(int num) 
+/**
+ * @param num Number of seconds 
+ * @return What the time will be `num` seconds from now 
+ */
+static inline clock_t NSecondsFromNow(int num) 
 {
     return clock() + num * CLOCKS_PER_SEC; 
 }
 
-static inline bool HandleOutOfTime(SearchCtx* ctx) 
+/**
+ * Quit the search if the alloted time has run out. 
+ * 
+ * If search is out of time, the current best move will be printed and the thread will exit. 
+ * 
+ * @param ctx Search context 
+ * @return True if out of time and thread is exiting
+ */
+static inline bool HandleOutOfTime(SearchContext* ctx) 
 {
-    if (ctx->CheckTime++ < CHECK_TIME || NoHandleTime) return false; 
+    // only check every so often to reduce affect on search speed 
+    if (ctx->CheckTime++ < CheckTimeThreshold || NoHandleTime) return false; 
 
     ctx->CheckTime = 0; 
 
     // check for time limit
-    if (OutOfTime(ctx)) 
+    if (IsOutOfTime(ctx)) 
     {
-        if (ctx->PV.NumMoves) 
+        if (ctx->BestLine.NumMoves) 
         {
             printf("bestmove "); 
-            PrintMoveEnd(ctx->PV.Moves[0], "\n"); 
+            PrintMoveEnd(ctx->BestLine.Moves[0], "\n"); 
             fflush(stdout); 
         }
         else 
@@ -66,45 +93,69 @@ static inline bool HandleOutOfTime(SearchCtx* ctx)
         return true; 
     }
 
+    // if next depth is taking too long send occasional updates 
     clock_t curTime = clock(); 
-    if (curTime >= ctx->NextMsgAt) 
+    if (curTime >= ctx->NextMessageAt) 
     {
-        U64 nodes = ctx->Board->Nodes; 
+        U64 nodes = ctx->State->Nodes; 
         double dur = (double) (curTime - ctx->StartAt) / CLOCKS_PER_SEC; 
         double nps = nodes / dur; 
-        printf("info depth %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %" PRIu64 "\n", ctx->Depth+1, dur*1000, nodes, nps, 1000*ctx->TT.Used/ctx->TT.Size);
+        printf("info depth %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %" PRIu64 "\n", ctx->Depth+1, dur*1000, nodes, nps, 1000*ctx->Transpositions.Used/ctx->Transpositions.Size);
         fflush(stdout); 
-        ctx->NextMsgAt = NSecFromNow(1); 
+        ctx->NextMessageAt = NSecondsFromNow(1); 
     }
 
     return false; 
 }
 
-// assumes the move is a capture 
-static inline int Mvvlva(SearchCtx* ctx, Move mv) 
+/**
+ * Gets MVV-LVA value for move ordering. 
+ * 
+ * Moves are assumed to be captures, don't call this function if they are not. 
+ * 
+ * @param ctx Search context
+ * @param mv The move
+ * @return MVV-LVA value
+ */
+static inline int MvvLva(SearchContext* ctx, Move mv) 
 {
-    Piece pcType = GetNoCol(FromPc(mv)); 
-    return 10 * (PcValues[GetNoCol(PcAt(ctx->Board, ToSq(mv)))] - PcValues[pcType]); 
+    (void) ctx; 
+    PieceType pcType = TypeOfPiece(FromPiece(mv)); 
+    PieceType tgtType = TypeOfPiece(TargetPiece(mv));
+    return 10 * (PieceValues[tgtType] - PieceValues[pcType]); 
 }
 
-static inline int QMoveVal(SearchCtx* ctx, Move mv, Move hashMove) 
+/**
+ * Move ordering values for qsearch. 
+ * 
+ * @param ctx Search context 
+ * @param mv The move
+ * @param hashMove TT move for the board position
+ * @return Move value where higher values should come first 
+ */
+static inline int QMoveVal(SearchContext* ctx, Move mv, Move hashMove) 
 {
+    // push quiet moves to the end
     if (IsQuiet(mv)) return -1000000; 
 
+    // try hash move first 
     if (mv == hashMove) return 999999998; 
 
     int val = 0; 
 
+    // order captures by MVV-LVA 
     if (IsCapture(mv)) 
     {
-        val += Mvvlva(ctx, mv); 
+        val += MvvLva(ctx, mv); 
     }
 
-    if (IsPro(mv)) 
+    // promotions 
+    if (IsPromotion(mv)) 
     {
-        val += 10 * PcValues[GetNoCol(ProPc(mv))]; 
+        val += 10 * PieceValues[TypeOfPiece(PromotionPiece(mv))]; 
     }
 
+    // bonus for checks 
     if (IsCheck(mv)) 
     {
         val += 1000; 
@@ -113,19 +164,27 @@ static inline int QMoveVal(SearchCtx* ctx, Move mv, Move hashMove)
     return val; 
 }
 
-static inline int MoveVal(SearchCtx* ctx, Move mv, Move hashMove) 
+/**
+ * Move ordering values for negamax search. 
+ * 
+ * @param ctx Search context 
+ * @param mv The move
+ * @param hashMove TT move for the board position
+ * @return Move value where higher values should come first 
+ */
+static inline int MoveVal(SearchContext* ctx, Move mv, Move hashMove) 
 {
-    Game* g = ctx->Board; 
-    Piece pcType = GetNoCol(FromPc(mv)); 
+    Game* g = ctx->State; 
+    PieceType pcType = TypeOfPiece(FromPiece(mv)); 
 
     int add = IsCheck(mv) * 1000000; 
 
     // previous pv has highest priority 
     // first move is ply 1, not ply 0
     // so check <= instead of <
-    if (ctx->InPV && ctx->Ply <= (S64) ctx->PV.NumMoves) 
+    if (ctx->InPV && ctx->Ply <= (S64) ctx->BestLine.NumMoves) 
     {
-        if (mv == ctx->PV.Moves[ctx->Ply - 1]) return 999999999 + add;  
+        if (mv == ctx->BestLine.Moves[ctx->Ply - 1]) return 999999999 + add;  
     }
 
     if (mv == hashMove) return 999999998; 
@@ -133,7 +192,7 @@ static inline int MoveVal(SearchCtx* ctx, Move mv, Move hashMove)
     // capture
     if (IsCapture(mv)) 
     {
-        return 100000 + Mvvlva(ctx, mv) + add; 
+        return 100000 + MvvLva(ctx, mv) + add; 
     }
 
     bool q = IsQuiet(mv); 
@@ -150,7 +209,7 @@ static inline int MoveVal(SearchCtx* ctx, Move mv, Move hashMove)
         }
 
         // history heuristic 
-        int hist = ctx->History[g->Turn][pcType][ToSq(mv)]; 
+        int hist = ctx->History[g->Turn][pcType][ToSquare(mv)]; 
         if (hist > 0) 
         {
             return hist + add; 
@@ -158,25 +217,35 @@ static inline int MoveVal(SearchCtx* ctx, Move mv, Move hashMove)
     }
     
     // promotion
-    if (IsPro(mv)) 
+    if (IsPromotion(mv)) 
     {
-        return PcValues[GetNoCol(ProPc(mv))] + add; 
+        return PieceValues[TypeOfPiece(PromotionPiece(mv))] + add; 
     }
 
     // default 
-    if (g->Turn == COL_B) 
+    if (g->Turn == ColorB) 
     {
-        return -100000 + PcSq[0][pcType][ToSq(mv)] - PcSq[0][pcType][FromSq(mv)] + add; 
+        return -100000 + PieceSquare[0][pcType][ToSquare(mv)] - PieceSquare[0][pcType][FromSquare(mv)] + add; 
     }
-    else // COL_W
+    else // ColorW
     {
-        return -100000 + PcSq[0][pcType][RRank(ToSq(mv))] - PcSq[0][pcType][RRank(FromSq(mv))] + add; 
+        return -100000 + PieceSquare[0][pcType][FlipRank(ToSquare(mv))] - PieceSquare[0][pcType][FlipRank(FromSquare(mv))] + add; 
     }
 }
 
-static inline void GetMoveOrder(SearchCtx* ctx, U64 start, Move hashMove, int (*moveVal)(SearchCtx*,Move,Move), int* values) 
+/**
+ * Compute move order values for all moves. 
+ * This does not sort moves. 
+ * 
+ * @param ctx Search context 
+ * @param start Start index 
+ * @param hashMove TT move 
+ * @param moveVal Function for determining move order value 
+ * @param values Output for move values
+ */
+static inline void GetMoveOrder(SearchContext* ctx, U64 start, Move hashMove, int (*moveVal)(SearchContext*,Move,Move), int* values) 
 {
-    MvList* moves = ctx->Moves; 
+    MoveList* moves = ctx->Moves; 
 
     for (U64 i = start; i < moves->Size; i++) 
     {
@@ -184,9 +253,18 @@ static inline void GetMoveOrder(SearchCtx* ctx, U64 start, Move hashMove, int (*
     }
 }
 
-static inline Move NextMove(SearchCtx* ctx, U64 start, int* values) 
+/**
+ * Finds the next move with the highest move order value. 
+ * Move values should already be computed with `GetMoveOrder`. 
+ * 
+ * @param ctx Search context 
+ * @param start Start index 
+ * @param values Input/output for move values 
+ * @return 
+ */
+static inline Move NextMove(SearchContext* ctx, U64 start, int* values) 
 {
-    MvList* moves = ctx->Moves; 
+    MoveList* moves = ctx->Moves; 
 
     // swap current index with highest priority move 
     U64 bestI = start; 
@@ -203,7 +281,7 @@ static inline Move NextMove(SearchCtx* ctx, U64 start, int* values)
     }
 
     // put best move in first place and return it 
-    SwapMvList(moves, start, bestI); 
+    SwapMoves(moves, start, bestI); 
 
     // swap move value too 
     values[bestI - start] = values[0]; 
@@ -212,28 +290,38 @@ static inline Move NextMove(SearchCtx* ctx, U64 start, int* values)
     return moves->Moves[start]; 
 }
 
-static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth) 
+/**
+ * Continues search to make positions quiet and then returns board evaluation. 
+ * 
+ * @param ctx Search context 
+ * @param alpha Lower bound score 
+ * @param beta Upper bound score 
+ * @param depth Remaining depth to search 
+ * @return Quiescence search evaluation
+ */
+static inline int QSearch(SearchContext* ctx, int alpha, int beta, int depth) 
 {
-    Game* g = ctx->Board; 
-    MvList* moves = ctx->Moves; 
+    Game* g = ctx->State; 
+    MoveList* moves = ctx->Moves; 
     U64 start = moves->Size; 
 
     ctx->NumQNodes++; 
 
     HandleOutOfTime(ctx); 
 
+    // no further moves are possible 
     bool draw = IsSpecialDraw(g); 
-    if (draw) return -ctx->ColContempt * ColSign(g->Turn); 
+    if (draw) return -ctx->ColorContempt * ColorSign(g->Turn); 
 
     GenMoves(g, moves); 
     U64 numMoves = moves->Size - start; 
 
-    int standPat = ColSign(g->Turn) * Evaluate(g, ctx->Ply, numMoves, draw, -ctx->ColContempt); 
+    int standPat = ColorSign(g->Turn) * Evaluate(g, ctx->Ply, numMoves, draw, -ctx->ColorContempt); 
 
     // check for beta cutoff
     if (standPat >= beta) 
     {
-        PopMvList(moves, start); 
+        PopMovesToSize(moves, start); 
         return beta; 
     }
     
@@ -247,14 +335,15 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
     if (depth <= 0) 
     {
         ctx->NumQLeaves++; 
-        PopMvList(moves, start); 
+        PopMovesToSize(moves, start); 
         return alpha; 
     }
 
-    TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, g); 
-    Move hashMove = entry ? entry->Mv : NO_MOVE; 
+    // check if position has a TT move 
+    TTableEntry* entry = FindTTableEntry(&ctx->Transpositions, g->Hash, g); 
+    Move hashMove = entry ? entry->Mv : NoMove; 
 
-    // search active moves 
+    // search tactical moves 
     bool foundMove = false; 
     if (!draw) 
     {
@@ -268,7 +357,7 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
             bool shouldSearch = IsTactical(mv); 
             if (!shouldSearch) continue; 
 
-            // there is 1+ active moves, so not a leaf node 
+            // there are 1+ tactical moves, so not a leaf node 
             foundMove = true; 
 
             // search move 
@@ -280,7 +369,7 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
             if (score >= beta) 
             {
                 ctx->Ply--; 
-                PopMvList(moves, start); 
+                PopMovesToSize(moves, start); 
                 return beta; 
             }
 
@@ -294,11 +383,18 @@ static inline int QSearch(SearchCtx* ctx, int alpha, int beta, int depth)
     }
     if (!foundMove) ctx->NumQLeaves++; 
 
-    PopMvList(moves, start); 
+    PopMovesToSize(moves, start); 
     return alpha; 
 }
 
-static inline void UpdatePV(SearchCtx* ctx, Move mv, int offset) 
+/**
+ * Adds a new move to the current principal variation. 
+ * 
+ * @param ctx Search context 
+ * @param mv Move to add 
+ * @param offset Offset from current ply 
+ */
+static inline void UpdatePV(SearchContext* ctx, Move mv, int offset) 
 {
     PVLine* dst = ctx->Lines + ctx->Ply + offset; 
     PVLine* src = ctx->Lines + ctx->Ply + 1 + offset; 
@@ -308,11 +404,22 @@ static inline void UpdatePV(SearchCtx* ctx, Move mv, int offset)
     dst->NumMoves = src->NumMoves + 1; 
 }
 
-static inline void ClearPV(SearchCtx* ctx, int offset) 
+/**
+ * Clears the principal variation. 
+ * 
+ * @param ctx Search context 
+ * @param offset Offset from current ply 
+ */
+static inline void ClearPV(SearchContext* ctx, int offset) 
 {
     ctx->Lines[ctx->Ply + offset].NumMoves = 0; 
 }
 
+/**
+ * Handles ordered move looping in negamax. 
+ * 
+ * @param onMove Actions to perform for each move
+ */
 #define NEGAMAX_LOOP_MOVES(onMove) \
     /* search moves if there is remaining depth */ \
     /* must reset: */ \
@@ -320,8 +427,8 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
     /* - InPV */ \
 \
     ctx->Ply++; \
-    Move bestMove = NO_MOVE; \
-    int score = -EVAL_MAX; \
+    Move bestMove = NoMove; \
+    int score = -MaxScore; \
     bool foundPV = false; \
     bool nodeInPV = ctx->InPV; \
     int moveValues[moves->Size - start]; \
@@ -333,7 +440,7 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
         onMove; \
 \
         bool capture = IsCapture(mv); \
-        bool pro = IsPro(mv); \
+        bool pro = IsPromotion(mv); \
         bool check = g->InCheck; \
 \
         /* search position after applying move */ \
@@ -392,7 +499,7 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
                 }\
 \
                 /* history heuristic */ \
-                ctx->History[g->Turn][GetNoCol(FromPc(mv))][ToSq(mv)] = depth * depth; \
+                ctx->History[g->Turn][TypeOfPiece(FromPiece(mv))][ToSquare(mv)] = depth * depth; \
             }\
 \
             alpha = beta; \
@@ -415,7 +522,17 @@ static inline void ClearPV(SearchCtx* ctx, int offset)
     ctx->Ply--; \
     ctx->InPV = nodeInPV; 
 
-static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth) 
+/**
+ * Negamax for non-root nodes. 
+ * Call `Negamax` instead. 
+ * 
+ * @param ctx Search context
+ * @param alpha Lower bound
+ * @param beta Upper bound 
+ * @param depth Remaining depth 
+ * @return Evaluation
+ */
+static inline int Negamax_(SearchContext* ctx, int alpha, int beta, int depth) 
 {
     // init node 
     ClearPV(ctx, 0); 
@@ -424,8 +541,8 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
     // break out if search should end 
     HandleOutOfTime(ctx); 
 
-    Game* g = ctx->Board; 
-    MvList* moves = ctx->Moves; 
+    Game* g = ctx->State; 
+    MoveList* moves = ctx->Moves; 
     U64 start = moves->Size; 
 
     int alphaOrig = alpha; 
@@ -434,7 +551,7 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
     bool draw = IsSpecialDraw(g); 
     if (draw) 
     {
-        return -ctx->ColContempt * ColSign(g->Turn); 
+        return -ctx->ColorContempt * ColorSign(g->Turn); 
     }
 
     // collect all moves from current position 
@@ -449,28 +566,28 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
         ClearPV(ctx, 0); 
         ctx->NumLeaves++; 
 
-        PopMvList(moves, start); 
+        PopMovesToSize(moves, start); 
         return QSearch(ctx, alpha, beta, 16); 
     }
 
-    TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, g); 
-    Move hashMove = entry ? entry->Mv : NO_MOVE; 
+    TTableEntry* entry = FindTTableEntry(&ctx->Transpositions, g->Hash, g); 
+    Move hashMove = entry ? entry->Mv : NoMove; 
 
     if (!ctx->InPV) 
     {
         if (entry && entry->Depth >= depth) 
         {
-            if (entry->Type == PV_NODE) 
+            if (entry->Type == PVNode) 
             {
-                PopMvList(moves, start); 
+                PopMovesToSize(moves, start); 
                 return entry->Score; 
             }
-            else if (entry->Type == FAIL_HIGH) 
+            else if (entry->Type == FailHigh) 
             {
                 // alpha = max(entry, alpha)
                 if (entry->Score > alpha) alpha = entry->Score; 
             }
-            else if (entry->Type == FAIL_LOW) 
+            else if (entry->Type == FailLow) 
             {
                 // beta = min(entry, beta) 
                 if (entry->Score < beta) beta = entry->Score; 
@@ -478,7 +595,7 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
 
             if (alpha >= beta) 
             {
-                PopMvList(moves, start); 
+                PopMovesToSize(moves, start); 
                 return beta; 
             }
         }
@@ -491,7 +608,7 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
         // - depth is too shallow 
         // - in check 
         // - either side has only pawns 
-        if (depth >= 1 + R && !g->InCheck && !AnySideKP(g)) 
+        if (depth >= 1 + R && !g->InCheck && !EitherSideKP(g)) 
         {
             ctx->Ply++; 
             ctx->NullMove = false; 
@@ -509,7 +626,7 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
                 ctx->Ply--; 
 
                 ClearPV(ctx, 0); 
-                PopMvList(moves, start); 
+                PopMovesToSize(moves, start); 
                 return beta; 
             }
 
@@ -521,24 +638,33 @@ static inline int Negamax_(SearchCtx* ctx, int alpha, int beta, int depth)
 
     NEGAMAX_LOOP_MOVES(); 
 
-    int ttType = PV_NODE; 
+    int ttType = PVNode; 
     if (alpha <= alphaOrig) 
     {
-        ttType = FAIL_LOW; 
+        ttType = FailLow; 
     }
     else if (alpha >= beta) 
     {
-        ttType = FAIL_HIGH; 
+        ttType = FailHigh; 
     }
 
-    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, bestMove, g); 
+    UpdateTTable(&ctx->Transpositions, g->Hash, ttType, alpha, depth, bestMove, g); 
 
-    PopMvList(moves, start); 
+    PopMovesToSize(moves, start); 
 
     return alpha; 
 }
 
-static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth) 
+/**
+ * Negamax for root nodes. 
+ * 
+ * @param ctx Search context
+ * @param alpha Lower bound
+ * @param beta Upper bound 
+ * @param depth Remaining depth 
+ * @return Evaluation
+ */
+static inline int Negamax(SearchContext* ctx, int alpha, int beta, int depth) 
 {
     // reset data on root node 
     ctx->NumNodes = 0; 
@@ -558,8 +684,8 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
     // break out if search should end 
     HandleOutOfTime(ctx); 
 
-    Game* g = ctx->Board; 
-    MvList* moves = ctx->Moves; 
+    Game* g = ctx->State; 
+    MoveList* moves = ctx->Moves; 
     U64 start = moves->Size; 
 
     int alphaOrig = alpha; 
@@ -576,12 +702,12 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
         ClearPV(ctx, 0); 
         ctx->NumLeaves++; 
 
-        PopMvList(moves, start); 
+        PopMovesToSize(moves, start); 
         return QSearch(ctx, alpha, beta, 16); 
     }
 
-    TTableEntry* entry = FindTTableEntry(&ctx->TT, g->Hash, g); 
-    Move hashMove = entry ? entry->Mv : NO_MOVE; 
+    TTableEntry* entry = FindTTableEntry(&ctx->Transpositions, g->Hash, g); 
+    Move hashMove = entry ? entry->Mv : NoMove; 
 
     clock_t curTime = clock(); 
     bool printCurMove = curTime >= ctx->CurMoveAt; 
@@ -596,35 +722,44 @@ static inline int Negamax(SearchCtx* ctx, int alpha, int beta, int depth)
         }
     );
 
-    int ttType = PV_NODE; 
+    int ttType = PVNode; 
     if (alpha <= alphaOrig) 
     {
-        ttType = FAIL_LOW; 
+        ttType = FailLow; 
     }
     else if (alpha >= beta) 
     {
-        ttType = FAIL_HIGH; 
+        ttType = FailHigh; 
     }
+    UpdateTTable(&ctx->Transpositions, g->Hash, ttType, alpha, depth, bestMove, g); 
 
-    UpdateTTable(&ctx->TT, g->Hash, ttType, alpha, depth, bestMove, g); 
-
-    PopMvList(moves, start); 
-
+    PopMovesToSize(moves, start); 
     return alpha; 
 }
 
-static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t start, clock_t end, int depth, int eval, const PVLine* line) 
+/**
+ * Updates the best principal variation and prints info to stdout. 
+ * 
+ * @param ctx Search context 
+ * @param searchStart Start time of search
+ * @param start Start of current depth's search
+ * @param end When did current depth's search end 
+ * @param depth Current search depth target 
+ * @param eval Negamax evaluation
+ * @param line Best PV for current search
+ */
+static inline void UpdateSearch(SearchContext* ctx, clock_t searchStart, clock_t start, clock_t end, int depth, int eval, const PVLine* line) 
 {
     (void) start; 
 
-    U64 nodes = ctx->Board->Nodes;// ctx->NumLeaves; 
+    U64 nodes = ctx->State->Nodes;
 
     float startDuration = (end - searchStart); 
     if (startDuration <= 0) startDuration = 1; 
     float nps = nodes / (startDuration / CLOCKS_PER_SEC); 
     startDuration /= CLOCKS_PER_SEC * 0.001; 
 
-    ctx->PV = *line; 
+    ctx->BestLine = *line; 
     ctx->Nodes = nodes; 
     ctx->Nps = (U64) nps; 
     ctx->Depth = depth; 
@@ -633,55 +768,64 @@ static inline void UpdateSearch(SearchCtx* ctx, clock_t searchStart, clock_t sta
     if (IsMateScore(eval)) 
     {
         int matePly = 100000 - abs(eval); 
-        int plies = matePly;// - ctx->Board->Ply + 1; 
+        int plies = matePly;
         printf("info depth %d seldepth %" PRIu64 " multipv 1 score mate %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
             depth, 
-            ctx->PV.NumMoves, 
+            ctx->BestLine.NumMoves, 
             (eval > 0 ? 1 : -1) * (plies/2), 
             startDuration, 
             nodes, 
             nps, 
-            1000.0f * ctx->TT.Used / ctx->TT.Size); 
+            1000.0f * ctx->Transpositions.Used / ctx->Transpositions.Size); 
     }
     else 
     {
         printf("info depth %d seldepth %" PRIu64 " multipv 1 score cp %d time %.0f nodes %" PRIu64 " nps %.0f hashfull %.0f pv ", 
             depth, 
-            ctx->PV.NumMoves, 
+            ctx->BestLine.NumMoves, 
             eval, 
             startDuration, 
             nodes, 
             nps, 
-            1000.0f * ctx->TT.Used / ctx->TT.Size); 
+            1000.0f * ctx->Transpositions.Used / ctx->Transpositions.Size); 
     }
-    for (U64 i = 0; i < ctx->PV.NumMoves; i++) 
+    // print PV for mate and normal eval 
+    for (U64 i = 0; i < ctx->BestLine.NumMoves; i++) 
     {
-        PrintMoveEnd(ctx->PV.Moves[i], " "); 
+        PrintMoveEnd(ctx->BestLine.Moves[i], " "); 
     }
     printf("\n"); 
     fflush(stdout); 
 }
 
-void RunSearch(SearchCtx* ctx) 
+/**
+ * Performs the search using iterative deepening and aspiration windows. 
+ * 
+ * @param ctx Search context 
+ */
+void RunSearch(SearchContext* ctx) 
 {
     clock_t start, end, searchStart = clock(); 
 
-    int tgtDepth = ctx->TgtDepth; 
+    int tgtDepth = ctx->TargetDepth; 
     if (tgtDepth < 0) tgtDepth = INT_MAX; 
-    if (tgtDepth > MAX_DEPTH) tgtDepth = MAX_DEPTH; 
+    if (tgtDepth > MaxDepth) tgtDepth = MaxDepth; 
 
+    // there is no last eval for depth 1
     start = clock(); 
-    int eval = Negamax(ctx, -EVAL_MAX, EVAL_MAX, 1); 
+    int eval = Negamax(ctx, -MaxScore, MaxScore, 1); 
     end = clock(); 
     UpdateSearch(ctx, searchStart, start, end, 1, eval, &ctx->Lines[0]); 
 
+    // iterative deepening
     for (int depth = 2; depth <= tgtDepth; depth++) 
     {
-        ClearMvList(ctx->Moves); 
+        ClearMoves(ctx->Moves); 
         int last = eval; 
 
-        int a[] = { last - 30, last - 130, last - 530, -EVAL_MAX }; 
-        int b[] = { last + 30, last + 130, last + 530, EVAL_MAX }; 
+        // aspiration windows 
+        int a[] = { last - 30, last - 130, last - 530, -MaxScore }; 
+        int b[] = { last + 30, last + 130, last + 530,  MaxScore }; 
         int ai = 0; 
         int bi = 0; 
 
@@ -715,44 +859,50 @@ void RunSearch(SearchCtx* ctx)
     fflush(stdout); 
 }
 
+/**
+ * Entry point for search thread. 
+ * 
+ * @param data Pointer to the search context 
+ * @return Null
+ */
 static void* StartPThreadSearch(void* data) 
 {
-    SearchCtx* ctx = data; 
+    SearchContext* ctx = data; 
     RunSearch(ctx); 
 
     return NULL; 
 }
 
-void CreateSearchCtx(SearchCtx* ctx) 
+void CreateSearchContext(SearchContext* ctx) 
 {
-    memset(ctx, 0, sizeof(SearchCtx)); 
+    memset(ctx, 0, sizeof(SearchContext)); 
 
     // board should always be initialized
-    ctx->Board = NewGame(); 
-    ctx->Moves = NewMvList(); 
+    ctx->State = NewGame(); 
+    ctx->Moves = NewMoveList(); 
     ctx->Contempt = 0; 
-    CreateTTable(&ctx->TT, 1); 
+    CreateTTable(&ctx->Transpositions, 1); 
 
     pthread_mutex_init(&ctx->Lock, NULL); 
 } 
 
-void DestroySearchCtx(SearchCtx* ctx) 
+void DestroySearchContext(SearchContext* ctx) 
 {
-    StopSearchCtx(ctx); 
-    FreeGame(ctx->Board); 
-    FreeMvList(ctx->Moves); 
-    DestroyTTable(&ctx->TT); 
+    StopSearchContext(ctx); 
+    FreeGame(ctx->State); 
+    FreeMoveList(ctx->Moves); 
+    DestroyTTable(&ctx->Transpositions); 
     pthread_mutex_destroy(&ctx->Lock); 
 }
 
-void StopSearchCtx(SearchCtx* ctx) 
+void StopSearchContext(SearchContext* ctx) 
 {
     if (ctx->Running) 
     {
         ctx->ShouldExit = true; 
         pthread_join(ctx->Thread, NULL); 
 
-        ClearMvList(ctx->Moves); 
+        ClearMoves(ctx->Moves); 
         // ResetTTable(&ctx->TT); 
         ctx->Running = false; 
     }
@@ -761,7 +911,7 @@ void StopSearchCtx(SearchCtx* ctx)
     fflush(stdout); 
 }
 
-void WaitSearchCtx(SearchCtx* ctx) 
+void WaitForSearchContext(SearchContext* ctx) 
 {
     if (ctx->Running) 
     {
@@ -769,47 +919,51 @@ void WaitSearchCtx(SearchCtx* ctx)
     }
 }
 
-void Search(SearchCtx* ctx, SearchParams* params) 
+void Search(SearchContext* ctx, SearchParams* params) 
 {
-    StopSearchCtx(ctx); 
+    StopSearchContext(ctx); 
 
-    ctx->PV.NumMoves = 0; 
+    // prepare for search 
+
+    ctx->BestLine.NumMoves = 0; 
     ctx->Nodes = 0; 
     ctx->Nps = 0; 
     ctx->Depth = 0; 
     ctx->Eval = 0; 
     ctx->Running = true; 
     ctx->StartAt = clock(); 
-    ctx->CurMoveAt = NSecFromNow(2); 
-    ctx->NextMsgAt = NSecFromNow(1); 
+    ctx->CurMoveAt = NSecondsFromNow(2); 
+    ctx->NextMessageAt = NSecondsFromNow(1); 
 
-    ClearMvList(ctx->Moves); 
+    ClearMoves(ctx->Moves); 
     ctx->Ply = 0; 
-    for (int i = 0; i < MAX_DEPTH; i++) 
+    for (int i = 0; i < MaxDepth; i++) 
     {
         ctx->Lines[i].NumMoves = 0; 
     }
 
-    ctx->TgtDepth = params->Depth; 
-    ctx->TgtTime = params->TimeMs; 
+    ctx->TargetDepth = params->Depth; 
+    ctx->TargetTimeMs = params->TimeMs; 
     ctx->ShouldExit = false; 
-    if (ctx->TgtTime >= 0) 
+    if (ctx->TargetTimeMs >= 0) 
     {
-        ctx->EndAt = clock() + ctx->TgtTime * CLOCKS_PER_SEC / 1000; 
+        ctx->EndAt = clock() + ctx->TargetTimeMs * CLOCKS_PER_SEC / 1000; 
     }
 
-    CopyGame(ctx->Board, params->Board); 
-    NoDepth(ctx->Board); 
+    // assign the current board state to the search context 
+    CopyGame(ctx->State, params->Board); 
+    ClearDepth(ctx->State); 
 
-    ctx->StartCol = ctx->Board->Turn; 
-    ctx->ColContempt = ColSign(ctx->StartCol) * ctx->Contempt; 
+    ctx->StartColor = ctx->State->Turn; 
+    ctx->ColorContempt = ColorSign(ctx->StartColor) * ctx->Contempt; 
 
+    // run search on another thread 
     pthread_create(&ctx->Thread, NULL, StartPThreadSearch, ctx); 
 }
 
-int BasicQSearch(SearchCtx* ctx) 
+int BasicQSearch(SearchContext* ctx) 
 {
-    ctx->PV.NumMoves = 0; 
+    ctx->BestLine.NumMoves = 0; 
     NoHandleTime = true; 
-    return QSearch(ctx, -EVAL_MAX, EVAL_MAX, 16); 
+    return QSearch(ctx, -MaxScore, MaxScore, 16); 
 } 

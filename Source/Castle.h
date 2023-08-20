@@ -10,20 +10,30 @@
 
 #pragma once 
 
-#define CASTLE_WK 1 
-#define CASTLE_WQ 2 
-#define CASTLE_W 3 
+/**
+ * Represents castling types that are currently available.
+ */
+typedef enum CastleFlags
+{
+    CastleWK = 1, 
+    CastleWQ = 2, 
+    CastleW = 3, 
 
-#define CASTLE_BK 4 
-#define CASTLE_BQ 8 
-#define CASTLE_B 12 
+    CastleBK = 4, 
+    CastleBQ = 8, 
+    CastleB = 12, 
 
-#define CASTLE_ALL 15 
-#define CASTLE_NONE 0 
+    CastleAll = 15, 
+    CastleNone = 0 
+} CastleFlags;
 
-typedef int CastleFlags; 
-
-static const char* StrCastle(CastleFlags cf) 
+/**
+ * Returns FEN-style string describing castling availability. 
+ * 
+ * @param cf Castle flags
+ * @return Castle availability string
+ */
+static const char* CastleString(CastleFlags cf) 
 {
     static const char* Str[] = 
     {

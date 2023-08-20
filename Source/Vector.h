@@ -14,12 +14,56 @@
 #include <stdlib.h> 
 #include <string.h> 
 
-#define CREATE_VEC(v, type) CreateVec(v, sizeof(type))
-#define PUSH_VEC(v, type, value) do { type vecTmpValue = (value); PushVec(v, &vecTmpValue); } while (0)
-#define INSERT_VEC(v, type, index, value) do { type vecTmpValue = (value); InsertVec(v, index, &vecTmpValue); } while (0)
-#define AT_VEC(v, type, index) (*(type*) AtVec(v, index)) 
-#define AT_VEC_CONST(v, type, index) (*(const type*) AtVecConst(v, index))
+/**
+ * Creates a vector wit the specified element type. 
+ * 
+ * @param v The vector 
+ * @param type Element data type 
+ */
+#define CreateVectorType(v, type) CreateVector(v, sizeof(type))
 
+/**
+ * Pushes one element onto the end of the vector. 
+ * 
+ * @param v The vector
+ * @param type Element data type
+ * @param value Data to set the element to (not a pointer) 
+ */
+#define PushElemType(v, type, value) do { type vecTmpValue = (value); PushElem(v, &vecTmpValue); } while (0)
+
+/**
+ * Inserts an element at the specified index. 
+ * 
+ * @param v The vector 
+ * @param type Element data type
+ * @param index Array index 
+ * @param value Data to set the element to (not a pointer) 
+ */
+#define InsertElemType(v, type, index, value) do { type vecTmpValue = (value); InsertElem(v, index, &vecTmpValue); } while (0)
+
+/**
+ * Gets a pointer to the `index`th element. 
+ * 
+ * @param v The vector 
+ * @param type Element data type 
+ * @param index Array index 
+ * @return Pointer to element
+ */
+#define ElemAtType(v, type, index) (*(type*) ElemAt(v, index)) 
+
+/**
+ * Gets a const pointer to the `index`th element. 
+ * 
+ * @param v The vector 
+ * @param type Element data type 
+ * @param index Array index 
+ * @return Const pointer to element
+ */
+#define ConstElemAtType(v, type, index) (*(const type*) ConstElemAt(v, index))
+
+/**
+ * Dynamic array for generic data types. 
+ */
 typedef struct Vector Vector; 
 
 struct Vector 
@@ -30,7 +74,13 @@ struct Vector
     char* Data; 
 };
 
-static inline void CreateVec(Vector* v, U64 elemSize) 
+/**
+ * Initializes a vector with an element size of `elemSize`
+ * 
+ * @param v The vector 
+ * @param elemSize Element size in bytes 
+ */
+static inline void CreateVector(Vector* v, U64 elemSize) 
 {
     v->Size = 0; 
     v->Capacity = 16; 
@@ -38,7 +88,13 @@ static inline void CreateVec(Vector* v, U64 elemSize)
     v->Data = malloc(v->Capacity * elemSize); 
 }
 
-static inline void CreateVecCopy(Vector* v, const Vector* src) 
+/**
+ * Initializes a vector to be a copy of another. 
+ * 
+ * @param v The vector 
+ * @param src The vector to make a copy of 
+ */
+static inline void CreateVectorCopy(Vector* v, const Vector* src) 
 {
     v->Size = src->Size; 
     v->Capacity = src->Capacity; 
@@ -47,7 +103,13 @@ static inline void CreateVecCopy(Vector* v, const Vector* src)
     memcpy(v->Data, src->Data, v->Size * v->ElemSize); 
 }
 
-static inline void CopyVec(Vector* v, const Vector* src) 
+/**
+ * Makes an (already initialized) vector a copy of another. 
+ * 
+ * @param v The vector 
+ * @param src The vector to make a copy of 
+ */
+static inline void CopyVector(Vector* v, const Vector* src) 
 {
     v->Size = src->Size; 
     v->Capacity = src->Capacity; 
@@ -56,12 +118,23 @@ static inline void CopyVec(Vector* v, const Vector* src)
     memcpy(v->Data, src->Data, v->Size * v->ElemSize); 
 }
 
-static inline void DestroyVec(Vector* v) 
+/**
+ * Frees vector memory. This does not perform any deinitialization of elements. 
+ * 
+ * @param v The vector 
+ */
+static inline void DestroyVector(Vector* v) 
 {
     free(v->Data); 
 }
 
-static inline void ReserveVec(Vector* v, U64 cap) 
+/**
+ * Reserves space. 
+ * 
+ * @param v The vector 
+ * @param cap Element capacity 
+ */
+static inline void ReserveElems(Vector* v, U64 cap) 
 {
     U64 newCap = v->Capacity; 
     while (newCap < cap) 
@@ -75,79 +148,163 @@ static inline void ReserveVec(Vector* v, U64 cap)
     }
 }
 
-static inline const void* AtVecConst(const Vector* v, U64 index) 
+/**
+ * Gets a const pointer to the `index`th element. 
+ * 
+ * @param v The vector 
+ * @param index Array index 
+ * @return Const pointer to element
+ */
+static inline const void* ConstElemAt(const Vector* v, U64 index) 
 {
     return &v->Data[v->ElemSize * index]; 
 }
 
-static inline void* AtVec(Vector* v, U64 index) 
+/**
+ * Gets a pointer to the `index`th element. 
+ * 
+ * @param v The vector 
+ * @param index Array index 
+ * @return Pointer to element
+ */
+static inline void* ElemAt(Vector* v, U64 index) 
 {
     return &v->Data[v->ElemSize * index]; 
 }
 
-static inline void PushVec(Vector* v, const void* in) 
+/**
+ * Pushes one element onto the end of the vector. 
+ * 
+ * @param v The vector
+ * @param in Data to set the element to
+ */
+static inline void PushElem(Vector* v, const void* in) 
 {
-    ReserveVec(v, v->Size + 1); 
-    memcpy(AtVec(v, v->Size++), in, v->ElemSize); 
+    ReserveElems(v, v->Size + 1); 
+    memcpy(ElemAt(v, v->Size++), in, v->ElemSize); 
 }
 
-static inline void* PushVecEmpty(Vector* v) 
+/**
+ * Pushes an un initialized element to the end of the vector. 
+ * 
+ * @param v The vector 
+ * @return Pointer to the new element
+ */
+static inline void* PushEmptyElem(Vector* v) 
 {
-    ReserveVec(v, v->Size + 1); 
-    return AtVec(v, v->Size++); 
+    ReserveElems(v, v->Size + 1); 
+    return ElemAt(v, v->Size++); 
 }
 
-static inline void PopVec(Vector* v) 
+/**
+ * Pops one element from the end of the vector. 
+ * 
+ * @param v The vector 
+ */
+static inline void PopElem(Vector* v) 
 {
     v->Size--; 
 }
 
-static inline void PopVecN(Vector* v, U64 n) 
+/**
+ * Pops multiple elements from the end of the vector 
+ * 
+ * @param v The vector 
+ * @param n Number of elements to pop 
+ */
+static inline void PopNElems(Vector* v, U64 n) 
 {
     v->Size -= n; 
 }
 
-static inline void PopVecToSize(Vector* v, U64 newSize) 
+/**
+ * Pops elements from the end of the vector such that the final size is the requested size. 
+ * 
+ * @param v The vector 
+ * @param newSize Target size 
+ */
+static inline void PopElemsToSize(Vector* v, U64 newSize) 
 {
     v->Size = newSize; 
 }
 
-static inline void GetVec(const Vector* v, U64 index, void* out) 
+/**
+ * Copies element data. 
+ * 
+ * @param v The vector 
+ * @param index Array index 
+ * @param out Element data
+ */
+static inline void GetElem(const Vector* v, U64 index, void* out) 
 {
-    memcpy(out, AtVecConst(v, index), v->ElemSize); 
+    memcpy(out, ConstElemAt(v, index), v->ElemSize); 
 }
 
-static inline void SetVec(Vector* v, U64 index, const void* in) 
+/**
+ * Sets the data of an existing element. 
+ * 
+ * @param v The vector 
+ * @param index Array index 
+ * @param in Element data
+ */
+static inline void SetElem(Vector* v, U64 index, const void* in) 
 {
-    memcpy(AtVec(v, index), in, v->ElemSize); 
+    memcpy(ElemAt(v, index), in, v->ElemSize); 
 }
 
-static inline void InsertVec(Vector* v, U64 index, const void* in) 
+/**
+ * Inserts an element at the specified index. 
+ * 
+ * @param v The vector 
+ * @param index Array index 
+ * @param in Element data
+ */
+static inline void InsertElem(Vector* v, U64 index, const void* in) 
 {
-    ReserveVec(v, v->Size + 1); 
-    memmove(AtVec(v, index + 1), AtVec(v, index), v->ElemSize * (v->Size - index)); 
+    ReserveElems(v, v->Size + 1); 
+    memmove(ElemAt(v, index + 1), ElemAt(v, index), v->ElemSize * (v->Size - index)); 
     v->Size++; 
-    SetVec(v, index, in); 
+    SetElem(v, index, in); 
 }
 
-static inline void ClearVec(Vector* v) 
+/**
+ * Removes all elements from the vector. 
+ * 
+ * @param v The vector 
+ */
+static inline void ClearVector(Vector* v) 
 {
     v->Size = 0; 
 }
 
-static inline void SwapVec(Vector* v, U64 a, U64 b) 
+/**
+ * Swaps the indices of two elements. 
+ * 
+ * @param v The vector 
+ * @param a First array index 
+ * @param b Second array index 
+ */
+static inline void SwapElems(Vector* v, U64 a, U64 b) 
 {
     char tmp[v->ElemSize]; 
-    GetVec(v, a, tmp); 
-    GetVec(v, b, AtVec(v, a)); 
-    SetVec(v, b, tmp); 
+    GetElem(v, a, tmp); 
+    GetElem(v, b, ElemAt(v, a)); 
+    SetElem(v, b, tmp); 
 }
 
-static inline bool ContainsVec(const Vector* v, const void* in, U64* idx) 
+/**
+ * Checks if the vector contains the specified element. 
+ * 
+ * @param v The vector 
+ * @param in Element to search for 
+ * @param idx First instance of the element index. Only set if it is found. 
+ * @return True if the element is found, otherwise false. 
+ */
+static inline bool ContainsElem(const Vector* v, const void* in, U64* idx) 
 {
     for (U64 i = 0; i < v->Size; i++) 
     {
-        if (memcmp(in, AtVecConst(v, i), v->ElemSize) == 0) 
+        if (memcmp(in, ConstElemAt(v, i), v->ElemSize) == 0) 
         {
             if (idx) *idx = i; 
             return true; 

@@ -16,31 +16,31 @@
 #include "Move.h" 
 #include "Random.h" 
 
-bool s_IsZbInit = false; 
+bool IsHashInit = false; 
 
-Zobrist SqPcHash[NUM_SQ][NUM_PC + 1]; 
-Zobrist CastleHash[CASTLE_ALL + 1]; 
-Zobrist EPHash[8 + 1]; 
-Zobrist ColHash; 
+Zobrist SquarePieceHashValues[NumSquares][NumPieces + 1]; 
+Zobrist CastleHashValues[CastleAll + 1]; 
+Zobrist EnPassantHashValues[8 + 1]; 
+Zobrist ColorHashValue; 
 
-void InitZb(void) 
+void InitHash(void) 
 {
-    if (s_IsZbInit) return; 
+    if (IsHashInit) return; 
 
     Random r; 
-    InitRandom(&r, ZB_SEED); 
+    InitRandom(&r, ZobristSeed); 
 
-    for (U64 i = 0; i < NUM_SQ; i++) 
+    for (U64 i = 0; i < NumSquares; i++) 
     {
-        for (U64 j = 0; j < NUM_PC; j++) 
+        for (U64 j = 0; j < NumPieces; j++) 
         {
-            SqPcHash[i][j] = NextU64(&r); 
+            SquarePieceHashValues[i][j] = NextU64(&r); 
         }
     }
 
     for (U64 i = 0; i < 8; i++) 
     {
-        EPHash[i] = NextU64(&r); 
+        EnPassantHashValues[i] = NextU64(&r); 
     }
 
     Zobrist castle[4]; 
@@ -49,22 +49,22 @@ void InitZb(void)
         castle[i] = NextU64(&r); 
     }
 
-    for (CastleFlags index = 0; index <= CASTLE_ALL; index++) 
+    for (CastleFlags index = 0; index <= CastleAll; index++) 
     {
         Zobrist hash = 0; 
         for (U64 i = 0; i <= 4; i++) 
         {
             if (index & (1 << i)) hash ^= castle[i]; 
         }
-        CastleHash[index] = hash; 
+        CastleHashValues[index] = hash; 
     }
 
-    ColHash = NextU64(&r); 
+    ColorHashValue = NextU64(&r); 
 
-    s_IsZbInit = true; 
+    IsHashInit = true; 
 }
 
-void FindPrintZb(Zobrist hash) 
+void FindPrintHash(Zobrist hash) 
 {
     if (!hash) 
     {
@@ -72,13 +72,13 @@ void FindPrintZb(Zobrist hash)
         return; 
     }
 
-    for (U64 i = 0; i < NUM_SQ; i++) 
+    for (U64 i = 0; i < NumSquares; i++) 
     {
-        for (U64 j = 0; j < NUM_PC; j++) 
+        for (U64 j = 0; j < NumPieces; j++) 
         {
-            if (hash == SqPcHash[i][j]) 
+            if (hash == SquarePieceHashValues[i][j]) 
             {
-                printf("[%s, %s]\n", StrSq(i), StrPc(j)); 
+                printf("[%s, %s]\n", SquareString(i), PieceString(j)); 
                 return; 
             }
         }
@@ -86,28 +86,28 @@ void FindPrintZb(Zobrist hash)
 
     for (U64 i = 0; i < 8; i++) 
     {
-        if (hash == EPHash[i]) 
+        if (hash == EnPassantHashValues[i]) 
         {
             printf("[ep %d]\n", (int) i); 
             return; 
         }
     }
 
-    for (CastleFlags index = 0; index <= CASTLE_ALL; index++) 
+    for (CastleFlags index = 0; index <= CastleAll; index++) 
     {
-        if (hash == CastleHash[index]) 
+        if (hash == CastleHashValues[index]) 
         {
-            printf("[castle %s]\n", StrCastle(index)); 
+            printf("[castle %s]\n", CastleString(index)); 
             return; 
         }
     }
 
-    if (hash == ColHash) 
+    if (hash == ColorHashValue) 
     {
         printf("[color]\n"); 
         return; 
     }
 
     printf("[unknown "); 
-    PrintZbEnd(hash, "]\n"); 
+    PrintHashEnd(hash, "]\n"); 
 }
