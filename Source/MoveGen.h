@@ -89,7 +89,7 @@ struct MoveInfo
     Bitboard Moves[64]; 
     Piece Pieces[64]; 
     Square From[64]; 
-    int NumPiecess; 
+    int NumPieces; 
     int NumMoves; 
 };
 

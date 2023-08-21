@@ -47,7 +47,7 @@ void FreeMoveList(MoveList* moves)
  */
 static inline void InitMoveInfo(MoveInfo* info) 
 {
-    info->NumPiecess = info->NumMoves = 0; 
+    info->NumPieces = info->NumMoves = 0; 
 }
 
 /**
@@ -61,9 +61,9 @@ static inline void InitMoveInfo(MoveInfo* info)
  */
 static inline void AddMovesToInfo(MoveInfo* info, Piece pc, Square from, Bitboard moves, int nMoves) 
 {
-    info->From[info->NumPiecess] = from; 
-    info->Pieces[info->NumPiecess] = pc; 
-    info->Moves[info->NumPiecess++] = moves; 
+    info->From[info->NumPieces] = from; 
+    info->Pieces[info->NumPieces] = pc; 
+    info->Moves[info->NumPieces++] = moves; 
     info->NumMoves += nMoves; 
 }
 
@@ -646,7 +646,7 @@ static inline void GenBKMoves(const Game* g, Square from, Bitboard to, Square op
     Square oppKSquare = LeastSigBit(oppK); \
     /* pin type array for detecting discovery checks */ \
     const U8* pinIndex = PinIndex[oppKSquare]; \
-    for (int pcId = 0; pcId < info->NumPiecess; pcId++) \
+    for (int pcId = 0; pcId < info->NumPieces; pcId++) \
     {\
         Bitboard to = info->Moves[pcId]; \
         Piece pc = info->Pieces[pcId]; \
