@@ -15,7 +15,7 @@
 #include "Move.h"
 
 /**
- * Used to quickly generate moves without listing them out. 
+ * Used to store moves. 
  */
 typedef struct MoveList MoveList; 
 
