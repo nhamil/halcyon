@@ -265,11 +265,11 @@ int GetNumEvalParams(void)
  */
 static inline void EvalWPieceSquare(const Game* g, PieceType pc, int* mg, int* eg) 
 {
-    Bitboard pcs = FlipRow(g->Pieces[pc]); 
+    Bitboard pcs = g->Pieces[MakePiece(pc, ColorW)]; 
     FOR_EACH_BIT(pcs, 
     {
-        *mg += PieceSquare[0][pc][sq]; 
-        *eg += PieceSquare[1][pc][sq]; 
+        *mg += PieceSquare[0][pc][FlipRank(sq)]; 
+        *eg += PieceSquare[1][pc][FlipRank(sq)]; 
     });
 }
 

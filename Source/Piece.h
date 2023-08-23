@@ -42,18 +42,18 @@ typedef enum PieceType
  */
 typedef enum Piece
 {
-    PieceWP = 0,
-    PieceWN = 1,
-    PieceWB = 2,
-    PieceWR = 3,
-    PieceWQ = 4,
-    PieceWK = 5,
-    PieceBP = 6,
-    PieceBN = 7,
-    PieceBB = 8,
-    PieceBR = 9,
-    PieceBQ = 10,
-    PieceBK = 11,
+    PieceWP = 0 << 1 | ColorW,
+    PieceWN = 1 << 1 | ColorW,
+    PieceWB = 2 << 1 | ColorW,
+    PieceWR = 3 << 1 | ColorW,
+    PieceWQ = 4 << 1 | ColorW,
+    PieceWK = 5 << 1 | ColorW,
+    PieceBP = 0 << 1 | ColorB,
+    PieceBN = 1 << 1 | ColorB,
+    PieceBB = 2 << 1 | ColorB,
+    PieceBR = 3 << 1 | ColorB,
+    PieceBQ = 4 << 1 | ColorB,
+    PieceBK = 5 << 1 | ColorB,
     NumPieces = 12,
     NoPiece = NumPieces
 } Piece; 
@@ -82,7 +82,7 @@ static inline Color OppositeColor(Color c)
  */
 static inline Color ColorOfPiece(Piece p) 
 {
-    return p >= 6; 
+    return (Color) (p & 1); 
 }
 
 /**
@@ -93,7 +93,7 @@ static inline Color ColorOfPiece(Piece p)
  */
 static inline PieceType TypeOfPiece(Piece p) 
 {
-    return (PieceType) (p - (p >= 6) * 6); 
+    return (PieceType) (p >> 1); 
 }
 
 /**
@@ -107,7 +107,7 @@ static inline PieceType TypeOfPiece(Piece p)
  */
 static inline Piece MakePiece(PieceType colorless, Color col) 
 {
-    return (Piece) (colorless + col * 6); 
+    return (Piece) (colorless << 1 | col); 
 }
 
 /**
@@ -119,7 +119,7 @@ static inline Piece MakePiece(PieceType colorless, Color col)
  */
 static inline Piece Recolor(Piece p, Color col) 
 {
-    return MakePiece(TypeOfPiece(p), col); 
+    return (Piece) ((p & 0xE) | col); 
 }
 
 /**
@@ -132,8 +132,12 @@ static inline const char* PieceString(Piece p)
 {
     static const char* Str[] = 
     {
-        "P", "N", "B", "R", "Q", "K", 
-        "p", "n", "b", "r", "q", "k", 
+        "P", "p", 
+        "N", "n", 
+        "B", "b", 
+        "R", "r", 
+        "Q", "q", 
+        "K", "k",
         " ", " ", " ", " "
     };
     return Str[p]; 
@@ -149,8 +153,12 @@ static inline const char* PieceTypeString(Piece p)
 {
     static const char* Str[] = 
     {
-        "p", "n", "b", "r", "q", "k", 
-        "p", "n", "b", "r", "q", "k", 
+        "p", "p", 
+        "n", "n", 
+        "b", "b", 
+        "r", "r", 
+        "q", "q", 
+        "k", "k",
         " ", " ", " ", " "
     };
     return Str[p]; 
