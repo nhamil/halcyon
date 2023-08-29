@@ -964,6 +964,7 @@ void Search(SearchContext* ctx, SearchParams* params)
 int BasicQSearch(SearchContext* ctx) 
 {
     ctx->BestLine.NumMoves = 0; 
+    ctx->Ply = 0; 
     NoHandleTime = true; 
     return QSearch(ctx, -MaxScore, MaxScore, 16); 
 } 

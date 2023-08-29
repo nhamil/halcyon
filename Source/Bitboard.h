@@ -246,7 +246,7 @@ static const Bitboard Bits[65] =
  * @param b Bitboard to flip
  * @return Bitboard with mirrored ranks
  */
-static inline Bitboard FlipRow(Bitboard b) 
+static inline Bitboard FlipRows(Bitboard b) 
 {
     b = (b & 0xFFFF0000FFFF0000ULL) >> 16 | (b & 0x0000FFFF0000FFFFULL) << 16; 
     b = (b & 0xFF00FF00FF00FF00ULL) >>  8 | (b & 0x00FF00FF00FF00FFULL) <<  8; 
@@ -261,7 +261,7 @@ static inline Bitboard FlipRow(Bitboard b)
  */
 static inline Bitboard BSwap(U64 b) 
 {
-    return FlipRow((Bitboard) b); 
+    return FlipRows((Bitboard) b); 
 }
 
 /**
@@ -270,7 +270,7 @@ static inline Bitboard BSwap(U64 b)
  * @param b Bitboard to flip
  * @return Bitboard with mirrored files
  */
-static inline Bitboard FlipColumn(Bitboard b) 
+static inline Bitboard FlipColumns(Bitboard b) 
 {
     b = (b & 0xF0F0F0F0F0F0F0F0ULL) >> 4 | (b & 0x0F0F0F0F0F0F0F0FULL) << 4; 
     b = (b & 0xCCCCCCCCCCCCCCCCULL) >> 2 | (b & 0x3333333333333333ULL) << 2; 
@@ -536,7 +536,7 @@ static inline Bitboard ClearBit(Bitboard b, Square sq)
  */
 static void PrintBits(Bitboard b) 
 {
-    b = FlipRow(b); 
+    b = FlipRows(b); 
     printf("+---------------+\n"); 
     for (int i = 0; i < 64; i++) 
     {
