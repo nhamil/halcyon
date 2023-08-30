@@ -282,11 +282,12 @@ bool IsLegal(const Game* g, Move mv)
         Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, col)]); 
         return !IsAttackedMaskAdd(g, ksq, col, ~(srcBits | rmBits), dstBits); 
     }
-    else 
+    else if (TypeOfPiece(pc) == PieceP)
     {
         Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, col)]); 
         return !IsAttackedMaskAdd(g, ksq, col, ~(srcBits | dstBits), dstBits); 
     }
+    else return true; 
 }
 
 void PushMove(Game* g, Move mv) 

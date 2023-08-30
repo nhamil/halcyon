@@ -12,6 +12,11 @@
 
 #include <stdlib.h> 
 
+/**
+ * Filter out moves ignoring absolute pins. 
+ */
+#define TARGET_SQUARES ( allowed & ( ((GetBit(pinDirs[pinIndex[sq]], sq) == 0) * AllBits) | pinDirs[pinIndex[sq]] ) )
+
 MoveList* NewMoveList(void) 
 {
     MoveList* moves = malloc(sizeof(MoveList)); 
@@ -279,43 +284,43 @@ static inline void GenKMoves(const Game* g, Color turn, Bitboard allowed, MoveLi
     }
 }
 
-static inline void GenNMoves(const Game* g, Color turn, Bitboard allowed, MoveList* moves) 
+static inline void GenNMoves(const Game* g, Color turn, Bitboard allowed, Bitboard* pinDirs, const U8* pinIndex, MoveList* moves) 
 {
     Bitboard to; 
     Piece pc = MakePiece(PieceN, turn); 
 
     FOR_EACH_BIT(g->Pieces[pc], 
     {
-        to = MovesN[sq] & allowed; 
+        to = MovesN[sq] & TARGET_SQUARES; 
         PushBitboardMoves(g, pc, sq, to, moves); 
     });
 }
 
-static inline void GenBMoves(const Game* g, Color turn, Bitboard allowed, MoveList* moves) 
+static inline void GenBMoves(const Game* g, Color turn, Bitboard allowed, Bitboard* pinDirs, const U8* pinIndex, MoveList* moves) 
 {
     Bitboard to; 
     Piece pc = MakePiece(PieceB, turn); 
     
     FOR_EACH_BIT(g->Pieces[pc], 
     {
-        to = BAttacks(sq, g->All) & allowed; 
+        to = BAttacks(sq, g->All) & TARGET_SQUARES; 
         PushBitboardMoves(g, pc, sq, to, moves); 
     });
 }
 
-static inline void GenRMoves(const Game* g, Color turn, Bitboard allowed, MoveList* moves) 
+static inline void GenRMoves(const Game* g, Color turn, Bitboard allowed, Bitboard* pinDirs, const U8* pinIndex, MoveList* moves) 
 {
     Bitboard to; 
     Piece pc = MakePiece(PieceR, turn); 
     
     FOR_EACH_BIT(g->Pieces[pc], 
     {
-        to = RAttacks(sq, g->All) & allowed; 
+        to = RAttacks(sq, g->All) & TARGET_SQUARES; 
         PushBitboardMoves(g, pc, sq, to, moves); 
     });
 }
 
-static inline void GenQMoves(const Game* g, Color turn, Bitboard allowed, MoveList* moves) 
+static inline void GenQMoves(const Game* g, Color turn, Bitboard allowed, Bitboard* pinDirs, const U8* pinIndex, MoveList* moves) 
 {
     Bitboard to; 
     Piece pc = MakePiece(PieceQ, turn); 
@@ -324,7 +329,7 @@ static inline void GenQMoves(const Game* g, Color turn, Bitboard allowed, MoveLi
     {
         to  = RAttacks(sq, g->All); 
         to |= BAttacks(sq, g->All); 
-        to &= allowed; 
+        to &= TARGET_SQUARES; 
         PushBitboardMoves(g, pc, sq, to, moves); 
     });
 }
@@ -333,13 +338,72 @@ void GenMoves(const Game* g, MoveList* moves)
 {
     ClearMoves(moves); 
 
-    Color turn = g->Turn; 
-    Bitboard allowed = ~g->Colors[turn]; 
+    Color col = g->Turn; 
+    Bitboard allowed = ~g->Colors[col]; 
 
-    GenPMoves(g, turn, moves); 
-    GenNMoves(g, turn, allowed, moves); 
-    GenBMoves(g, turn, allowed, moves); 
-    GenRMoves(g, turn, allowed, moves); 
-    GenQMoves(g, turn, allowed, moves); 
-    GenKMoves(g, turn, allowed, moves); 
+    Color opp = OppositeColor(col); 
+    Bitboard oppP = g->Pieces[MakePiece(PieceP, opp)]; 
+    Bitboard oppN = g->Pieces[MakePiece(PieceN, opp)]; 
+    Bitboard oppB = g->Pieces[MakePiece(PieceB, opp)]; 
+    Bitboard oppR = g->Pieces[MakePiece(PieceR, opp)]; 
+    Bitboard oppQ = g->Pieces[MakePiece(PieceQ, opp)]; 
+    Bitboard oppK = g->Pieces[MakePiece(PieceK, opp)]; 
+    Bitboard target = g->Pieces[MakePiece(PieceK, col)]; 
+    Bitboard ksq = LeastSigBit(target); 
+    Bitboard colOcc = g->Colors[col]; 
+    /* relevant opp sliding pieces for each direction */ 
+    Bitboard oppRQ = oppR | oppQ; 
+    Bitboard oppBQ = oppB | oppQ; 
+    /* if the king were a rook, how far could it move */ 
+    Bitboard kRHit  = RAttacks(ksq, g->All); 
+    /* used to remove ally pieces (check for pinned pieces) */ 
+    Bitboard kRNoCol = ~(kRHit & colOcc); 
+    /* check if removing one ally piece reveals an attacker */ 
+    Bitboard kRDHit = RAttacks(ksq, g->All & kRNoCol) & oppRQ; 
+    /* do the above for bishop */ 
+    Bitboard kBHit  = BAttacks(ksq, g->All); 
+    Bitboard kBNoCol = ~(kBHit & colOcc); 
+    Bitboard kBDHit = BAttacks(ksq, g->All & kBNoCol) & oppBQ; 
+    /* sliding piece checkers */ 
+    Bitboard chkSlide = (kRHit & oppRQ) | (kBHit & oppBQ); 
+    /* all checkers (remaining pieces can only be captured or force the king to retreat) */ 
+    Bitboard chk = chkSlide 
+               | (oppK & MovesK[ksq]) 
+               | (oppN & MovesN[ksq]) 
+               | (oppP & AttacksP[col][ksq]); 
+    Bitboard dirs[9] = { 0 }; 
+    const U8* pinIndex = PinIndex[ksq]; 
+    FOR_EACH_BIT(kRDHit | kBDHit, 
+    {
+        dirs[pinIndex[sq]] = SlideTo[ksq][sq]; 
+    });
+
+    if (chk == 0) 
+    {
+        GenPMoves(g, col, moves); 
+        GenNMoves(g, col, allowed, dirs, pinIndex, moves); 
+        GenBMoves(g, col, allowed, dirs, pinIndex, moves); 
+        GenRMoves(g, col, allowed, dirs, pinIndex, moves); 
+        GenQMoves(g, col, allowed, dirs, pinIndex, moves); 
+        GenKMoves(g, col, allowed, moves); 
+    }
+    else 
+    {
+        int nChecks = PopCount(chk); 
+        if (nChecks == 1) 
+        {
+            Square attacker = LeastSigBit(chk); 
+            Bitboard okSquares = allowed & (SlideTo[ksq][attacker] | Bits[attacker]); 
+            GenPMoves(g, col, moves); 
+            GenNMoves(g, col, okSquares, dirs, pinIndex, moves); 
+            GenBMoves(g, col, okSquares, dirs, pinIndex, moves); 
+            GenRMoves(g, col, okSquares, dirs, pinIndex, moves); 
+            GenQMoves(g, col, okSquares, dirs, pinIndex, moves); 
+            GenKMoves(g, col, allowed, moves); 
+        }
+        else 
+        {
+            GenKMoves(g, col, allowed, moves); 
+        }
+    }
 }
