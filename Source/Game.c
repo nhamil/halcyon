@@ -287,7 +287,10 @@ bool IsLegal(const Game* g, Move mv)
         Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, col)]); 
         return !IsAttackedMaskAdd(g, ksq, col, ~(srcBits | dstBits), dstBits); 
     }
-    else return true; 
+    else 
+    {
+        return true; 
+    }
 }
 
 void PushMove(Game* g, Move mv) 
@@ -680,11 +683,19 @@ bool ValidateGame(const Game* g)
 
 static inline U64 PerftInternal(Game* g, int depth) 
 {
-    if (depth <= 0) 
+    if (depth == 1)
     {
-        return 1; 
+        MoveList moves; 
+        GenMoves(g, &moves); 
+        U64 total = 0; 
+
+        for (U64 i = 0; i < moves.Size; i++) 
+        {
+            total += IsLegal(g, moves.Moves[i]); 
+        }
+        return total; 
     }
-    else 
+    else if (depth > 1) 
     {
         MoveList moves; 
         GenMoves(g, &moves); 
@@ -700,6 +711,10 @@ static inline U64 PerftInternal(Game* g, int depth)
             }
         }
         return total; 
+    }
+    else 
+    {
+        return 1; 
     }
 }
 
