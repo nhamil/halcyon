@@ -84,7 +84,6 @@ bool RunPerft(const char* name, const char* fen, const U64* expected)
         {
             printf("FAILURE: Expected %lu, difference of %ld\n", e, (S64) e - (S64) total); 
             ret = 0; 
-            // goto cleanup; 
         }
 
         fflush(stdout); 
@@ -92,7 +91,6 @@ bool RunPerft(const char* name, const char* fen, const U64* expected)
 
     printf("DONE\n\n"); 
 
-cleanup: 
     FreeGame(g); 
     return ret; 
 }

@@ -15,14 +15,9 @@
 #include "Move.h"
 
 /**
- * Used to store moves. 
+ * Used to store moves for a single ply. 
  */
 typedef struct MoveList MoveList; 
-
-/**
- * Stores moves without needing to add them all to a list. 
- */
-typedef struct MoveInfo MoveInfo; 
 
 /**
  * Maximum possible moves a color has in a legal position. 
@@ -31,8 +26,8 @@ typedef struct MoveInfo MoveInfo;
 
 struct MoveList 
 {
-    Move Moves[MaxMovesPerTurn * MaxDepth]; 
-    U64 Size; 
+    Move Moves[MaxMovesPerTurn]; 
+    U8 Size; 
 };
 
 /**
@@ -42,11 +37,22 @@ struct MoveList
  * @param a First index
  * @param b Second index 
  */
-static inline void SwapMoves(MoveList* m, U64 a, U64 b) 
+static inline void SwapMoves(MoveList* m, U8 a, U8 b) 
 {
     Move tmp = m->Moves[a]; 
     m->Moves[a] = m->Moves[b]; 
     m->Moves[b] = tmp; 
+}
+
+/**
+ * Adds one move to a move list. 
+ * 
+ * @param m Move list 
+ * @param mv Move to add 
+ */
+static inline void PushMoveToList(MoveList* m, Move mv) 
+{
+    m->Moves[m->Size++] = mv; 
 }
 
 /**
@@ -71,54 +77,9 @@ static inline void ClearMoves(MoveList* m)
 }
 
 /**
- * Allocates a new move list. 
- * 
- * @return New move list 
- */
-MoveList* NewMoveList(void); 
-
-/**
- * Frees a move list. 
- * 
- * @param moves Move list 
- */
-void FreeMoveList(MoveList* moves); 
-
-struct MoveInfo 
-{
-    Bitboard Moves[64]; 
-    Piece Pieces[64]; 
-    Square From[64]; 
-    int NumPieces; 
-    int NumMoves; 
-};
-
-/**
- * Generate moves without listing them out. 
- * 
- * @param g Game state
- * @param info Info output 
- */
-void GenMoveInfo(const Game* g, MoveInfo* info); 
-
-/**
- * Put move info moves into a list 
- * 
- * @param g Game state 
- * @param info Move info 
- * @param moves List output
- */
-void GenMovesFromInfo(const Game* g, const MoveInfo* info, MoveList* moves); 
-
-/**
  * Generate moves and store them in a list. 
  * 
  * @param g Game state
  * @param moves List output 
  */
-static inline void GenMoves(const Game* g, MoveList* moves) 
-{
-    MoveInfo info; 
-    GenMoveInfo(g, &info); 
-    GenMovesFromInfo(g, &info, moves); 
-}
+void GenMoves(const Game* g, MoveList* moves); 

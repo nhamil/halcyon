@@ -134,9 +134,9 @@ typedef U32 Move;
  * @param check Is check 
  * @return The move
  */
-static inline Move MakeMove(Square from, Square to, Piece pc, Piece tgt, bool check) 
+static inline Move MakeMove(Square from, Square to, Piece pc, Piece tgt) 
 {
-    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) tgt << 20) | ((Move) check << 29); 
+    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) tgt << 20); 
 }
 
 /**
@@ -146,13 +146,12 @@ static inline Move MakeMove(Square from, Square to, Piece pc, Piece tgt, bool ch
  * @param to To square 
  * @param pc Piece to move 
  * @param pro Promotion piece 
- * @param tgt Piece to capture (no NoPiece)
- * @param check Is check 
+ * @param tgt Piece to capture (or NoPiece)
  * @return The move
  */
-static inline Move MakePromotionMove(Square from, Square to, Piece pc, Piece pro, Piece tgt, bool check) 
+static inline Move MakePromotionMove(Square from, Square to, Piece pc, Piece pro, Piece tgt) 
 {
-    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pro << 16) | ((Move) tgt << 20) | ((Move) check << 29); 
+    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pro << 16) | ((Move) tgt << 20); 
 }
 
 /**
@@ -163,12 +162,11 @@ static inline Move MakePromotionMove(Square from, Square to, Piece pc, Piece pro
  * @param pc Piece to move 
  * @param tgt Piece to capture 
  * @param ep Is the move en passant
- * @param check Is check 
  * @return The move
  */
-static inline Move MakeEnPassantMove(Square from, Square to, Piece pc, Piece tgt, bool ep, bool check) 
+static inline Move MakeEnPassantMove(Square from, Square to, Piece pc, Piece tgt, bool ep) 
 {
-    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) tgt << 20) | ((Move) ep << 24) | ((Move) check << 29); 
+    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) tgt << 20) | ((Move) ep << 24); 
 }
 
 /**
@@ -178,12 +176,11 @@ static inline Move MakeEnPassantMove(Square from, Square to, Piece pc, Piece tgt
  * @param to To square 
  * @param pc Piece to move (king)
  * @param idx Type of castle 
- * @param check Is check 
  * @return The move
  */
-static inline Move MakeCastleMove(Square from, Square to, Piece pc, MoveCastleIndex idx, bool check) 
+static inline Move MakeCastleMove(Square from, Square to, Piece pc, MoveCastleIndex idx) 
 {
-    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) NoPiece << 20) | ((Move) idx << 25) | ((Move) check << 29); 
+    return ((Move) from) | ((Move) to << 6) | ((Move) pc << 12) | ((Move) pc << 16) | ((Move) NoPiece << 20) | ((Move) idx << 25); 
 }
 
 /**
@@ -268,15 +265,6 @@ static inline bool IsCapture(Move m)
 }
 
 /**
- * @param m The move 
- * @return Does the move check the enemy king
- */
-static inline bool IsCheck(Move m) 
-{
-    return (bool) ((m >> 29) & 1); 
-}
-
-/**
  * Should the move be considered for quiescence search. 
  * 
  * @param m The move 
@@ -284,7 +272,7 @@ static inline bool IsCheck(Move m)
  */
 static inline bool IsTactical(Move m) 
 {
-    return IsCapture(m) || IsCheck(m) || IsPromotion(m); 
+    return IsCapture(m) || IsPromotion(m); 
 }
 
 /**
@@ -293,7 +281,7 @@ static inline bool IsTactical(Move m)
  */
 static inline bool IsQuiet(Move m) 
 {
-    return !IsCapture(m) && !IsCheck(m) && !IsPromotion(m); 
+    return !IsCapture(m) && !IsPromotion(m); 
 }
 
 /**

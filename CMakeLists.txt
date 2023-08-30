@@ -121,13 +121,13 @@ set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
 set(SOURCES 
-    Source/Eval.c 
+    # Source/Eval.c 
     Source/Fen.c 
     Source/Game.c 
     Source/Magic.c 
     Source/MoveGen.c 
-    Source/Search.c 
-    Source/TTable.c 
+    # Source/Search.c 
+    # Source/TTable.c 
     Source/Tables.c 
     Source/Zobrist.c
 )

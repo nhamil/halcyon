@@ -42,14 +42,12 @@ void ResetGame(Game* g)
     memset(g->Colors, 0, sizeof(g->Colors)); 
     memset(g->Counts, 0, sizeof(g->Counts)); 
     g->All = 0; 
-    g->Movement = 0; 
     g->Hash = 0; 
     g->Castle = 0; 
     g->EnPassant = NoSquare; 
     g->Ply = 0; 
     g->Halfmove = 0; 
     g->Turn = ColorW; 
-    g->InCheck = false; 
     g->Nodes = 0; 
     g->Depth = 0; 
 }
@@ -62,14 +60,12 @@ void CopyGame(Game* g, const Game* from)
     memcpy(g->Colors, from->Colors, sizeof(g->Colors)); 
     memcpy(g->Counts, from->Counts, sizeof(g->Counts)); 
     g->All = from->All; 
-    g->Movement = from->Movement; 
     g->Hash = from->Hash; 
     g->Castle = from->Castle; 
     g->EnPassant = from->EnPassant; 
     g->Ply = from->Ply; 
     g->Halfmove = from->Halfmove; 
     g->Turn = from->Turn; 
-    g->InCheck = from->InCheck; 
     g->Nodes = 0; 
     g->Depth = from->Depth; 
     for (int i = 0; i < g->Depth; i++) 
@@ -92,20 +88,10 @@ bool EqualsTTableGame(const Game* a, const Game* b)
     if (memcmp(a->Colors, b->Colors, sizeof(a->Colors)) != 0) { printf("Not equal: Colors\n"); return false; }
     if (memcmp(a->Counts, b->Counts, sizeof(a->Counts) - sizeof(int)) != 0) { printf("Not equal: Counts\n"); return false; } // ignore the scratch index
     GAME_EQ(All); 
-    GAME_EQ(Movement); 
     GAME_EQ(Hash); 
     GAME_EQ(Castle); 
     GAME_EQ(EnPassant); 
-    // GAME_EQ(Ply); 
-    // GAME_EQ(Halfmove); 
     GAME_EQ(Turn); 
-    GAME_EQ(InCheck); 
-    // GAME_EQ(Nodes); 
-    // GAME_EQ(Depth); 
-    // for (int i = 0; i < a->Depth; i++) 
-    // {
-    //     if (a->Hist[i] != b->Hist[i]) return false; 
-    // }
 
     return true; 
 }
@@ -147,7 +133,6 @@ void FilePrintGame(const Game* g, FILE* out)
     fprintf(out, "Castling: %s\n", CastleString(g->Castle)); 
 
     fprintf(out, "En passant: %s, ", SquareString(g->EnPassant)); 
-    fprintf(out, "In check: %s\n", g->InCheck ? "yes" : "no"); 
 
     fprintf(out, "Special draw: %s, ", IsSpecialDraw(g) ? "yes" : "no");
 
@@ -159,6 +144,151 @@ void PrintGame(const Game* g)
     FilePrintGame(g, stdout); 
 }
 
+/**
+ * Checks if a square is attacked. 
+ * Applies the mask and then adds any extra bits. 
+ * 
+ * @param g The game 
+ * @param sq The square 
+ * @param chkCol Friendly color
+ * @param mask Remove pieces from being considered 
+ * @param add Add blockers to occupants
+ * @return True if the square is attacked, otherwise false
+ */
+static inline bool IsAttackedMaskAdd(const Game* g, Square sq, Color chkCol, Bitboard mask, Bitboard add) 
+{
+    Color col = chkCol; 
+    Color opp = OppositeColor(col); 
+
+    Bitboard occ = (g->All & mask) | add; 
+
+    // b,r,q are not used directly 
+    // applying mask to the aggregate bitboards is 1 fewer "&" 
+
+    Bitboard oppP = g->Pieces[MakePiece(PieceP, opp)] & mask; 
+    Bitboard oppN = g->Pieces[MakePiece(PieceN, opp)] & mask; 
+    Bitboard oppB = g->Pieces[MakePiece(PieceB, opp)]; 
+    Bitboard oppR = g->Pieces[MakePiece(PieceR, opp)]; 
+    Bitboard oppQ = g->Pieces[MakePiece(PieceQ, opp)]; 
+    Bitboard oppK = g->Pieces[MakePiece(PieceK, opp)] & mask; 
+
+    Bitboard oppRQ = (oppR | oppQ) & mask; 
+    Bitboard oppBQ = (oppB | oppQ) & mask; 
+
+    Bitboard chk = (RAttacks(sq, occ) & oppRQ) 
+               | (BAttacks(sq, occ) & oppBQ) 
+               | (oppK & MovesK[sq]) 
+               | (oppN & MovesN[sq]) 
+               | (oppP & AttacksP[col][sq]);     
+
+    return chk != 0; 
+}
+
+/**
+ * Checks if a square is attacked. 
+ * Applies the mask and then adds any extra bits. 
+ * 
+ * @param g The game 
+ * @param sq The square 
+ * @param chkCol Friendly color
+ * @param mask ONLY remove pieces from the aggregate bitboard, 
+ *             those squares can still be included in attackers 
+ * @return True if the square is attacked, otherwise false
+ */
+static inline bool IsAttackedColMask(const Game* g, Square sq, Color chkCol, Bitboard mask) 
+{
+    Color col = chkCol; 
+    Color opp = OppositeColor(col); 
+
+    Bitboard occ = (g->All & mask); 
+
+    // b,r,q are not used directly 
+    // applying mask to the aggregate Bitboards is 1 fewer "&" 
+
+    Bitboard oppP = g->Pieces[MakePiece(PieceP, opp)]; 
+    Bitboard oppN = g->Pieces[MakePiece(PieceN, opp)]; 
+    Bitboard oppB = g->Pieces[MakePiece(PieceB, opp)]; 
+    Bitboard oppR = g->Pieces[MakePiece(PieceR, opp)]; 
+    Bitboard oppQ = g->Pieces[MakePiece(PieceQ, opp)]; 
+    Bitboard oppK = g->Pieces[MakePiece(PieceK, opp)]; 
+
+    Bitboard oppRQ = (oppR | oppQ); 
+    Bitboard oppBQ = (oppB | oppQ); 
+
+    Bitboard chk = (RAttacks(sq, occ) & oppRQ) 
+               | (BAttacks(sq, occ) & oppBQ) 
+               | (oppK & MovesK[sq]) 
+               | (oppN & MovesN[sq]) 
+               | (oppP & AttacksP[col][sq]);     
+
+    return chk != 0; 
+}
+
+bool TryPushMove(Game* g, Move mv) 
+{
+    bool legal = IsLegal(g, mv); 
+    if (legal) PushMove(g, mv); 
+    return legal; 
+}
+
+bool IsLegal(const Game* g, Move mv) 
+{
+    Color col = g->Turn; 
+
+    Piece pc = FromPiece(mv); 
+
+    Square src = FromSquare(mv); 
+    Square dst = ToSquare(mv); 
+
+    Bitboard srcBits = Bits[src]; 
+    Bitboard dstBits = Bits[dst]; 
+
+    bool ep = IsEnPassant(mv); 
+    int casIndex = CastleIndex(mv); 
+
+    if (casIndex != MoveCastleNone) 
+    {
+        switch (casIndex) 
+        {
+            case MoveCastleWK: 
+                return !IsAttackedColMask(g, E1, col, ~srcBits) && 
+                       !IsAttackedColMask(g, F1, col, ~srcBits) && 
+                       !IsAttackedColMask(g, G1, col, ~srcBits); 
+            case MoveCastleWQ: 
+                return !IsAttackedColMask(g, E1, col, ~srcBits) && 
+                       !IsAttackedColMask(g, D1, col, ~srcBits) && 
+                       !IsAttackedColMask(g, C1, col, ~srcBits); 
+            case MoveCastleBK: 
+                return !IsAttackedColMask(g, E8, col, ~srcBits) && 
+                       !IsAttackedColMask(g, F8, col, ~srcBits) && 
+                       !IsAttackedColMask(g, G8, col, ~srcBits); 
+            case MoveCastleBQ: 
+                return !IsAttackedColMask(g, E8, col, ~srcBits) && 
+                       !IsAttackedColMask(g, D8, col, ~srcBits) && 
+                       !IsAttackedColMask(g, C8, col, ~srcBits); 
+            default: 
+                return true; 
+        }
+    }
+    else if (TypeOfPiece(pc) == PieceK) 
+    {
+        return !IsAttackedColMask(g, dst, col, ~srcBits); 
+    }
+    else if (ep) 
+    {
+        Square rm = g->EnPassant + SquareS * ColorSign(col); 
+        Bitboard rmBits = Bits[rm]; 
+
+        Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, col)]); 
+        return !IsAttackedMaskAdd(g, ksq, col, ~(srcBits | rmBits), dstBits); 
+    }
+    else 
+    {
+        Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, col)]); 
+        return !IsAttackedMaskAdd(g, ksq, col, ~(srcBits | dstBits), dstBits); 
+    }
+}
+
 void PushMove(Game* g, Move mv) 
 {
     g->Nodes++; 
@@ -168,12 +298,6 @@ void PushMove(Game* g, Move mv)
     hist->Halfmove = g->Halfmove; 
     hist->EnPassant = g->EnPassant; 
     hist->Castle = g->Castle; 
-    hist->InCheck = g->InCheck; 
-    hist->Hash = g->Hash; 
-
-    // swap color and reset en passant hash
-    g->Hash ^= HashColor(); 
-    g->Hash ^= HashEnPassant(g->EnPassant); 
 
     Color col = g->Turn; 
     Color opp = OppositeColor(col); 
@@ -185,11 +309,28 @@ void PushMove(Game* g, Move mv)
     Square src = FromSquare(mv); 
     Square dst = ToSquare(mv); 
 
+    Bitboard srcBits = Bits[src]; 
+    Bitboard dstBits = Bits[dst]; 
+
     bool ep = IsEnPassant(mv); 
     int casIndex = CastleIndex(mv); 
 
-    Bitboard srcPos = Bits[src]; 
-    Bitboard dstPos = Bits[dst]; 
+    // take piece off the board and place (promoted) piece 
+    ClearPieceAt(&g->Board, src); 
+    SetPieceAt(&g->Board, dst, pro); 
+    g->Colors[col] ^= srcBits ^ dstBits; 
+
+    if (pc == pro) // moving piece  
+    {
+        g->Pieces[pc] ^= srcBits ^ dstBits; 
+    }
+    else // promotion  
+    {
+        g->Pieces[pc] ^= srcBits; 
+        g->Pieces[pro] ^= dstBits; 
+        g->Counts[pc]--; 
+        g->Counts[pro]++; 
+    }
 
     // 50-move rule logic 
     if (IsCapture(mv) || TypeOfPiece(pc) == PieceP) 
@@ -203,112 +344,41 @@ void PushMove(Game* g, Move mv)
 
     if (ep) // en passant 
     {
-        Square rm = g->EnPassant - 8 * ColorSign(g->Turn); 
-        Bitboard rmPos = Bits[rm]; 
+        Square rm = g->EnPassant + SquareS * ColorSign(col); 
+        Bitboard rmBits = Bits[rm]; 
 
-        // move pawn from source to destination
-        // remove enemy piece 
-
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= rmPos; 
-
-        g->Pieces[pc] ^= srcPos ^ dstPos; 
-        g->Pieces[tgt] ^= rmPos; 
-        
-        g->Hash ^= HashSquarePiece(src, pc); 
-        g->Hash ^= HashSquarePiece(dst, pc); 
-        g->Hash ^= HashSquarePiece(rm, tgt); 
-
-        ClearPieceAt(&g->Board, src); 
         ClearPieceAt(&g->Board, rm); 
-        SetPieceAt(&g->Board, dst, pc); 
-
-        // enemy piece has been captured 
+        g->Colors[opp] ^= rmBits; 
+        g->Pieces[tgt] ^= rmBits; 
         g->Counts[tgt]--; 
-
-        // after en passant, a new en passant square is not possible 
-        g->EnPassant = NoSquare; 
     }
-    else if (casIndex) // castling 
+    else if (tgt != NoPiece) // capture 
     {
-        // MoveCastleBits* arrays handle removing king and rook as well as placing them on new squares  
+        // target is already removed from mailbox 
+        g->Colors[opp] ^= dstBits; 
+        g->Pieces[tgt] ^= dstBits; 
+        g->Counts[tgt]--; 
+    }
+    else if (casIndex != MoveCastleNone) // castle
+    {
+        Piece r = MakePiece(PieceR, col); 
 
-        g->Colors[col] ^= MoveCastleBitsAll[casIndex]; 
+        // king is updated but rook still needs to be 
+        g->Colors[col] ^= MoveCastleBitsR[casIndex]; 
+        g->Pieces[r] ^= MoveCastleBitsR[casIndex]; 
 
-        g->Pieces[pc] ^= MoveCastleBitsK[casIndex]; 
-        g->Pieces[MakePiece(PieceR, col)] ^= MoveCastleBitsR[casIndex]; 
-
-        g->Hash ^= HashSquarePiece(MoveCastleSquareK[casIndex][0], MoveCastlePieceK[casIndex]); 
-        g->Hash ^= HashSquarePiece(MoveCastleSquareK[casIndex][1], MoveCastlePieceK[casIndex]); 
-        g->Hash ^= HashSquarePiece(MoveCastleSquareR[casIndex][0], MoveCastlePieceR[casIndex]); 
-        g->Hash ^= HashSquarePiece(MoveCastleSquareR[casIndex][1], MoveCastlePieceR[casIndex]); 
-
-        ClearPieceAt(&g->Board, MoveCastleSquareK[casIndex][0]); 
         ClearPieceAt(&g->Board, MoveCastleSquareR[casIndex][0]); 
-        SetPieceAt(&g->Board, MoveCastleSquareK[casIndex][1], pc); 
-        SetPieceAt(&g->Board, MoveCastleSquareR[casIndex][1], MakePiece(PieceR, col)); 
-
-        // en passant square is not possible after castling 
-        g->EnPassant = NoSquare; 
+        SetPieceAt(&g->Board, MoveCastleSquareR[casIndex][1], r); 
     }
-    else if (pc != pro) // promotion
+    
+    // en passant is possible if a pawn moved two squares 
+    if (TypeOfPiece(pc) == PieceP && abs((int) src - (int) dst) == 2 * SquareN) 
     {
-        // remove old piece 
-        // place promoted piece 
-        // remove captured piece if it exists 
-        // target is scratch index if there is no capture so this is okay 
-
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
-
-        g->Hash ^= HashSquarePiece(src, pc); 
-        g->Hash ^= HashSquarePiece(dst, pro); 
-        g->Hash ^= HashSquarePiece(dst, tgt); 
-
-        g->Pieces[pc] ^= srcPos; 
-        g->Pieces[pro] ^= dstPos; 
-        g->Pieces[tgt] ^= dstPos; 
-        
-        ClearPieceAt(&g->Board, src); 
-        SetPieceAt(&g->Board, dst, pro); 
-
-        g->Counts[tgt]--; 
-        g->Counts[pc]--; 
-        g->Counts[pro]++; 
-
-        // en passant is not possible after promoting a pawn
-        g->EnPassant = NoSquare; 
+        g->EnPassant = ColorSign(col) * SquareN + src; 
     }
-    else // standard move 
+    else 
     {
-        // remove old piece and place it on new square 
-        // remove captured piece if it exists 
-        // target is scratch index if there is no capture so this is okay 
-
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
-
-        g->Hash ^= HashSquarePiece(src, pc); 
-        g->Hash ^= HashSquarePiece(dst, pc); 
-        g->Hash ^= HashSquarePiece(dst, tgt); 
-
-        g->Pieces[pc] ^= srcPos ^ dstPos; 
-        g->Pieces[tgt] ^= dstPos; 
-        
-        ClearPieceAt(&g->Board, src); 
-        SetPieceAt(&g->Board, dst, pc); 
-
-        g->Counts[tgt]--; 
-
-        // en passant is possible if a pawn moved two squares 
-        if (TypeOfPiece(pc) == PieceP && abs((int) src - (int) dst) == 16) 
-        {
-            g->EnPassant = ColorSign(g->Turn) * 8 + src; 
-        }
-        else 
-        {
-            g->EnPassant = NoSquare; 
-        }
+        g->EnPassant = NoSquare; 
     }
 
     // remove castling rights if: 
@@ -319,20 +389,8 @@ void PushMove(Game* g, Move mv)
     // update occupants 
     g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
 
-    // re-apply en passant hash 
-    g->Hash ^= HashEnPassant(g->EnPassant); 
-
-    // apply diff of castle flag hash 
-    g->Hash ^= HashCastleFlags(g->Castle ^ hist->Castle); 
-
-    // for next movement: 
-    //   can move to any square without own pieces 
-    g->Movement = ~g->Colors[opp]; 
     g->Ply++; 
     g->Turn = opp; 
-    g->InCheck = IsCheck(mv); 
-
-    VALIDATE_GAME_MOVE(g, mv, "pushing"); 
 }
 
 void PopMove(Game* g, Move mv) 
@@ -348,9 +406,6 @@ void PopMove(Game* g, Move mv)
     g->Halfmove = hist->Halfmove; 
     g->EnPassant = hist->EnPassant; 
     g->Castle = hist->Castle; 
-    g->InCheck = hist->InCheck; 
-    // no need to recalculate hash 
-    g->Hash = hist->Hash; 
 
     Piece pc = FromPiece(mv); 
     Piece pro = PromotionPiece(mv); 
@@ -359,148 +414,77 @@ void PopMove(Game* g, Move mv)
     Square src = FromSquare(mv); 
     Square dst = ToSquare(mv); 
 
+    Bitboard srcBits = Bits[src]; 
+    Bitboard dstBits = Bits[dst]; 
+
     bool ep = IsEnPassant(mv); 
     int casIndex = CastleIndex(mv); 
 
-    Bitboard srcPos = Bits[src]; 
-    Bitboard dstPos = Bits[dst]; 
+    // take piece off the board and place (promoted) piece 
+    SetPieceAt(&g->Board, src, pc); 
+    SetPieceAt(&g->Board, dst, tgt); 
+    g->Colors[col] ^= srcBits ^ dstBits; 
 
-    if (ep) // en passant 
+    if (pc == pro) // moving piece  
     {
-        // piece did not move to the same square as it captured 
-        Bitboard rmPos = Bits[g->EnPassant - 8 * ColorSign(g->Turn)]; 
-
-        // move pawn from destination to source
-        // add enemy piece 
-
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= rmPos; 
-
-        g->Pieces[pc] ^= srcPos ^ dstPos; 
-        g->Pieces[tgt] ^= rmPos; 
-        
-        SetPieceAt(&g->Board, src, pc); 
-        SetPieceAt(&g->Board, g->EnPassant - 8 * ColorSign(g->Turn), tgt); 
-        ClearPieceAt(&g->Board, dst); 
-
-        // enemy piece is uncaptured 
-        g->Counts[tgt]++; 
+        g->Pieces[pc] ^= srcBits ^ dstBits; 
     }
-    else if (casIndex) // castling 
+    else // promotion  
     {
-        // MoveCastleBits* arrays handle removing king and rook as well as placing them on old squares  
-
-        g->Colors[col] ^= MoveCastleBitsAll[casIndex]; 
-
-        g->Pieces[pc] ^= MoveCastleBitsK[casIndex]; 
-        g->Pieces[MakePiece(PieceR, col)] ^= MoveCastleBitsR[casIndex]; 
-
-        ClearPieceAt(&g->Board, MoveCastleSquareK[casIndex][1]); 
-        ClearPieceAt(&g->Board, MoveCastleSquareR[casIndex][1]); 
-        SetPieceAt(&g->Board, MoveCastleSquareK[casIndex][0], pc); 
-        SetPieceAt(&g->Board, MoveCastleSquareR[casIndex][0], MakePiece(PieceR, col)); 
-    }
-    else if (pc != pro) // promotion 
-    {
-        // add old piece 
-        // remove promoted piece 
-        // add enemy piece if there was a capture  
-        // target is scratch index if there is no capture so this is okay 
-
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
-
-        g->Pieces[pc] ^= srcPos; 
-        g->Pieces[pro] ^= dstPos; 
-        g->Pieces[tgt] ^= dstPos; 
-        
-        SetPieceAt(&g->Board, src, pc); 
-        SetPieceAt(&g->Board, dst, tgt); 
-
-        g->Counts[tgt]++; 
+        g->Pieces[pc] ^= srcBits; 
+        g->Pieces[pro] ^= dstBits; 
         g->Counts[pc]++; 
         g->Counts[pro]--; 
     }
-    else // standard move 
+
+    if (ep) // en passant 
     {
-        // add old piece and remove it from new square 
-        // add captured piece if it exists 
-        // target is scratch index if there is no capture so this is okay 
+        Square rm = g->EnPassant + SquareS * ColorSign(col); 
+        Bitboard rmBits = Bits[rm]; 
 
-        g->Colors[col] ^= srcPos ^ dstPos; 
-        g->Colors[opp] ^= (tgt != NoPiece) * dstPos; 
+        // we assumed the capture wasn't EP, so dest square needs to be fixed
+        SetPieceAt(&g->Board, rm, tgt); 
+        ClearPieceAt(&g->Board, dst); 
 
-        g->Pieces[pc] ^= srcPos ^ dstPos; 
-        g->Pieces[tgt] ^= dstPos; 
-        
-        SetPieceAt(&g->Board, src, pc); 
-        SetPieceAt(&g->Board, dst, tgt); 
-
+        g->Colors[opp] ^= rmBits; 
+        g->Pieces[tgt] ^= rmBits; 
         g->Counts[tgt]++; 
     }
+    else if (tgt != NoPiece) // capture 
+    {
+        // target is already added to mailbox 
+        g->Colors[opp] ^= dstBits; 
+        g->Pieces[tgt] ^= dstBits; 
+        g->Counts[tgt]++; 
+    }
+    else if (casIndex != MoveCastleNone) // castle
+    {
+        Piece r = MakePiece(PieceR, col); 
 
+        // king is updated but rook still needs to be 
+        g->Colors[col] ^= MoveCastleBitsR[casIndex]; 
+        g->Pieces[r] ^= MoveCastleBitsR[casIndex]; 
+
+        ClearPieceAt(&g->Board, MoveCastleSquareR[casIndex][1]); 
+        SetPieceAt(&g->Board, MoveCastleSquareR[casIndex][0], r); 
+    }
+    
     // update occupants 
     g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
-
-    // for previous movement: 
-    //   can move to any square without own pieces 
-    g->Movement = ~g->Colors[col]; 
-
-    VALIDATE_GAME_MOVE(g, mv, "popping"); 
 }
 
 void PushNullMove(Game* g) 
 {
     g->Nodes++; 
 
-    MoveHist* hist = g->Hist + g->Depth++; 
-    hist->Halfmove = g->Halfmove; 
-    hist->EnPassant = g->EnPassant; 
-    hist->Castle = g->Castle; 
-    hist->InCheck = g->InCheck; 
-    hist->Hash = g->Hash; 
-
-    Color col = g->Turn; 
-    Color opp = OppositeColor(col); 
-
-    g->Hash ^= HashColor(); 
-
-    // opponent should not be able to en passant just because we skipped a turn 
-    g->Hash ^= HashEnPassant(g->EnPassant); 
-    g->EnPassant = NoSquare; 
-    g->Hash ^= HashEnPassant(g->EnPassant); 
-
-    // for next movement: 
-    //   can move to any square without own pieces 
-    g->Movement = ~g->Colors[opp]; 
-
-    g->Ply++; 
-    g->Turn = opp; 
-
-    g->InCheck = IsAttacked(g, LeastSigBit(g->Pieces[MakePiece(PieceK, opp)]), opp); 
-
-    VALIDATE_GAME_MOVE(g, 0, "pushing null"); 
+    printf("TODO null move\n"); 
+    exit(1); 
 }
 
 void PopNullMove(Game* g) 
 {
-    Color opp = g->Turn; 
-    Color col = OppositeColor(opp); 
-
-    g->Ply--; 
-    g->Turn = col; 
-
-    MoveHist* hist = g->Hist + --g->Depth; 
-    g->Halfmove = hist->Halfmove; 
-    g->EnPassant = hist->EnPassant; 
-    g->Castle = hist->Castle; 
-    g->InCheck = hist->InCheck; 
-    g->Hash = hist->Hash; 
-
-    g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
-    g->Movement = ~g->Colors[col]; 
-
-    VALIDATE_GAME_MOVE(g, 0, "popping null"); 
+    printf("TODO null move\n"); 
+    exit(1); 
 }
 
 bool IsSpecialDraw(const Game* g) 
@@ -582,18 +566,6 @@ bool ValidateGame(const Game* g)
         if (all != g->All) { printf("info string ERROR piece bitboards don't match accumulated board\n"); valid = false; } 
         if (col[ColorW] != g->Colors[ColorW]) { printf("info string ERROR piece bitboards don't match accumulated white board\n"); valid = false; } 
         if (col[ColorB] != g->Colors[ColorB]) { printf("info string ERROR piece bitboards don't match accumulated black board\n"); valid = false; } 
-    }
-
-    // check 
-    {
-        Square ksq = LeastSigBit(g->Pieces[MakePiece(PieceK, g->Turn)]); 
-        bool actuallyInCheck = IsAttacked(g, ksq, g->Turn); 
-        if (actuallyInCheck ^ g->InCheck) 
-        {
-            printf("info string ERROR check flag is incorrect: %d instead of %d\n", g->InCheck, actuallyInCheck); 
-            printf("info string       king on %s\n", SquareString(ksq)); 
-            valid = false; 
-        }
     }
 
     // pieces 
@@ -705,48 +677,34 @@ bool ValidateGame(const Game* g)
     return valid; 
 }
 
-static inline U64 PerftInternal(Game* g, MoveList* moves, int depth) 
+static inline U64 PerftInternal(Game* g, int depth) 
 {
-    U64 total = 0, start = moves->Size, size; 
-
-    if (depth == 1) 
+    if (depth <= 0) 
     {
-        MoveInfo info; 
-        GenMoveInfo(g, &info); 
-        total += info.NumMoves; 
-    }
-    else if (depth > 1) 
-    {
-        GenMoves(g, moves); 
-        size = moves->Size; 
-
-        // PrintGame(g); 
-
-        for (U64 i = start; i < size; i++) 
-        {
-            Move mv = moves->Moves[i]; 
-            PushMove(g, mv); 
-            total += PerftInternal(g, moves, depth - 1); 
-            PopMove(g, mv); 
-        }
-
-        PopMovesToSize(moves, size); 
+        return 1; 
     }
     else 
     {
-        total = 1; 
-    }
+        MoveList moves; 
+        GenMoves(g, &moves); 
+        U64 total = 0; 
 
-    return total; 
+        for (U64 i = 0; i < moves.Size; i++) 
+        {
+            Move mv = moves.Moves[i]; 
+            if (TryPushMove(g, mv)) 
+            {
+                total += PerftInternal(g, depth - 1); 
+                PopMove(g, mv); 
+            }
+        }
+        return total; 
+    }
 }
 
 U64 Perft(Game* g, int depth) 
 {
-    MoveList* moves = NewMoveList(); 
-
-    U64 total = PerftInternal(g, moves, depth); 
+    U64 total = PerftInternal(g, depth); 
     printf("Depth: %d, Total: %" PRIu64 "", depth, total); 
-
-    FreeMoveList(moves); 
     return total; 
 }

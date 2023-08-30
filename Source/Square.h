@@ -82,7 +82,12 @@ typedef enum Square
     G8 = 62,
     H8 = 63,
     NumSquares = 64,
-    NoSquare = NumSquares 
+    NoSquare = NumSquares, 
+
+    SquareN = 8, 
+    SquareS = -8,
+    SquareE = 1, 
+    SquareW = -1
 } Square; 
 
 /**

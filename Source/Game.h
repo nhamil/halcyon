@@ -68,7 +68,6 @@ struct MoveHist
     int Halfmove; 
     Square EnPassant; 
     CastleFlags Castle; 
-    bool InCheck;
     Zobrist Hash; 
 };
 
@@ -81,7 +80,6 @@ struct Game
     Bitboard Pieces[NumPieces + 1]; // extra bitboard for NoPiece
     Bitboard Colors[NumColors]; 
     Bitboard All; 
-    Bitboard Movement; 
     int Counts[NumPieces + 1]; 
 
     Zobrist Hash; 
@@ -91,7 +89,6 @@ struct Game
     int Ply; 
     int Halfmove; 
     Color Turn; 
-    bool InCheck; 
     int Depth; 
 
     U64 Nodes; 
@@ -157,12 +154,32 @@ void LoadFen(Game* g, const char* fen);
 void ToFen(const Game* g, char* out); 
 
 /**
- * Makes one move. Does not check for legality. 
+ * Checks if a pseudolegal move is legal. 
+ * Note that the move must already be pseudolegal. 
+ * 
+ * @param g The game 
+ * @param m The move 
+ * @return Whether the move is legal
+ */
+bool IsLegal(const Game* g, Move m); 
+
+/**
+ * Makes one move. Does not check for legality.
  * 
  * @param g The game 
  * @param m The move 
  */
 void PushMove(Game* g, Move m); 
+
+/**
+ * Tries to push a psuedolegal move. 
+ * If it is not legal then the move is not pushed. 
+ * 
+ * @param g The game
+ * @param m The move
+ * @return Whether the move was pushed or not
+ */
+bool TryPushMove(Game* g, Move m); 
 
 /**
  * Undoes one move. Does not check for legality or that it is the last move played. 

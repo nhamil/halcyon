@@ -257,9 +257,6 @@ void LoadFen(Game* g, const char* fen)
     }
 
     g->All = g->Colors[ColorW] | g->Colors[ColorB]; 
-    g->Movement = ~g->Colors[g->Turn]; 
-
-    g->InCheck = IsAttacked(g, LeastSigBit(g->Pieces[MakePiece(PieceK, g->Turn)]), g->Turn); 
 
     for (Square sq = A1; sq <= H8; sq++) 
     {
