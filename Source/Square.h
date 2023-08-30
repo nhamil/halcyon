@@ -99,7 +99,7 @@ typedef enum Square
  */
 static inline Square MakeSquare(int file, int rank) 
 {
-    return file | rank << 3; 
+    return (Square) (file | rank << 3); 
 }
 
 /**
@@ -176,7 +176,7 @@ static inline int GetAnti(Square sq)
  */
 static inline Square FlipRank(Square sq) 
 {
-    return MakeSquare(GetFile(sq), 7 - GetRank(sq)); 
+    return (Square) (56 ^ sq); 
 }
 
 /**
