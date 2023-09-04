@@ -83,3 +83,19 @@ static inline void ClearMoves(MoveList* m)
  * @param moves List output 
  */
 void GenMoves(const Game* g, MoveList* moves); 
+
+/**
+ * Generate capture (and promotion) moves and store them in a list. 
+ * 
+ * @param g Game state 
+ * @param moves List output
+ */
+void GenCaptureMoves(const Game* g, MoveList* moves); 
+
+/**
+ * Generate quiet moves and store them in a list. 
+ * 
+ * @param g Game state 
+ * @param moves List output
+ */
+void GenQuietMoves(const Game* g, MoveList* moves); 
